@@ -1,0 +1,8 @@
+/* Dependências baixadas via npm — nada de CDN. Mantém a SPA visualmente
+ * consistente com o restante do site mesmo fora do shell Jinja. */
+@import "bootstrap/dist/css/bootstrap.min.css";
+@import "bootstrap-icons/font/bootstrap-icons.min.css";
+
+body {
+  margin: 0;
+}

@@ -189,11 +189,11 @@
 
 {% block scripts %}
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/choices/choices.min.css') }}">
 
-<script src="https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js"></script>
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/choices/choices.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/d3/d3.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/echarts/echarts.min.js') }}"></script>
 
 <script src="{{ url_for('static', filename='js/echarts_theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/b2b_mobile.js') }}"></script>

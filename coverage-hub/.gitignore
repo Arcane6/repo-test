@@ -3,3 +3,8 @@ node_modules
 package-lock.json
 __pycache__
 
+# Artefatos de build do frontend (gerados por `npm run build` no /frontend) —
+# nunca commitados, sempre regenerados no deploy.
+static/dist
+static/vendor
+
