@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import * as echarts from "echarts/core";
-import { BarChart, LineChart } from "echarts/charts";
+import { BarChart, LineChart, PieChart } from "echarts/charts";
 import {
   GridComponent,
   TooltipComponent,
@@ -10,10 +10,13 @@ import {
 import { CanvasRenderer } from "echarts/renderers";
 import type { EChartsCoreOption } from "echarts/core";
 import type { ChartClickEvent } from "./types";
+import { useThemeStore } from "../theme/useThemeStore";
+import { applyChartTheme } from "../theme/chartTheme";
 
 echarts.use([
   BarChart,
   LineChart,
+  PieChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
@@ -38,6 +41,7 @@ interface ChartProps {
 export function Chart({ option, onClick, height = 360, loading, instanceRef }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
+  const theme = useThemeStore((s) => s.theme);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -60,9 +64,9 @@ export function Chart({ option, onClick, height = 360, loading, instanceRef }: C
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-    chart.setOption(option, true);
+    chart.setOption(applyChartTheme(option, theme), true);
     loading ? chart.showLoading() : chart.hideLoading();
-  }, [option, loading]);
+  }, [option, loading, theme]);
 
   useEffect(() => {
     const chart = chartRef.current;

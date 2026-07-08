@@ -1,9 +1,14 @@
 # Frontend (React + TypeScript + Vite)
 
 Vive dentro do `coverage-hub` — é o mesmo projeto, não um repo separado.
-Nova UI dos dashboards de BI, migrando aos poucos do Flask+Jinja+JS
-vanilla atual. Sem CDN: todas as dependências (React, ECharts, Bootstrap,
-etc.) são baixadas via npm e empacotadas no build.
+Migração completa: **toda a UI é React**. O Flask não renderiza mais
+nenhum HTML — só serve APIs JSON (`/mobile-access/api/*`, `/api/modules`)
+e o bundle estático desta pasta (`static/dist/`, servido pra qualquer
+rota via `send_from_directory`, deixando o roteamento de verdade por
+conta do react-router no cliente).
+
+Sem CDN: todas as dependências (React, ECharts, Bootstrap, react-select,
+ExcelJS...) são baixadas via npm e empacotadas no build.
 
 ## Como rodar
 
@@ -22,31 +27,44 @@ na porta 5000) — suba os dois em paralelo durante o desenvolvimento.
 npm run build
 ```
 
-Isso gera, dentro do `coverage-hub` (um nível acima de `frontend/`):
-- `static/dist/` — o bundle React (JS/CSS com hash), servido pelo Flask
-  como estático.
-- `static/vendor/` — cópia das libs que as páginas Jinja legadas ainda
-  carregam via `<script>` direto (Bootstrap, Choices.js, D3, ECharts),
-  vindas dos mesmos pacotes do `package.json` — sem CDN.
-
-Esses dois diretórios são gerados (não versionados — veja `.gitignore`
-do `coverage-hub`). Rodar `npm run build` faz parte do processo de
-deploy; não precisa de Docker, só de Node instalado onde o build rodar.
+Isso gera `../static/dist/` (bundle React com JS/CSS com hash), servido
+pelo Flask como estático. Esse diretório é gerado (não versionado — veja
+`.gitignore` do `coverage-hub`). Rodar `npm run build` faz parte do
+processo de deploy; não precisa de Docker, só de Node instalado onde o
+build rodar.
 
 ## Arquitetura
 
 ```
 src/
-  api/         client tipado por módulo (ex.: mobileAccess.ts), consome as
-               mesmas rotas JSON que o Flask já expõe hoje
-  store/       estado global de filtros (Zustand) — é o que viabiliza o
+  api/         client tipado por módulo (mobileAccess.ts, summary.ts,
+               modules.ts), consome as rotas JSON do Flask
+  store/       estado global de filtros (Zustand) — viabiliza o
                cross-filtering entre gráficos
+  theme/       tema claro/escuro (Zustand) + paleta aplicada automaticamente
+               a qualquer gráfico ECharts (sem precisar repetir por gráfico)
   charts/      <Chart /> genérico: wrapper único de ciclo de vida do
-               ECharts (init/resize/dispose/click). Gráficos novos só
-               precisam montar um `option`, não reimplementar o resto
-  components/  peças de UI reutilizáveis (KPIs, tabela, filtros...)
+               ECharts (init/resize/dispose/click/tema). Gráficos novos só
+               precisam montar um `option`, não reimplementar o resto.
+               optionBuilders.ts tem os formatos reutilizáveis (barras,
+               donut, pizza, sunburst) usados no Resumo.
+  components/  peças de UI reutilizáveis (KPIs, tabela, filtros, Venn,
+               ChartPanel — card padrão de gráfico com export de
+               imagem/dados —, ChartToolbar, small multiples)
+  layout/      Navbar (menu + módulos habilitados + tema), Footer, Layout
+  pages/       Home (cards de módulo) e o layout de tabs do Acesso Móvel
   dashboards/  composição de components para uma visão completa
+               (Cidades, Resumo com suas 3 raias)
+  utils/       exportação pra Excel (ExcelJS) com formatação de verdade
 ```
+
+### Roteamento
+
+React Router controla toda a navegação:
+- `/` — Home (cards de módulo, vindos de `GET /api/modules`)
+- `/mobile-access` — redireciona pra `/mobile-access/resumo`
+- `/mobile-access/resumo` — aba Resumo (3 raias)
+- `/mobile-access/cidades` — aba Cidades
 
 ### Cross-filtering
 
@@ -57,11 +75,27 @@ elemento de gráfico (ex.: uma barra) chama `toggle(dimensão, valor)` no
 store, que funciona exatamente como selecionar aquele valor no filtro
 manual — é o mesmo mecanismo, só disparado pelo clique no gráfico.
 
+### Exportação (imagem e dados brutos)
+
+Todo gráfico construído com `<ChartPanel/>` ganha, de graça: um botão
+"baixar imagem" (PNG em alta resolução via `getDataURL` do ECharts, fundo
+branco fixo — pronto pra PPTX) e um botão "exportar dados" (a base bruta
+por trás do gráfico, não o resumo visual, em `.xlsx` formatado via
+ExcelJS — cabeçalho em negrito, cor da marca, autofiltro). A aba Cidades
+também tem um botão de "exportar base completa" que junta várias fontes
+num único Excel de múltiplas abas.
+
+### Tema claro/escuro
+
+`useThemeStore` aplica `data-theme`/`data-bs-theme` no `<html>` e persiste
+em `localStorage`. O componente `<Chart/>` genérico já aplica a paleta do
+tema atual a qualquer `option` automaticamente (ver `theme/chartTheme.ts`)
+— nenhum gráfico precisa se preocupar com isso individualmente.
+
 ### Próximos módulos
 
-O piloto atual é a aba **Cidades** do Acesso Móvel
-(`/mobile-access/cidades-react/`, ainda não linkada no menu). Depois de
-validado, o plano é: apontar a tab "Cidades" pra essa versão, remover a
-implementação antiga (`static/js/mobile_access.js` + `_tab_actual.html`),
-e repetir o padrão pra Resumo — hoje o único outro módulo em uso (B2B
-Mobile foi removido; Plano e Consolidado seguem fora do menu).
+Hoje só o Acesso Móvel (Resumo + Cidades) está ativo — é o único módulo
+habilitado em `config/modules.py`. Os demais aparecem na Home como
+"Em breve" (Core, Transporte, Orçamento, Resumo Executivo, Base Única);
+o padrão de arquitetura acima (API tipada + FilterBar por campos +
+ChartPanel/optionBuilders) é o que se repete ao ligar um módulo novo.

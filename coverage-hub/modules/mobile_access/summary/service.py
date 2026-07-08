@@ -22,7 +22,8 @@ from modules.mobile_access.summary.queries import (
     R2_NEW_CITIES_BY_ANF,
     R2_VENDORS_NEW_SITES,
     R2_TOP_PROJECTS,
-    R3_TOTAL_CITIES_BY_REGIONAL
+    R3_TOTAL_CITIES_BY_REGIONAL,
+    YEARS_QUERY,
 )
 
 
@@ -105,6 +106,16 @@ def _vendor_payload(rows):
             "color": VENDOR_COLORS.get(name, "#888888"),
         })
     return result
+
+
+# ---------------------------------------------------------------------------
+# Anos disponíveis (filtro "Ano")
+# ---------------------------------------------------------------------------
+
+def get_years():
+    """Lista de anos distintos disponíveis no TB_ROLLOUT_ACESSO."""
+    result = execute_query(YEARS_QUERY)
+    return [int(r["ano"]) for r in result if r.get("ano") is not None]
 
 
 # ---------------------------------------------------------------------------

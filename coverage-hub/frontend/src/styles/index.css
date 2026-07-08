@@ -3,6 +3,304 @@
 @import "bootstrap/dist/css/bootstrap.min.css";
 @import "bootstrap-icons/font/bootstrap-icons.min.css";
 
+/* =============================================================================
+ * TIM Technical Planning — tema claro/escuro (portado de static/css/app.css)
+ * ============================================================================= */
+
+:root,
+[data-theme="light"] {
+  --tim-bg: #f6f8fa;
+  --tim-card-bg: #ffffff;
+  --tim-card-border: rgba(0, 0, 0, 0.05);
+  --tim-text: #212529;
+  --tim-text-muted: #6c757d;
+  --tim-heading: #212529;
+  --tim-navbar-bg-1: #003399;
+  --tim-navbar-bg-2: #001a66;
+  --tim-footer-bg: #ffffff;
+  --tim-hover-bg: #f1f3f5;
+  --tim-table-stripe: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] {
+  --tim-bg: #0f1419;
+  --tim-card-bg: #1a1f28;
+  --tim-card-border: rgba(255, 255, 255, 0.08);
+  --tim-text: #e6edf3;
+  --tim-text-muted: #8b949e;
+  --tim-heading: #f0f6fc;
+  --tim-navbar-bg-1: #001a66;
+  --tim-navbar-bg-2: #000d33;
+  --tim-footer-bg: #1a1f28;
+  --tim-hover-bg: #262c37;
+  --tim-table-stripe: rgba(255, 255, 255, 0.03);
+}
+
 body {
   margin: 0;
+  background: var(--tim-bg);
+  color: var(--tim-text);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* -----------------------------------------------------------------------------
+ * Navbar
+ * ---------------------------------------------------------------------------*/
+
+.tim-navbar {
+  background: linear-gradient(135deg, var(--tim-navbar-bg-1) 0%, var(--tim-navbar-bg-2) 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.tim-navbar .navbar-brand {
+  letter-spacing: 0.3px;
+}
+
+.tim-navbar .nav-link {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 500;
+  padding: 0.5rem 0.9rem !important;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.tim-navbar .nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+}
+
+.tim-navbar .nav-link.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff !important;
+}
+
+/* -----------------------------------------------------------------------------
+ * Cards
+ * ---------------------------------------------------------------------------*/
+
+.card {
+  background: var(--tim-card-bg);
+  color: var(--tim-text);
+  border-color: var(--tim-card-border);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.card .card-title,
+.card h1,
+.card h2,
+.card h3,
+.card h4,
+.card h5,
+.card h6 {
+  color: var(--tim-heading);
+}
+
+.card .text-muted {
+  color: var(--tim-text-muted) !important;
+}
+
+/* -----------------------------------------------------------------------------
+ * Tabelas
+ * ---------------------------------------------------------------------------*/
+
+.table {
+  color: var(--tim-text);
+}
+
+.table > thead {
+  color: var(--tim-heading);
+}
+
+.table > tbody > tr:hover {
+  background-color: var(--tim-hover-bg);
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+  background-color: var(--tim-table-stripe);
+  color: var(--tim-text);
+}
+
+[data-theme="dark"] .table thead.sticky-top,
+[data-theme="dark"] .table thead.sticky-top tr,
+[data-theme="dark"] .table thead.sticky-top th {
+  background-color: var(--tim-card-bg) !important;
+}
+
+/* -----------------------------------------------------------------------------
+ * Footer
+ * ---------------------------------------------------------------------------*/
+
+.tim-footer {
+  border-top: 1px solid var(--tim-card-border);
+  background: var(--tim-footer-bg);
+  color: var(--tim-text-muted);
+}
+
+.tim-footer .text-muted {
+  color: var(--tim-text-muted) !important;
+}
+
+/* -----------------------------------------------------------------------------
+ * Venn (SVG) — não vira preto no dark
+ * ---------------------------------------------------------------------------*/
+
+.venn-diagram text {
+  pointer-events: none;
+  user-select: none;
+  fill: var(--tim-text);
+}
+
+/* =============================================================================
+ * Home — hero e cards de módulo (portado de static/css/home.css)
+ * ============================================================================= */
+
+.tim-hero {
+  background: linear-gradient(135deg, #003399 0%, #001a66 100%);
+  color: #fff;
+}
+
+.module-card {
+  position: relative;
+  color: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.module-card .card {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.module-card:hover:not(.disabled) {
+  transform: translateY(-4px);
+}
+
+.module-card:hover:not(.disabled) .card {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+.module-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.module-card-top {
+  height: 6px;
+  background: var(--module-color, #003399);
+}
+
+.module-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--module-color, #003399) 12%, transparent);
+  color: var(--module-color, #003399);
+  font-size: 1.6rem;
+}
+
+.module-badge {
+  background: color-mix(in srgb, var(--module-color, #003399) 12%, transparent) !important;
+  color: var(--module-color, #003399) !important;
+  font-weight: 600;
+}
+
+.module-cta {
+  color: var(--module-color, #003399);
+}
+
+/* =============================================================================
+ * Resumo — raias e small multiples (portado de _tab_summary.html)
+ * ============================================================================= */
+
+.raia-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 8px;
+  color: white;
+  font-weight: bold;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+}
+
+.summary-raia {
+  border-left: 4px solid var(--tim-card-border);
+  padding-left: 16px;
+}
+
+.sm-tec-card {
+  border: 1px solid var(--tim-card-border);
+  border-radius: 8px;
+  padding: 8px 6px;
+  text-align: center;
+  background: var(--tim-card-bg);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sm-tec-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sm-tec-title {
+  font-weight: bold;
+  font-size: 0.95rem;
+  color: #003399;
+  letter-spacing: 0.5px;
+}
+
+[data-theme="dark"] .sm-tec-title {
+  color: #7dc242;
+}
+
+.sm-tec-total {
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: var(--tim-heading);
+  margin: 2px 0 6px;
+  line-height: 1;
+}
+
+.sm-tec-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  margin: 3px 0;
+}
+
+.sm-tec-bar-wrap {
+  flex: 1;
+  height: 10px;
+  background: var(--tim-hover-bg);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  display: block;
+}
+
+.sm-tec-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.sm-tec-value {
+  font-weight: bold;
+  color: var(--tim-text);
+  min-width: 40px;
+  text-align: right;
+  font-size: 0.72rem;
+}
+
+.sm-legend-box {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 4px;
 }
