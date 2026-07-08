@@ -155,8 +155,34 @@ body {
  * ============================================================================= */
 
 .tim-hero {
-  background: linear-gradient(135deg, #003399 0%, #001a66 100%);
+  background:
+    radial-gradient(ellipse 900px 500px at 85% -10%, rgba(125, 194, 66, 0.18), transparent 60%),
+    linear-gradient(135deg, #003399 0%, #001a66 100%);
   color: #fff;
+}
+
+.tim-hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 0.6rem;
+}
+
+.tim-module-count {
+  font-size: 0.85rem;
+  color: var(--tim-text-muted);
+  background: var(--tim-hover-bg);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+}
+
+.tim-module-count strong {
+  color: var(--tim-heading);
 }
 
 .module-card {
@@ -230,17 +256,31 @@ body {
 }
 
 .sm-tec-card {
+  display: block;
+  width: 100%;
+  font: inherit;
   border: 1px solid var(--tim-card-border);
   border-radius: 8px;
   padding: 8px 6px;
   text-align: center;
   background: var(--tim-card-bg);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
 }
 
 .sm-tec-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sm-tec-card:focus-visible {
+  outline: 2px solid var(--tim-navbar-bg-1);
+  outline-offset: 2px;
+}
+
+.sm-tec-card--focused {
+  border-color: var(--tim-navbar-bg-1);
+  box-shadow: 0 0 0 1px var(--tim-navbar-bg-1);
 }
 
 .sm-tec-title {
@@ -303,4 +343,55 @@ body {
   border-radius: 2px;
   vertical-align: middle;
   margin-right: 4px;
+}
+
+/* =============================================================================
+ * Skeleton (loading state)
+ * ============================================================================= */
+
+.tim-skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--tim-hover-bg) 30%,
+    var(--tim-card-border) 50%,
+    var(--tim-hover-bg) 70%
+  );
+  background-size: 200% 100%;
+  animation: tim-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tim-skeleton {
+    animation: none;
+  }
+}
+
+@keyframes tim-skeleton-shimmer {
+  0% { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
+}
+
+/* =============================================================================
+ * PageHeader
+ * ============================================================================= */
+
+.tim-page-header h3 {
+  letter-spacing: -0.01em;
+}
+
+.tim-page-header-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tim-navbar-bg-1) 12%, transparent);
+  color: var(--tim-navbar-bg-1);
+  font-size: 1.3rem;
+}
+
+[data-theme="dark"] .tim-page-header-icon {
+  color: #7d9cff;
 }

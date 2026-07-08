@@ -5,9 +5,12 @@ import { ChartPanel } from "../../components/ChartPanel";
 import { SmallMultiplesTech } from "../../components/SmallMultiplesTech";
 import { ChartToolbar } from "../../components/ChartToolbar";
 import { downloadSheet } from "../../utils/excelExport";
+import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia3({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano } = filters;
+  const { tecnologia: focusedTec, regional: focusedRegional, toggleTecnologia, toggleRegional } =
+    useResumoFocusStore();
 
   const { data: sites } = useQuery({
     queryKey: ["summary-r3-sites", uf, municipio, ano],
@@ -72,7 +75,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
                 />
               </div>
 
-              <SmallMultiplesTech data={sites} />
+              <SmallMultiplesTech data={sites} focusedTec={focusedTec} onSelectTec={toggleTecnologia} />
 
               <div className="d-flex justify-content-center gap-2 mt-3 small flex-wrap">
                 <span><i className="sm-legend-box" style={{ background: "#B0BEC5" }} /> Base 25</span>
@@ -86,9 +89,11 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-3">
           <ChartPanel
             title="Cidades 5G por Regional (Projeção EoY)"
+            subtitle="Clique num regional pra destacar na Raia 2"
             height={340}
-            option={citiesAnf ? regionalSunburstOption(citiesAnf) : {}}
+            option={citiesAnf ? regionalSunburstOption(citiesAnf, focusedRegional) : {}}
             loading={loadingCitiesAnf}
+            onClick={(e) => toggleRegional(e.name)}
             imageFilename="r3-cidades-5g-por-regional.png"
             exportSheet={{
               name: "R3 Cidades por Regional",
