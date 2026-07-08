@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { mobileAccessApi, type MunicipioRow } from "../api/mobileAccess";
 import { useFilterStore } from "../store/filters";
 import { ChartToolbar } from "./ChartToolbar";
+import { Skeleton } from "./Skeleton";
 import { downloadSheet } from "../utils/excelExport";
 import { municipiosColumns, municipiosToRows } from "../utils/municipiosColumns";
 
@@ -21,10 +22,11 @@ export function MunicipiosTable() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data: rows = [] } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["actual-table", uf, municipio, tecnologia],
     queryFn: () => mobileAccessApi.table({ uf, municipio, tecnologia }),
   });
+  const rows = data ?? [];
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
@@ -86,17 +88,29 @@ export function MunicipiosTable() {
               </tr>
             </thead>
             <tbody>
-              {pageRows.map((r) => (
-                <tr key={`${r.uf}-${r.municipio}`}>
-                  <td>{r.uf}</td>
-                  <td>{r.municipio}</td>
-                  <td className="text-center"><Badge value={r.presenca} /></td>
-                  <td className="text-center"><Badge value={r.presenca_5g} /></td>
-                  <td className="text-center"><Badge value={r.presenca_4g} /></td>
-                  <td className="text-center"><Badge value={r.presenca_3g} /></td>
-                  <td className="text-center"><Badge value={r.presenca_2g} /></td>
-                </tr>
-              ))}
+              {isLoading
+                ? Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      <td><Skeleton height={12} width="70%" /></td>
+                      <td><Skeleton height={12} width="85%" /></td>
+                      <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
+                      <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
+                      <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
+                      <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
+                      <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
+                    </tr>
+                  ))
+                : pageRows.map((r) => (
+                    <tr key={`${r.uf}-${r.municipio}`}>
+                      <td>{r.uf}</td>
+                      <td>{r.municipio}</td>
+                      <td className="text-center"><Badge value={r.presenca} /></td>
+                      <td className="text-center"><Badge value={r.presenca_5g} /></td>
+                      <td className="text-center"><Badge value={r.presenca_4g} /></td>
+                      <td className="text-center"><Badge value={r.presenca_3g} /></td>
+                      <td className="text-center"><Badge value={r.presenca_2g} /></td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>

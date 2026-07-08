@@ -3,6 +3,7 @@ import type * as echarts from "echarts/core";
 import type { EChartsCoreOption } from "echarts/core";
 import { Chart } from "../charts/Chart";
 import { ChartToolbar } from "./ChartToolbar";
+import { Skeleton } from "./Skeleton";
 import { downloadChartImage } from "../charts/exportImage";
 import { downloadSheet, type SheetSpec } from "../utils/excelExport";
 import type { ChartClickEvent } from "../charts/types";
@@ -37,6 +38,12 @@ export function ChartPanel({
 }: ChartPanelProps) {
   const instanceRef = useRef<echarts.ECharts | null>(null);
 
+  // Sem dado nenhum ainda (primeira carga) — mostra esqueleto no lugar
+  // do canvas em vez de um gráfico vazio piscando. Num refetch (filtro
+  // mudou mas já existe opção anterior), deixa o <Chart/> lidar com o
+  // loading discreto do próprio ECharts, sem trocar de layout.
+  const isFirstLoad = loading && Object.keys(option).length === 0;
+
   return (
     <div className="card shadow-sm h-100">
       <div className="card-body d-flex flex-column">
@@ -56,7 +63,14 @@ export function ChartPanel({
             }
           />
         </div>
-        <Chart option={option} loading={loading} height={height} instanceRef={instanceRef} onClick={onClick} />
+        {isFirstLoad ? (
+          <div style={{ height }} className="d-flex flex-column justify-content-end gap-2 px-2 pb-2">
+            <Skeleton height="65%" radius={4} />
+            <Skeleton height={12} width="40%" />
+          </div>
+        ) : (
+          <Chart option={option} loading={loading} height={height} instanceRef={instanceRef} onClick={onClick} />
+        )}
       </div>
     </div>
   );
