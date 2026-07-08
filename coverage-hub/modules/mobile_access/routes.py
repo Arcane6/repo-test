@@ -29,7 +29,7 @@ mobile_access_bp = Blueprint(
 
 @mobile_access_bp.route("/")
 def index():
-    return redirect("/mobile-access/consolidated/")
+    return redirect("/mobile-access/summary/")
 
 
 @mobile_access_bp.route("/actual/")
