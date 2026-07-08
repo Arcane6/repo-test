@@ -20,7 +20,6 @@ export default defineConfig({
     // rodando em paralelo, evitando CORS e mantendo as mesmas URLs de prod.
     proxy: {
       '/mobile-access/api': 'http://127.0.0.1:5000',
-      '/b2b-mobile/api': 'http://127.0.0.1:5000',
     },
   },
 })

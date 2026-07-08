@@ -53,16 +53,6 @@ MODULES = [
         "color": "#6C757D",
         "enabled": False,
     },
-    
-    {
-    "key": "b2b_mobile",
-    "name": "B2B Mobile",
-    "description": "Rollout dedicado para clientes corporativos (Agro, Logística, Indústria)",
-    "url": "/b2b-mobile/",
-    "icon": "bi-briefcase",
-    "color": "#7B1FA2",
-    "enabled": True,
-    },
 ]
 
 
