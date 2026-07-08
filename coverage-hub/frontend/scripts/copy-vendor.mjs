@@ -8,7 +8,7 @@ import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const vendorDir = path.resolve(root, "../coverage-hub/static/vendor");
+const vendorDir = path.resolve(root, "../static/vendor");
 
 const files = [
   ["bootstrap/dist/css/bootstrap.min.css", "bootstrap/bootstrap.min.css"],

@@ -1,13 +1,15 @@
 # Frontend (React + TypeScript + Vite)
 
-Nova UI dos dashboards de BI, migrando aos poucos do Flask+Jinja+JS vanilla
-atual. Sem CDN: todas as dependências (React, ECharts, Bootstrap, etc.)
-são baixadas via npm e empacotadas no build.
+Vive dentro do `coverage-hub` — é o mesmo projeto, não um repo separado.
+Nova UI dos dashboards de BI, migrando aos poucos do Flask+Jinja+JS
+vanilla atual. Sem CDN: todas as dependências (React, ECharts, Bootstrap,
+etc.) são baixadas via npm e empacotadas no build.
 
 ## Como rodar
 
 ```bash
-npm install       # instala as dependências (uma vez, ou quando mudarem)
+cd coverage-hub/frontend
+npm install       # instala as dependências (uma vez, ou quando mudarem — precisa rodar antes do primeiro `npm run dev`/`npm run build`, node_modules não vai pro git)
 npm run dev       # servidor de dev com hot-reload em http://localhost:5173
 ```
 
@@ -21,15 +23,15 @@ o desenvolvimento.
 npm run build
 ```
 
-Isso gera:
-- `../coverage-hub/static/dist/` — o bundle React (JS/CSS com hash),
-  servido pelo Flask como estático.
-- `../coverage-hub/static/vendor/` — cópia das libs que as páginas Jinja
-  legadas ainda carregam via `<script>` direto (Bootstrap, Choices.js, D3,
-  ECharts), vindas dos mesmos pacotes do `package.json` — sem CDN.
+Isso gera, dentro do `coverage-hub` (um nível acima de `frontend/`):
+- `static/dist/` — o bundle React (JS/CSS com hash), servido pelo Flask
+  como estático.
+- `static/vendor/` — cópia das libs que as páginas Jinja legadas ainda
+  carregam via `<script>` direto (Bootstrap, Choices.js, D3, ECharts),
+  vindas dos mesmos pacotes do `package.json` — sem CDN.
 
-Esses dois diretórios são gerados (não versionados — veja
-`coverage-hub/.gitignore`). Rodar `npm run build` faz parte do processo de
+Esses dois diretórios são gerados (não versionados — veja `.gitignore`
+do `coverage-hub`). Rodar `npm run build` faz parte do processo de
 deploy; não precisa de Docker, só de Node instalado onde o build rodar.
 
 ## Arquitetura
