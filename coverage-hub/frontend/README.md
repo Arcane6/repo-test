@@ -13,9 +13,8 @@ npm install       # instala as dependências (uma vez, ou quando mudarem — pre
 npm run dev       # servidor de dev com hot-reload em http://localhost:5173
 ```
 
-O dev server proxeia `/mobile-access/api/*` e `/b2b-mobile/api/*` para o
-Flask (`python app.py`, na porta 5000) — suba os dois em paralelo durante
-o desenvolvimento.
+O dev server proxeia `/mobile-access/api/*` para o Flask (`python app.py`,
+na porta 5000) — suba os dois em paralelo durante o desenvolvimento.
 
 ## Como buildar para produção
 
@@ -64,4 +63,5 @@ O piloto atual é a aba **Cidades** do Acesso Móvel
 (`/mobile-access/cidades-react/`, ainda não linkada no menu). Depois de
 validado, o plano é: apontar a tab "Cidades" pra essa versão, remover a
 implementação antiga (`static/js/mobile_access.js` + `_tab_actual.html`),
-e repetir o padrão pros próximos módulos (Resumo, B2B Mobile, etc.).
+e repetir o padrão pra Resumo — hoje o único outro módulo em uso (B2B
+Mobile foi removido; Plano e Consolidado seguem fora do menu).
