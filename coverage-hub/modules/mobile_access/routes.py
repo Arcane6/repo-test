@@ -112,10 +112,6 @@ def api_summary_r2_projects():
 def api_summary_r3_sites():
     return jsonify(summary.get_r3_sites_by_tech(parse_filters()))
 
-@mobile_access_bp.route("/api/summary/r3/cities-by-tech")
-def api_summary_r3_cities():
-    return jsonify(summary.get_r3_cities_by_tech(parse_filters()))
-
 @mobile_access_bp.route("/api/summary/r3/new-cities-by-anf")
 def api_summary_r3_cities_anf():
     return jsonify(summary.get_r3_new_cities_by_anf(parse_filters()))

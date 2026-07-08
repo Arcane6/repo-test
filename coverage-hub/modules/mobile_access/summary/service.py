@@ -280,36 +280,6 @@ def get_r2_top_projects(filters):
 # RAIA 3 — Fechamento 26 = Raia 1 + Raia 2 (composição)
 # ---------------------------------------------------------------------------
 
-def _sum_bars(bars_a, bars_b):
-    """Soma valores das mesmas tecnologias em duas listas de barras."""
-    map_a = {b["tec"]: b for b in bars_a}
-    map_b = {b["tec"]: b for b in bars_b}
-    result = []
-    for tec in TECH_ORDER:
-        va = map_a.get(tec, {}).get("value", 0)
-        vb = map_b.get(tec, {}).get("value", 0)
-        result.append({
-            "tec": tec,
-            "value": va + vb,
-            "color": TECH_COLORS[tec],
-        })
-    return result
-
-
-def _sum_vendors(a, b):
-    """Soma contagens por vendor. Retorna ordenado."""
-    acc = {}
-    for item in a + b:
-        label = item["label"]
-        acc[label] = acc.get(label, 0) + item["value"]
-    result = [
-        {"label": k, "value": v, "color": VENDOR_COLORS.get(k, "#888888")}
-        for k, v in acc.items()
-    ]
-    result.sort(key=lambda x: x["value"], reverse=True)
-    return result
-
-
 def get_r3_sites_by_tech(filters):
     """
     Sites físicos no fechamento EoY 26.
@@ -366,22 +336,6 @@ def get_r3_sites_by_tech(filters):
         # Total inflado (com upgrade) fica separado pra caso queira exibir
         "total_com_upgrades": r1["total"] + r2["total"],
     }
-
-
-def get_r3_cities_by_tech(filters):
-    """Cidades no fechamento 26 = quem já tinha + quem vai receber pelo plano."""
-    r1 = get_r1_cities_by_tech(filters)
-    # Cuidado: cidades não podem duplicar. Se uma cidade "vira 5G" no plano,
-    # ela sai de 0 pra 1. Precisamos usar a mesma lógica da aba Consolidado.
-    # Aqui simplificamos: R2 traz APENAS os deltas (novas cidades), R1 tem baseline.
-    # A soma direta funciona porque não há sobreposição semântica.
-    r2_new_5g = get_r2_new_cities_by_anf(filters)["total"]
-
-    bars = list(r1["bars"])
-    for b in bars:
-        if b["tec"] == "5G":
-            b["value"] = (b["value"] or 0) + r2_new_5g
-    return {"bars": bars, "total": r1["total"]}
 
 
 def get_r3_new_cities_by_anf(filters):

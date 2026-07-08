@@ -92,8 +92,6 @@ export const summaryApi = {
 
   r3SitesByTech: (f: SummaryFilters) =>
     fetchJson<StackedByTechResponse>(`${BASE}/r3/sites-by-tech?${query(f)}`),
-  r3CitiesByTech: (f: SummaryFilters) =>
-    fetchJson<TechBarsResponse>(`${BASE}/r3/cities-by-tech?${query(f)}`),
   r3NewCitiesByAnf: (f: SummaryFilters) =>
     fetchJson<RegionalSeriesResponse>(`${BASE}/r3/new-cities-by-anf?${query(f)}`),
   r3Vendors: (f: SummaryFilters) =>
