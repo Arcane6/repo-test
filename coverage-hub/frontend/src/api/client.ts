@@ -1,14 +1,16 @@
 export interface ActiveFilters {
   uf: string[];
   municipio: string[];
-  tecnologia: string[];
+  tecnologia?: string[];
+  ano?: string | null;
 }
 
 export function filtersToQuery(filters: ActiveFilters): string {
   const params = new URLSearchParams();
   filters.uf.forEach((v) => params.append("uf", v));
   filters.municipio.forEach((v) => params.append("municipio", v));
-  filters.tecnologia.forEach((v) => params.append("tecnologia", v));
+  filters.tecnologia?.forEach((v) => params.append("tecnologia", v));
+  if (filters.ano) params.append("ano", filters.ano);
   return params.toString();
 }
 

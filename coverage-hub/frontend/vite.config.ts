@@ -10,10 +10,6 @@ export default defineConfig({
   build: {
     outDir: '../static/dist',
     emptyOutDir: true,
-    manifest: true,
-    rollupOptions: {
-      input: 'src/main.tsx',
-    },
   },
   server: {
     // Durante o dev (npm run dev), proxeia as chamadas de API para o Flask

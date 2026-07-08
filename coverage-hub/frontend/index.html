@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TIM Technical Planning</title>
+
+    <!-- Aplica o tema salvo ANTES do CSS renderizar, evitando flash de tema errado -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("tim-theme") || "light";
+          document.documentElement.setAttribute("data-bs-theme", saved);
+          document.documentElement.setAttribute("data-theme", saved);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

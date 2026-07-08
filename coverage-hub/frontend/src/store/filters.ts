@@ -6,14 +6,16 @@ import { create } from "zustand";
  * consultar dados) e qualquer componente pode escrever nela (ao ser
  * clicado) — isso é o mecanismo de cross-filtering entre visuais.
  */
-export type FilterDimension = "uf" | "municipio" | "tecnologia";
+export type FilterListDimension = "uf" | "municipio" | "tecnologia";
 
 interface FilterState {
   uf: string[];
   municipio: string[];
   tecnologia: string[];
-  toggle: (dimension: FilterDimension, value: string) => void;
-  setValues: (dimension: FilterDimension, values: string[]) => void;
+  ano: string | null;
+  toggle: (dimension: FilterListDimension, value: string) => void;
+  setValues: (dimension: FilterListDimension, values: string[]) => void;
+  setAno: (ano: string | null) => void;
   clear: () => void;
 }
 
@@ -21,6 +23,7 @@ export const useFilterStore = create<FilterState>((set) => ({
   uf: [],
   municipio: [],
   tecnologia: [],
+  ano: null,
 
   // Clicar num valor já selecionado remove o filtro (comportamento padrão
   // de cross-highlighting: clicar de novo "desliga" o filtro).
@@ -35,6 +38,8 @@ export const useFilterStore = create<FilterState>((set) => ({
 
   setValues: (dimension, values) =>
     set(() => ({ [dimension]: values }) as Partial<FilterState>),
+
+  setAno: (ano) => set({ ano }),
 
   clear: () => set({ uf: [], municipio: [], tecnologia: [] }),
 }));

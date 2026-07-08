@@ -37,6 +37,29 @@ export interface TimeseriesResponse {
   series: TimeseriesSeries[];
 }
 
+export interface VennLegendItem {
+  label: string;
+  value: number;
+  percent: number;
+  color: string;
+}
+
+export interface VennRegions {
+  only_2g: number;
+  only_3g: number;
+  only_5g: number;
+  inter_2g_3g: number;
+  inter_2g_5g: number;
+  inter_3g_5g: number;
+  inter_all: number;
+}
+
+export interface VennResponse {
+  legend: VennLegendItem[];
+  regions: VennRegions;
+  total_municipios: number;
+}
+
 export interface MunicipioRow {
   uf: string;
   municipio: string;
@@ -61,6 +84,9 @@ export const mobileAccessApi = {
 
   kpis: (filters: ActiveFilters) =>
     fetchJson<KpisResponse>(`${BASE}/kpis?${filtersToQuery(filters)}`),
+
+  venn: (filters: ActiveFilters) =>
+    fetchJson<VennResponse>(`${BASE}/venn?${filtersToQuery(filters)}`),
 
   frequencies: (filters: ActiveFilters) =>
     fetchJson<FrequenciesResponse>(`${BASE}/frequencies?${filtersToQuery(filters)}`),

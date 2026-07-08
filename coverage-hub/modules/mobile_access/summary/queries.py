@@ -335,3 +335,15 @@ GROUP BY REGIONAL
 HAVING SUM(CASE WHEN MES_DIV_5G IS NOT NULL AND MES_DIV_5G <= :plan_end THEN 1 ELSE 0 END) > 0
 ORDER BY total DESC
 """
+
+
+# ---------------------------------------------------------------------------
+# Anos disponíveis (filtro "Ano" do Resumo) — migrada do módulo Plano
+# ---------------------------------------------------------------------------
+
+YEARS_QUERY = """
+SELECT DISTINCT PLANO AS ANO
+FROM NTW_OP.TB_ROLLOUT_ACESSO
+WHERE PLANO IS NOT NULL
+ORDER BY ANO DESC
+"""
