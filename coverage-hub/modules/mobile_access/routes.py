@@ -47,6 +47,17 @@ def page_consolidated():
     return render_template("mobile_access/dashboard.html", active_tab="consolidated")
 
 
+@mobile_access_bp.route("/cidades-react/")
+def page_cidades_react():
+    """
+    Piloto da migração para React: mesma aba "Cidades", mesmas APIs JSON,
+    UI nova com cross-filtering entre os gráficos. Rota separada e não
+    listada no menu por enquanto — acesse direto pra comparar com a
+    versão atual antes de promovê-la a substituta.
+    """
+    return render_template("mobile_access/cidades_react.html")
+
+
 # ---------------------------------------------------------------------------
 # API — Rede Hoje
 # ---------------------------------------------------------------------------

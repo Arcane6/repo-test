@@ -1,11 +1,13 @@
 from flask import Flask
 
+from modules.core.vite_assets import vite_asset_tags
 from modules.home.routes import home_bp
 from modules.mobile_access.routes import mobile_access_bp
 from modules.b2b_mobile.routes import b2b_mobile_bp
 
 
 app = Flask(__name__)
+app.jinja_env.globals["vite_asset_tags"] = vite_asset_tags
 
 # Auto-reload de templates (.html) — pega mudanças sem restart
 app.config["TEMPLATES_AUTO_RELOAD"] = True
