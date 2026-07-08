@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid mt-4">
+    <!-- Cabeçalho -->
+    <div class="mb-4">
+        <h3 class="fw-bold mb-1">Acesso Móvel</h3>
+        <small class="text-muted">Cobertura por município, tecnologia e frequência</small>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" id="mobileTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="/mobile-access/summary/" id="summary-tab" role="tab">
+                <i class="bi bi-bar-chart-line me-1"></i> Resumo
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="/mobile-access/actual/" id="actual-tab" role="tab">
+                <i class="bi bi-geo-alt me-1"></i> Atual
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="/mobile-access/plan/" id="plan-tab" role="tab">
+                <i class="bi bi-calendar-check me-1"></i> Plano
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="/mobile-access/consolidated/" id="consolidated-tab" role="tab">
+            <i class="bi bi-layers me-1"></i> Consolidado
+        </a>
+        </li>
+    </ul>
+    <!-- Barra de filtros globais -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">UF</label>
+                    <select id="filter-uf" multiple></select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">Município</label>
+                    <select id="filter-municipio" multiple></select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">Tecnologia</label>
+                    <select id="filter-tecnologia" multiple>
+                        <option value="5G">5G</option>
+                        <option value="4G">4G</option>
+                        <option value="3G">3G</option>
+                        <option value="2G">2G</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">Ano</label>
+                    <select id="filter-ano" class="form-select"
+                            {% if active_tab == 'actual' %}disabled title="Aplicável só ao Plano/Consolidado"{% endif %}>
+                        <option value="2026" selected>2026</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex flex-column justify-content-end">
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" id="filter-canceladas"
+                               {% if active_tab == 'actual' %}disabled{% endif %}>
+                        <label class="form-check-label" for="filter-canceladas"
+                               title="{% if active_tab == 'actual' %}Aplicável só ao Plano/Consolidado{% endif %}">
+                            Incluir canceladas
+                        </label>
+                    </div>
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" id="filter-operacoes"
+                               {% if active_tab == 'actual' %}disabled{% endif %}>
+                        <label class="form-check-label" for="filter-operacoes"
+                               title="{% if active_tab == 'actual' %}Aplicável só ao Plano/Consolidado{% endif %}">
+                            Incluir operações (SWAP, Decommissioning)
+                        </label>
+                    </div>
+                    <button id="btn-clear" class="btn btn-sm btn-outline-secondary mt-1" title="Limpar filtros">
+                        <i class="bi bi-x-lg"></i> Limpar
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Conteúdo da tab ativa -->
+    {% if active_tab == 'summary' %}
+        {% include "mobile_access/_tab_summary.html" %}
+    {% elif active_tab == 'actual' %}
+        {% include "mobile_access/_tab_actual.html" %}
+    {% elif active_tab == 'plan' %}
+        {% include "mobile_access/_tab_plan.html" %}
+    {% elif active_tab == 'consolidated' %}
+        {% include "mobile_access/_tab_consolidated.html" %}
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+
+<script src="{{ url_for('static', filename='js/echarts_theme.js') }}"></script>
+
+{% if active_tab == 'actual' %}
+<script src="{{ url_for('static', filename='js/mobile_access.js') }}"></script>
+{% elif active_tab == 'summary' %}
+<script src="{{ url_for('static', filename='js/mobile_access_summary.js') }}"></script>
+{% elif active_tab == 'plan' %}
+<script src="{{ url_for('static', filename='js/mobile_access_plan.js') }}"></script>
+{% elif active_tab == 'consolidated' %}
+<script src="{{ url_for('static', filename='js/mobile_access_consolidated.js') }}"></script>
+{% endif %}
+
+{% endblock %}

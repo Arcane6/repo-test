@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid mt-4">
+
+    <!-- Cabeçalho -->
+    <div class="mb-4">
+        <h3 class="fw-bold mb-1" style="color:#7B1FA2;">
+            <i class="bi bi-briefcase-fill me-1"></i> B2B Mobile
+        </h3>
+        <small class="text-muted">
+            Rollout dedicado para clientes corporativos — Agronegócio, Logística, Indústria, Corporate
+        </small>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">Vertical</label>
+                    <select id="filter-vertical" multiple></select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">Cliente</label>
+                    <select id="filter-cliente" multiple></select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">UF</label>
+                    <select id="filter-uf" multiple></select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small">Tecnologia</label>
+                    <select id="filter-tecnologia" multiple>
+                        <option value="5G">5G</option>
+                        <option value="4G">4G</option>
+                        <option value="3G">3G</option>
+                        <option value="2G">2G</option>
+                    </select>
+                </div>
+
+                <div class="col-md-1">
+                    <label class="form-label fw-bold small">Ano</label>
+                    <select id="filter-ano" class="form-select">
+                        <option value="2026" selected>2026</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2 d-flex flex-column justify-content-end">
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" id="filter-canceladas">
+                        <label class="form-check-label" for="filter-canceladas">
+                            Incluir canceladas
+                        </label>
+                    </div>
+                    <button id="btn-clear" class="btn btn-sm btn-outline-secondary mt-1">
+                        <i class="bi bi-x-lg"></i> Limpar
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <div id="b2b-kpis" class="row g-3 mb-4"></div>
+
+    <!-- Top Clientes + Distribuição por Vertical -->
+    <div class="row g-3 mb-3">
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-1">Top 20 Clientes B2B</h5>
+                    <small class="text-muted d-block mb-3">
+                        Volume de OCs por cliente — cor identifica a vertical de negócio
+                    </small>
+                    <div id="b2b-top-clientes-chart" style="width:100%; height:520px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title mb-1">Distribuição por Vertical</h5>
+                    <small class="text-muted d-block mb-3">
+                        Onde está concentrado o esforço B2B
+                    </small>
+                    <div id="b2b-vertical-chart" class="flex-grow-1" style="width:100%; min-height:460px;"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Mapa + Mix Tecnologia -->
+    <div class="row g-3 mb-3">
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h5 class="card-title mb-1">Distribuição Geográfica</h5>
+                            <small class="text-muted">
+                                Intensidade proporcional ao número de OCs B2B por UF
+                            </small>
+                        </div>
+                        <span id="b2b-map-total" class="badge bg-light text-dark border small"></span>
+                    </div>
+                    <div id="b2b-map-chart" style="width:100%; height:520px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title mb-1">Mix por Tecnologia</h5>
+                    <small class="text-muted d-block mb-3">
+                        Radiofrequência do plano B2B
+                    </small>
+                    <div id="b2b-tech-chart" class="flex-grow-1" style="width:100%; min-height:460px;"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Tabela detalhada -->
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <div>
+                            <h5 class="card-title mb-0">Ordens Complexas B2B</h5>
+                            <small class="text-muted">Detalhamento OC a OC (até 1000 linhas)</small>
+                        </div>
+                        <input id="b2b-table-search" type="text"
+                               class="form-control form-control-sm"
+                               placeholder="Buscar em qualquer coluna..."
+                               style="max-width:280px;">
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 500px;">
+                        <table class="table table-sm table-striped table-hover">
+                            <thead class="sticky-top bg-white">
+                                <tr>
+                                    <th class="sortable" data-col="ordem_complexa">OC</th>
+                                    <th class="sortable" data-col="status_oc">Status</th>
+                                    <th class="sortable" data-col="vertical">Vertical</th>
+                                    <th class="sortable" data-col="cliente">Cliente</th>
+                                    <th class="sortable" data-col="classificacao_casa">Classificação</th>
+                                    <th class="sortable" data-col="tecnologia">Tec</th>
+                                    <th class="sortable" data-col="uf">UF</th>
+                                    <th class="sortable" data-col="municipio">Município</th>
+                                </tr>
+                            </thead>
+                            <tbody id="b2b-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small id="b2b-table-info" class="text-muted"></small>
+                        <div>
+                            <button id="b2b-prev-page" class="btn btn-sm btn-outline-secondary">‹</button>
+                            <span id="b2b-page-indicator" class="mx-2 small"></span>
+                            <button id="b2b-next-page" class="btn btn-sm btn-outline-secondary">›</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+
+<script src="{{ url_for('static', filename='js/echarts_theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/b2b_mobile.js') }}"></script>
+
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}TIM Technical Planning — Home{% endblock %}
+
+{% block head_extras %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="tim-hero py-5">
+    <div class="container">
+        <h1 class="fw-bold mb-2 text-white">TIM Technical Planning</h1>
+        <p class="lead mb-0 text-white-50">
+            Portal integrado de planejamento técnico de rede
+        </p>
+    </div>
+</div>
+
+<div class="container my-5">
+
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h4 class="fw-bold mb-1">Módulos</h4>
+            <small class="text-muted">Escolha um módulo para começar</small>
+        </div>
+        <small class="text-muted">
+            {{ modules | selectattr("enabled") | list | length }} de {{ modules | length }} disponíveis
+        </small>
+    </div>
+
+    <div class="row g-4">
+        {% for m in modules %}
+            {% include "_shared/module_card.html" %}
+        {% endfor %}
+    </div>
+
+</div>
+
+{% endblock %}
