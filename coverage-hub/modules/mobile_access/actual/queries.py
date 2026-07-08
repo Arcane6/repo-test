@@ -3,16 +3,15 @@ Queries SQL para a aba "Rede Hoje" (fonte: NTW_OP.MUNICIPIOS_FECHAMENTO).
 """
 
 BASE_CTE_TEMPLATE = """
-WITH BASE AS (
+WITH BASE_RAW AS (
+    -- PRESENCA_xG da tabela fica true assim que o site entra em rollout,
+    -- mesmo antes de divulgado (ainda em ativação/planejamento). "Rede
+    -- hoje" precisa refletir o que já foi de fato divulgado — daí
+    -- recalcular presença a partir de MES_DIV_xG <= hoje, não da flag.
     SELECT
         IBGE,
         UF,
         MUNICIPIO,
-        PRESENCA,
-        PRESENCA_5G,
-        PRESENCA_4G,
-        PRESENCA_3G,
-        PRESENCA_2G,
         BANDA_2G_MHZ,
         BANDA_3G_MHZ,
         BANDA_4G_MHZ,
@@ -20,12 +19,38 @@ WITH BASE AS (
         MES_DIV_2G,
         MES_DIV_3G,
         MES_DIV_4G,
-        MES_DIV_5G
+        MES_DIV_5G,
+        CASE WHEN MES_DIV_2G IS NOT NULL AND MES_DIV_2G <= TRUNC(SYSDATE) THEN 1 ELSE 0 END AS PRESENCA_2G,
+        CASE WHEN MES_DIV_3G IS NOT NULL AND MES_DIV_3G <= TRUNC(SYSDATE) THEN 1 ELSE 0 END AS PRESENCA_3G,
+        CASE WHEN MES_DIV_4G IS NOT NULL AND MES_DIV_4G <= TRUNC(SYSDATE) THEN 1 ELSE 0 END AS PRESENCA_4G,
+        CASE WHEN MES_DIV_5G IS NOT NULL AND MES_DIV_5G <= TRUNC(SYSDATE) THEN 1 ELSE 0 END AS PRESENCA_5G
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA))
         FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     )
+),
+BASE AS (
+    SELECT
+        IBGE,
+        UF,
+        MUNICIPIO,
+        BANDA_2G_MHZ,
+        BANDA_3G_MHZ,
+        BANDA_4G_MHZ,
+        BANDA_5G_MHZ,
+        MES_DIV_2G,
+        MES_DIV_3G,
+        MES_DIV_4G,
+        MES_DIV_5G,
+        PRESENCA_2G,
+        PRESENCA_3G,
+        PRESENCA_4G,
+        PRESENCA_5G,
+        CASE WHEN PRESENCA_2G = 1 OR PRESENCA_3G = 1 OR PRESENCA_4G = 1 OR PRESENCA_5G = 1
+             THEN 1 ELSE 0 END AS PRESENCA
+    FROM BASE_RAW
+    WHERE 1=1
     {uf_filter}
     {municipio_filter}
     {tecnologia_filter}
