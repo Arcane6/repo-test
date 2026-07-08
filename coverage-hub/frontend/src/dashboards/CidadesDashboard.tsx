@@ -9,11 +9,7 @@ import { ExportAllButton } from "../components/ExportAllButton";
 export function CidadesDashboard() {
   return (
     <div>
-      <div className="mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div>
-          <h4 className="fw-bold mb-1">Cidades</h4>
-          <small className="text-muted">Cobertura por município, tecnologia e frequência</small>
-        </div>
+      <div className="mb-4 d-flex justify-content-end">
         <ExportAllButton />
       </div>
 

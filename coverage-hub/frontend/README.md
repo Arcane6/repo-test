@@ -46,8 +46,16 @@ src/
   charts/      <Chart /> genérico: wrapper único de ciclo de vida do
                ECharts (init/resize/dispose/click/tema). Gráficos novos só
                precisam montar um `option`, não reimplementar o resto.
-               optionBuilders.ts tem os formatos reutilizáveis (barras,
-               donut, pizza, sunburst) usados no Resumo.
+               optionBuilders.ts é o catálogo de templates prontos —
+               antes de escrever um `option` do zero, veja se algum serve:
+                 barsByTechOption       barras verticais por tecnologia
+                 horizontalBarsOption   ranking (top N) em barras horizontais
+                 donutOption            donut, legenda embaixo
+                 pieOption              pizza cheia, paleta cíclica
+                 regionalSunburstOption donut c/ total no centro + 2 séries por categoria
+                 vendorDonutSideOption  donut c/ total no centro, legenda lateral
+                 timeSeriesOption       linhas acumuladas no tempo, com Δ no tooltip
+               Todos aceitam um `focusedX` opcional pro cross-filter visual.
   components/  peças de UI reutilizáveis (KPIs, tabela, filtros, Venn,
                ChartPanel — card padrão de gráfico com export de
                imagem/dados —, ChartToolbar, small multiples)
