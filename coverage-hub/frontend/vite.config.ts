@@ -4,9 +4,12 @@ import react from '@vitejs/plugin-react'
 // Build final entra em static/dist (irmão de frontend/, dentro do próprio
 // coverage-hub), servido pelo Flask como qualquer outro arquivo estático
 // (sem CDN, sem Node em produção).
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: '/static/dist/',
+  // O prefixo /static/dist/ só faz sentido no build de produção (é onde o
+  // Flask serve os assets). No dev server isso fazia o `npm run dev` abrir
+  // em /static/dist/ em vez da raiz — base '/' aqui resolve.
+  base: command === 'build' ? '/static/dist/' : '/',
   build: {
     outDir: '../static/dist',
     emptyOutDir: true,
@@ -16,6 +19,7 @@ export default defineConfig({
     // rodando em paralelo, evitando CORS e mantendo as mesmas URLs de prod.
     proxy: {
       '/mobile-access/api': 'http://127.0.0.1:5000',
+      '/api': 'http://127.0.0.1:5000',
     },
   },
-})
+}))
