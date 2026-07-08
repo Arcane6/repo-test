@@ -1,12 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { EChartsCoreOption } from "echarts/core";
+import type * as echarts from "echarts/core";
 import { Chart } from "../charts/Chart";
+import { downloadChartImage } from "../charts/exportImage";
 import { mobileAccessApi } from "../api/mobileAccess";
 import { useFilterStore } from "../store/filters";
+import { ChartToolbar } from "./ChartToolbar";
+import { downloadSheet } from "../utils/excelExport";
+import { timeseriesToRows } from "../utils/timeseries";
 
 export function TimelineChart() {
   const { uf, municipio, tecnologia } = useFilterStore();
+  const chartInstance = useRef<echarts.ECharts | null>(null);
 
   const { data, isFetching } = useQuery({
     queryKey: ["actual-timeseries", uf, municipio, tecnologia],
@@ -64,11 +70,29 @@ export function TimelineChart() {
   return (
     <div className="card shadow-sm h-100">
       <div className="card-body d-flex flex-column">
-        <h5 className="card-title mb-1">Linha do Tempo</h5>
-        <small className="text-muted d-block mb-3">
-          Municípios acumulados por tecnologia
-        </small>
-        <Chart option={option} loading={isFetching} height={420} />
+        <div className="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <h5 className="card-title mb-1">Linha do Tempo</h5>
+            <small className="text-muted d-block mb-3">
+              Municípios acumulados por tecnologia
+            </small>
+          </div>
+          <ChartToolbar
+            onDownloadImage={() =>
+              downloadChartImage(chartInstance.current, "linha-do-tempo.png")
+            }
+            onExportData={() => {
+              if (!data) return;
+              const { columns, rows } = timeseriesToRows(data);
+              downloadSheet("linha-do-tempo.xlsx", {
+                name: "Linha do Tempo",
+                columns,
+                rows,
+              });
+            }}
+          />
+        </div>
+        <Chart option={option} loading={isFetching} height={420} instanceRef={chartInstance} />
       </div>
     </div>
   );

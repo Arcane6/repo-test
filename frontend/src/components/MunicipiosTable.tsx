@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { mobileAccessApi, type MunicipioRow } from "../api/mobileAccess";
 import { useFilterStore } from "../store/filters";
+import { ChartToolbar } from "./ChartToolbar";
+import { downloadSheet } from "../utils/excelExport";
+import { municipiosColumns, municipiosToRows } from "../utils/municipiosColumns";
 
 const PAGE_SIZE = 15;
 
@@ -43,19 +46,30 @@ export function MunicipiosTable() {
   return (
     <div className="card shadow-sm h-100">
       <div className="card-body d-flex flex-column">
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex justify-content-between align-items-center mb-3 gap-2">
           <h5 className="card-title mb-0">Municípios</h5>
-          <input
-            type="text"
-            className="form-control form-control-sm"
-            placeholder="Buscar..."
-            style={{ maxWidth: 160 }}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
+          <div className="d-flex align-items-center gap-2">
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              placeholder="Buscar..."
+              style={{ maxWidth: 160 }}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+            <ChartToolbar
+              onExportData={() =>
+                downloadSheet("municipios.xlsx", {
+                  name: "Municípios",
+                  columns: municipiosColumns,
+                  rows: municipiosToRows(filtered),
+                })
+              }
+            />
+          </div>
         </div>
 
         <div className="table-responsive flex-grow-1" style={{ maxHeight: 380 }}>

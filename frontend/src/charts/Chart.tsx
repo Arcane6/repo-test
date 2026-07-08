@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import * as echarts from "echarts/core";
 import { BarChart, LineChart } from "echarts/charts";
 import {
@@ -26,6 +26,8 @@ interface ChartProps {
   onClick?: (event: ChartClickEvent) => void;
   height?: number | string;
   loading?: boolean;
+  /** Recebe a instância do ECharts (para export de imagem, zoom, etc.) */
+  instanceRef?: MutableRefObject<echarts.ECharts | null>;
 }
 
 /**
@@ -33,7 +35,7 @@ interface ChartProps {
  * do encaminhamento de cliques para o FilterStore. Qualquer gráfico novo só
  * precisa montar um `option` do ECharts — não reimplementa init/resize/click.
  */
-export function Chart({ option, onClick, height = 360, loading }: ChartProps) {
+export function Chart({ option, onClick, height = 360, loading, instanceRef }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
 
@@ -41,6 +43,7 @@ export function Chart({ option, onClick, height = 360, loading }: ChartProps) {
     if (!containerRef.current) return;
     const chart = echarts.init(containerRef.current);
     chartRef.current = chart;
+    if (instanceRef) instanceRef.current = chart;
 
     const resize = () => chart.resize();
     window.addEventListener("resize", resize);
@@ -49,7 +52,9 @@ export function Chart({ option, onClick, height = 360, loading }: ChartProps) {
       window.removeEventListener("resize", resize);
       chart.dispose();
       chartRef.current = null;
+      if (instanceRef) instanceRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

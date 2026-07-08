@@ -1,9 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { EChartsCoreOption } from "echarts/core";
+import type * as echarts from "echarts/core";
 import { Chart } from "../charts/Chart";
+import { downloadChartImage } from "../charts/exportImage";
 import { mobileAccessApi } from "../api/mobileAccess";
 import { useFilterStore } from "../store/filters";
+import { ChartToolbar } from "./ChartToolbar";
+import { downloadSheet } from "../utils/excelExport";
 
 /**
  * Gráfico de frequências por tecnologia. Clicar numa barra filtra o resto
@@ -12,6 +16,7 @@ import { useFilterStore } from "../store/filters";
  */
 export function FrequencyChart() {
   const { uf, municipio, tecnologia, toggle } = useFilterStore();
+  const chartInstance = useRef<echarts.ECharts | null>(null);
 
   const { data, isFetching } = useQuery({
     queryKey: ["actual-frequencies", uf, municipio, tecnologia],
@@ -89,14 +94,35 @@ export function FrequencyChart() {
   return (
     <div className="card shadow-sm">
       <div className="card-body">
-        <h5 className="card-title mb-1">Frequências Utilizadas por Tecnologia</h5>
-        <small className="text-muted d-block mb-3">
-          Clique numa barra para filtrar o dashboard por aquela tecnologia
-        </small>
+        <div className="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <h5 className="card-title mb-1">Frequências Utilizadas por Tecnologia</h5>
+            <small className="text-muted d-block mb-3">
+              Clique numa barra para filtrar o dashboard por aquela tecnologia
+            </small>
+          </div>
+          <ChartToolbar
+            onDownloadImage={() =>
+              downloadChartImage(chartInstance.current, "frequencias-por-tecnologia.png")
+            }
+            onExportData={() =>
+              downloadSheet("frequencias-por-tecnologia.xlsx", {
+                name: "Frequências",
+                columns: [
+                  { header: "Tecnologia", key: "tec" },
+                  { header: "Banda (MHz)", key: "banda" },
+                  { header: "Municípios", key: "value" },
+                ],
+                rows: bars,
+              })
+            }
+          />
+        </div>
         <Chart
           option={option}
           loading={isFetching}
           height={420}
+          instanceRef={chartInstance}
           onClick={(event) => {
             const bar = bars[event.dataIndex];
             if (bar) toggle("tecnologia", bar.tec);
