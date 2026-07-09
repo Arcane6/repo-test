@@ -2,13 +2,20 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { EChartsCoreOption } from "echarts/core";
 import { ChartPanel } from "./ChartPanel";
+import { stackedBarsOption } from "../charts/optionBuilders";
 import { mobileAccessApi } from "../api/mobileAccess";
 import { useFilterStore } from "../store/filters";
+import { TECH_ORDER } from "../theme";
+
+function bandaSortKey(banda: string): [number, string] {
+  const n = Number(banda);
+  return Number.isFinite(n) ? [n, banda] : [Number.POSITIVE_INFINITY, banda];
+}
 
 /**
- * Gráfico de frequências por tecnologia. Clicar numa barra filtra o resto
- * do dashboard por aquela tecnologia (cross-filter) — clicar de novo
- * remove o filtro.
+ * Frequências por banda, empilhadas por tecnologia (legenda). Clicar num
+ * segmento filtra o resto do dashboard por aquela tecnologia (cross-filter)
+ * — clicar de novo remove o filtro.
  */
 export function FrequencyChart() {
   const { uf, municipio, tecnologia, toggle } = useFilterStore();
@@ -33,62 +40,31 @@ export function FrequencyChart() {
       };
     }
 
-    const categories = bars.map((b) => `${b.banda}|${b.tec}`);
-    const hasSelection = tecnologia.length > 0;
+    const bandas = Array.from(new Set(bars.map((b) => b.banda))).sort((a, b) => {
+      const [an, as_] = bandaSortKey(a);
+      const [bn, bs] = bandaSortKey(b);
+      return an !== bn ? an - bn : as_.localeCompare(bs);
+    });
 
-    const values = bars.map((b) => ({
-      value: b.value,
-      itemStyle: {
-        color: b.color,
-        opacity: !hasSelection || tecnologia.includes(b.tec) ? 1 : 0.25,
-      },
-    }));
+    const tecsPresent = TECH_ORDER.filter((t) => bars.some((b) => b.tec === t));
 
-    return {
-      grid: { left: 50, right: 20, top: 40, bottom: 70 },
-      tooltip: {
-        trigger: "axis",
-        axisPointer: { type: "shadow" },
-        formatter: (params: unknown) => {
-          const p = (params as { name: string; value: number }[])[0];
-          const [band, tec] = p.name.split("|");
-          return `<b>${tec} — ${band} MHz</b><br/>${p.value.toLocaleString("pt-BR")} municípios`;
-        },
-      },
-      xAxis: {
-        type: "category",
-        data: categories,
-        axisTick: { show: false },
-        axisLine: { lineStyle: { color: "#999" } },
-        axisLabel: {
-          interval: 0,
-          formatter: (value: string) => value.split("|")[0],
-        },
-      },
-      yAxis: {
-        type: "value",
-        splitLine: { lineStyle: { color: "#eee" } },
-      },
-      series: [
-        {
-          type: "bar",
-          data: values,
-          barMaxWidth: 42,
-          label: {
-            show: true,
-            position: "top",
-            fontWeight: "bold",
-            formatter: (p: { value: number }) => p.value.toLocaleString("pt-BR"),
-          },
-        },
-      ],
-    };
-  }, [bars, tecnologia, isFetching]);
+    const series = tecsPresent.map((tec) => {
+      const barsByBanda = new Map(bars.filter((b) => b.tec === tec).map((b) => [b.banda, b]));
+      return {
+        name: tec,
+        color: bars.find((b) => b.tec === tec)?.color ?? "#888",
+        data: bandas.map((banda) => barsByBanda.get(banda)?.value ?? 0),
+      };
+    });
+
+    return stackedBarsOption(bandas, series);
+  }, [bars, isFetching]);
 
   return (
     <ChartPanel
       title="Frequências Utilizadas por Tecnologia"
-      subtitle="Clique numa barra para filtrar o dashboard por aquela tecnologia"
+      subtitle="Clique num segmento para filtrar o dashboard por aquela tecnologia"
+      sourceTable="MUNICIPIOS_FECHAMENTO"
       option={option}
       loading={isFetching}
       height={420}
@@ -103,8 +79,7 @@ export function FrequencyChart() {
         rows: bars,
       }}
       onClick={(event) => {
-        const bar = bars[event.dataIndex];
-        if (bar) toggle("tecnologia", bar.tec);
+        if (event.seriesName) toggle("tecnologia", event.seriesName);
       }}
     />
   );

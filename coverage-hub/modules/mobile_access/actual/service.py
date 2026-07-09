@@ -18,6 +18,9 @@ from modules.mobile_access.actual.queries import (
     MUNICIPIOS_SEARCH_QUERY,
     FREQUENCIES_TEMPLATE,
     TIMESERIES_TEMPLATE,
+    GAUGES_TEMPLATE,
+    GAUGE_METRIC,
+    GAUGE_TIM_METRIC,
 )
 
 
@@ -182,10 +185,66 @@ def get_venn(ufs=None, municipios=None, tecs=None):
     }
 
 
+def _year_labels():
+    """Rótulos EOY dinâmicos: em 2026 → ('EOY25', 'EOY26')."""
+    import datetime as _dt
+
+    year = _dt.date.today().year
+    return f"EOY{(year - 1) % 100:02d}", f"EOY{year % 100:02d}"
+
+
+def _translate_statuses(rows):
+    """Troca os marcadores EOY_PREV/EOY_CURR pelos rótulos do ano corrente."""
+    prev_label, curr_label = _year_labels()
+    mapping = {"EOY_PREV": prev_label, "YTD": "YTD", "EOY_CURR": curr_label}
+    for row in rows:
+        for key in ("status_5g", "status_4g", "status_3g", "status_2g"):
+            row[key] = mapping.get(row.get(key))
+    return rows
+
+
 def get_table(ufs=None, municipios=None, tecs=None):
     ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
     sql, params = _build_query(TABLE_TEMPLATE, ufs, municipios, tecs)
-    return execute_query(sql, params)
+    return _translate_statuses(execute_query(sql, params))
+
+
+def get_full_base():
+    """Base completa de municípios (última carga), sem nenhum filtro —
+    usada pelo botão de exportação, que sempre entrega a versão mais
+    recente inteira."""
+    sql, params = _build_query(TABLE_TEMPLATE, [], [], [])
+    return _translate_statuses(execute_query(sql, params))
+
+
+def get_gauges(ufs=None, municipios=None, tecs=None):
+    """Velocímetros: por tecnologia (e TIM geral), municípios divulgados no
+    fechamento anterior (piso), até hoje (ponteiro) e no fechamento do ano
+    corrente (alvo, inclui planejados)."""
+    ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
+    metrics = ",".join(
+        [GAUGE_TIM_METRIC] + [GAUGE_METRIC.format(tec=t) for t in TECH_ORDER]
+    )
+    sql, params = _build_query(GAUGES_TEMPLATE.format(metrics=metrics), ufs, municipios, tecs)
+    row = (execute_query(sql, params) or [{}])[0]
+
+    prev_label, curr_label = _year_labels()
+
+    def card(label, key, color):
+        return {
+            "label": label,
+            "color": color,
+            "eoy_prev": row.get(f"eoy_prev_{key}", 0) or 0,
+            "ytd": row.get(f"ytd_{key}", 0) or 0,
+            "eoy_curr": row.get(f"eoy_curr_{key}", 0) or 0,
+        }
+
+    return {
+        "labels": {"prev": prev_label, "curr": curr_label},
+        "total_municipios": row.get("total_municipios", 0) or 0,
+        "cards": [card("Municípios TIM", "tim", TIM_BRAND_COLOR)]
+        + [card(t, t.lower(), TECH_COLORS[t]) for t in reversed(TECH_ORDER)],
+    }
 
 
 def get_frequencies(ufs=None, municipios=None, tecs=None):
@@ -262,5 +321,16 @@ def get_timeseries(ufs=None, municipios=None, tecs=None):
             "color": TECH_COLORS[tec],
             "values": values,
         })
+
+    # Timeline mostra só os últimos 10 anos — o acumulado (running total)
+    # já reflete todo o histórico, então cortar períodos antigos aqui não
+    # perde contagem, só reduz o que aparece no eixo.
+    import datetime as _dt
+
+    cutoff = f"{_dt.date.today().year - 10}-01-01"
+    keep_from = next((i for i, p in enumerate(periods) if p >= cutoff), len(periods))
+    periods = periods[keep_from:]
+    for s in series:
+        s["values"] = s["values"][keep_from:]
 
     return {"periods": periods, "series": series}

@@ -6,21 +6,32 @@ import { ChartToolbar } from "./ChartToolbar";
 import { Skeleton } from "./Skeleton";
 import { downloadSheet } from "../utils/excelExport";
 import { municipiosColumns, municipiosToRows } from "../utils/municipiosColumns";
+import { SourceBadge } from "./SourceBadge";
 
 const PAGE_SIZE = 20;
 
-function Badge({ value }: { value: number }) {
-  return value === 1 ? (
-    <span className="badge bg-success">Sim</span>
-  ) : (
-    <span className="badge bg-secondary">Não</span>
-  );
+/** Rótulos EOY dinâmicos, espelhando modules/mobile_access/actual/service.py
+ * _year_labels() — em 2026 → ("EOY25", "EOY26"). */
+function yearLabels() {
+  const year = new Date().getFullYear();
+  return {
+    prev: `EOY${String((year - 1) % 100).padStart(2, "0")}`,
+    curr: `EOY${String(year % 100).padStart(2, "0")}`,
+  };
+}
+
+function StatusBadge({ value }: { value: string | null }) {
+  if (!value) return <span className="text-muted">—</span>;
+  const { curr } = yearLabels();
+  const className = value === curr ? "badge bg-warning text-dark" : "badge bg-success";
+  return <span className={className}>{value}</span>;
 }
 
 export function MunicipiosTable() {
   const { uf, municipio, tecnologia } = useFilterStore();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["actual-table", uf, municipio, tecnologia],
@@ -49,7 +60,10 @@ export function MunicipiosTable() {
     <div className="card shadow-sm h-100">
       <div className="card-body d-flex flex-column">
         <div className="d-flex justify-content-between align-items-center mb-3 gap-2">
-          <h5 className="card-title mb-0">Municípios</h5>
+          <div className="d-flex align-items-center gap-2">
+            <h5 className="card-title mb-0">Municípios</h5>
+            <SourceBadge table="MUNICIPIOS_FECHAMENTO" />
+          </div>
           <div className="d-flex align-items-center gap-2">
             <input
               type="text"
@@ -63,13 +77,20 @@ export function MunicipiosTable() {
               }}
             />
             <ChartToolbar
-              onExportData={() =>
-                downloadSheet("municipios.xlsx", {
-                  name: "Municípios",
-                  columns: municipiosColumns,
-                  rows: municipiosToRows(filtered),
-                })
-              }
+              onExportData={() => {
+                if (exporting) return;
+                setExporting(true);
+                mobileAccessApi
+                  .tableExport()
+                  .then((full) =>
+                    downloadSheet("municipios.xlsx", {
+                      name: "Municípios",
+                      columns: municipiosColumns,
+                      rows: municipiosToRows(full),
+                    }),
+                  )
+                  .finally(() => setExporting(false));
+              }}
             />
           </div>
         </div>
@@ -78,10 +99,9 @@ export function MunicipiosTable() {
           <table className="table table-sm table-striped table-hover">
             <thead className="sticky-top bg-white">
               <tr>
+                <th>IBGE</th>
                 <th>UF</th>
                 <th>Município</th>
-                <th>IBGE</th>
-                <th className="text-center">TIM</th>
                 <th className="text-center">5G</th>
                 <th className="text-center">4G</th>
                 <th className="text-center">3G</th>
@@ -93,9 +113,9 @@ export function MunicipiosTable() {
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
                       <td><Skeleton height={12} width="70%" /></td>
+                      <td><Skeleton height={12} width="70%" /></td>
                       <td><Skeleton height={12} width="85%" /></td>
                       <td><Skeleton height={12} width="85%" /></td>
-                      <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
                       <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
                       <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
                       <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
@@ -103,15 +123,14 @@ export function MunicipiosTable() {
                     </tr>
                   ))
                 : pageRows.map((r) => (
-                    <tr key={`${r.uf}-${r.municipio}`}>
+                    <tr key={r.ibge}>
+                      <td>{r.ibge}</td>
                       <td>{r.uf}</td>
                       <td>{r.municipio}</td>
-                      <td>{r.ibge}</td>
-                      <td className="text-center"><Badge value={r.presenca} /></td>
-                      <td className="text-center"><Badge value={r.presenca_5g} /></td>
-                      <td className="text-center"><Badge value={r.presenca_4g} /></td>
-                      <td className="text-center"><Badge value={r.presenca_3g} /></td>
-                      <td className="text-center"><Badge value={r.presenca_2g} /></td>
+                      <td className="text-center"><StatusBadge value={r.status_5g} /></td>
+                      <td className="text-center"><StatusBadge value={r.status_4g} /></td>
+                      <td className="text-center"><StatusBadge value={r.status_3g} /></td>
+                      <td className="text-center"><StatusBadge value={r.status_2g} /></td>
                     </tr>
                   ))}
             </tbody>

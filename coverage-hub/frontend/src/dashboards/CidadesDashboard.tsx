@@ -1,5 +1,5 @@
 import { FilterBar } from "../components/FilterBar";
-import { KpiCards } from "../components/KpiCards";
+import { GaugeCards } from "../components/GaugeCards";
 import { VennDiagram } from "../components/VennDiagram";
 import { FrequencyChart } from "../components/FrequencyChart";
 import { TimelineChart } from "../components/TimelineChart";
@@ -9,12 +9,13 @@ import { ExportAllButton } from "../components/ExportAllButton";
 export function CidadesDashboard() {
   return (
     <div>
-      <div className="mb-4 d-flex justify-content-end">
+      <div className="mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <p className="text-muted mb-0">Detalhamento de municípios</p>
         <ExportAllButton />
       </div>
 
       <FilterBar fields={["uf", "municipio", "tecnologia"]} />
-      <KpiCards />
+      <GaugeCards />
 
       <div className="row g-3">
         <div className="col-lg-4">

@@ -5,21 +5,21 @@ import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia1({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano } = filters;
+  const { uf, municipio, ano, regionais } = filters;
   const { tecnologia: focusedTec, toggleTecnologia } = useResumoFocusStore();
 
   const { data: sites, isFetching: loadingSites } = useQuery({
-    queryKey: ["summary-r1-sites", uf, municipio, ano],
+    queryKey: ["summary-r1-sites", uf, municipio, ano, regionais],
     queryFn: () => summaryApi.r1SitesByTech(filters),
   });
 
   const { data: cities, isFetching: loadingCities } = useQuery({
-    queryKey: ["summary-r1-cities", uf, municipio, ano],
+    queryKey: ["summary-r1-cities", uf, municipio, ano, regionais],
     queryFn: () => summaryApi.r1CitiesByTech(filters),
   });
 
   const { data: vendors, isFetching: loadingVendors } = useQuery({
-    queryKey: ["summary-r1-vendors", uf, municipio, ano],
+    queryKey: ["summary-r1-vendors", uf, municipio, ano, regionais],
     queryFn: () => summaryApi.r1Vendors(filters),
   });
 
@@ -34,26 +34,9 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
       <div className="row g-3">
         <div className="col-lg-4">
           <ChartPanel
-            title="Total de Sites por Tecnologia"
-            subtitle="Clique numa barra pra destacar a tecnologia nas outras raias"
-            option={barsByTechOption(sites?.bars ?? [], sites?.total ?? 0, focusedTec)}
-            loading={loadingSites}
-            onClick={(e) => toggleTecnologia(e.name)}
-            imageFilename="r1-sites-por-tecnologia.png"
-            exportSheet={{
-              name: "R1 Sites por Tecnologia",
-              columns: [
-                { header: "Tecnologia", key: "tec" },
-                { header: "Sites", key: "value" },
-              ],
-              rows: sites?.bars ?? [],
-            }}
-          />
-        </div>
-        <div className="col-lg-4">
-          <ChartPanel
             title="Cidades Cobertas por Tecnologia"
             subtitle="Clique numa barra pra destacar a tecnologia nas outras raias"
+            sourceTable="MUNICIPIOS_FECHAMENTO"
             option={barsByTechOption(cities?.bars ?? [], cities?.total ?? 0, focusedTec)}
             loading={loadingCities}
             onClick={(e) => toggleTecnologia(e.name)}
@@ -70,7 +53,27 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
         </div>
         <div className="col-lg-4">
           <ChartPanel
+            title="Total de Sites por Tecnologia"
+            subtitle="Clique numa barra pra destacar a tecnologia nas outras raias"
+            sourceTable="TB_FT_BASE_UNICA_SITES"
+            option={barsByTechOption(sites?.bars ?? [], sites?.total ?? 0, focusedTec)}
+            loading={loadingSites}
+            onClick={(e) => toggleTecnologia(e.name)}
+            imageFilename="r1-sites-por-tecnologia.png"
+            exportSheet={{
+              name: "R1 Sites por Tecnologia",
+              columns: [
+                { header: "Tecnologia", key: "tec" },
+                { header: "Sites", key: "value" },
+              ],
+              rows: sites?.bars ?? [],
+            }}
+          />
+        </div>
+        <div className="col-lg-4">
+          <ChartPanel
             title="Fornecedor por Site"
+            sourceTable="BASE_TB_END_ID_NEW"
             option={horizontalBarsOption(
               (vendors ?? []).map((v) => ({ name: v.label, value: v.value, color: v.color })),
             )}

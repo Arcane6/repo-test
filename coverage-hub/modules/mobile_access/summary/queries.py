@@ -24,7 +24,7 @@ Filtros globais compartilhados (aplicados via placeholders):
 
 R1_SITES_BY_TECH = """
 WITH BASE AS (
-    SELECT END_ID, TECNOLOGIA
+    SELECT END_ID, UF, MUNICIPIO, TECNOLOGIA
     FROM NTW_OP.TB_FT_BASE_UNICA_SITES
     WHERE MES_REF = (
         SELECT MAX(MES_REF)
@@ -33,6 +33,13 @@ WITH BASE AS (
     )
     {uf_filter_site}
     {municipio_filter_site}
+),
+GEO AS (
+    SELECT UF, MUNICIPIO, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
 )
 SELECT
     SUM(CASE WHEN TECNOLOGIA LIKE '%2G%' THEN 1 ELSE 0 END) AS sites_2g,
@@ -40,7 +47,10 @@ SELECT
     SUM(CASE WHEN TECNOLOGIA LIKE '%4G%' THEN 1 ELSE 0 END) AS sites_4g,
     SUM(CASE WHEN TECNOLOGIA LIKE '%5G%' THEN 1 ELSE 0 END) AS sites_5g,
     COUNT(DISTINCT END_ID) AS total_sites
-FROM BASE
+FROM BASE b
+LEFT JOIN GEO g ON g.UF = b.UF AND UPPER(g.MUNICIPIO) = UPPER(b.MUNICIPIO)
+WHERE 1=1
+{regional_filter_site}
 """
 
 
@@ -60,6 +70,7 @@ WHERE TRUNC(DT_CARGA) = (
 )
 {uf_filter}
 {municipio_filter}
+{regional_filter}
 """
 
 
@@ -103,19 +114,29 @@ WITH BASE AS (
 ),
 VENDOR_FINAL AS (
     SELECT
-        END_ID,
+        END_ID, UF, MUNICIPIO,
         COALESCE(VENDOR_5G, VENDOR_4G, VENDOR_3G, VENDOR_2G) AS VENDOR
     FROM BASE
     WHERE VENDOR_5G IS NOT NULL
        OR VENDOR_4G IS NOT NULL
        OR VENDOR_3G IS NOT NULL
        OR VENDOR_2G IS NOT NULL
+),
+GEO AS (
+    SELECT UF, MUNICIPIO, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
 )
 SELECT
-    UPPER(VENDOR) AS vendor,
+    UPPER(v.VENDOR) AS vendor,
     COUNT(*) AS qtd
-FROM VENDOR_FINAL
-GROUP BY UPPER(VENDOR)
+FROM VENDOR_FINAL v
+LEFT JOIN GEO g ON g.UF = v.UF AND UPPER(g.MUNICIPIO) = UPPER(v.MUNICIPIO)
+WHERE 1=1
+{regional_filter}
+GROUP BY UPPER(v.VENDOR)
 ORDER BY qtd DESC
 """
 
@@ -162,7 +183,7 @@ SELECT
     COUNT(*) AS total_sites
 FROM NTW_OP.TB_ROLLOUT_ACESSO r
 LEFT JOIN (
-    SELECT IBGE, UF, MUNICIPIO
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -172,6 +193,8 @@ WHERE r.PLANO = :ano
   AND r.STATUS_OC = 'ACTIVATED'
   {uf_filter_d}
   {municipio_filter_d}
+  {regional_filter_d}
+  {projeto_filter}
 """
 
 # ---------- Novas cidades por regional (ANF) — plano 26 ----------
@@ -190,6 +213,7 @@ AND MES_DIV_5G BETWEEN :plan_start AND :plan_end
 AND REGIONAL IS NOT NULL
 {uf_filter}
 {municipio_filter}
+{regional_filter}
 GROUP BY REGIONAL
 ORDER BY cidades DESC
 """
@@ -214,7 +238,7 @@ WITH ROLLOUT_2026 AS (
         END AS TIPO_CASA
     FROM NTW_OP.TB_ROLLOUT_ACESSO r
     LEFT JOIN (
-        SELECT IBGE, UF, MUNICIPIO
+        SELECT IBGE, UF, MUNICIPIO, REGIONAL
         FROM NTW_OP.MUNICIPIOS_FECHAMENTO
         WHERE TRUNC(DT_CARGA) = (
             SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -224,6 +248,8 @@ WITH ROLLOUT_2026 AS (
       AND r.STATUS_OC = 'ACTIVATED'
       {uf_filter_d}
       {municipio_filter_d}
+      {regional_filter_d}
+      {projeto_filter}
 ),
 -- Para cada município, pega o vendor dominante considerando TODOS os REFs
 -- (não só o último). Isso corrige o problema do "Sem info" massivo.
@@ -287,7 +313,7 @@ SELECT
     COUNT(*) AS qtd
 FROM NTW_OP.TB_ROLLOUT_ACESSO r
 LEFT JOIN (
-    SELECT IBGE, UF, MUNICIPIO
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -298,6 +324,8 @@ WHERE r.PLANO = :ano
   AND r.PRIORIDADE IS NOT NULL
   {uf_filter_d}
   {municipio_filter_d}
+  {regional_filter_d}
+  {projeto_filter}
 GROUP BY r.PRIORIDADE
 ORDER BY qtd DESC
 FETCH FIRST 10 ROWS ONLY
@@ -331,6 +359,7 @@ WHERE TRUNC(DT_CARGA) = (
 AND REGIONAL IS NOT NULL
 {uf_filter}
 {municipio_filter}
+{regional_filter}
 GROUP BY REGIONAL
 HAVING SUM(CASE WHEN MES_DIV_5G IS NOT NULL AND MES_DIV_5G <= :plan_end THEN 1 ELSE 0 END) > 0
 ORDER BY total DESC
@@ -346,4 +375,340 @@ SELECT DISTINCT PLANO AS ANO
 FROM NTW_OP.TB_ROLLOUT_ACESSO
 WHERE PLANO IS NOT NULL
 ORDER BY ANO DESC
+"""
+
+# ---------------------------------------------------------------------------
+# RAIA 2 — Financeiro (NEXUS)
+# ---------------------------------------------------------------------------
+
+# ---------- Orçamento por Tecnologia ----------
+# Rateia CAPEX/OPEX+LEASE do plano proporcionalmente ao nº de OCs de cada
+# (município, pivot). A query original agrupava só por (COD_IBGE,
+# ID_MASTER_PIVOT), perdendo a tecnologia no resultado — adicionamos
+# R.TECNOLOGIA ao agrupamento (mesma fórmula de rateio, só não colapsa a
+# tecnologia antes da hora) pra render um gráfico "por tecnologia" de
+# verdade. O denominador T.TOTAL continua sendo a soma geral de OCs.
+R2_ORCAMENTO_POR_TECNOLOGIA = """
+WITH ROLLOUT_ALL AS (
+    -- SEM filtro geográfico: é o universo completo que forma o
+    -- denominador do rateio — filtrar aqui inflaria a fatia de quem
+    -- ficou de fora do filtro.
+    SELECT
+        COD_IBGE,
+        TECNOLOGIA,
+        PRIORIDADE,
+        ID_MASTER_PIVOT,
+        COUNT(*) AS NUM_OCS
+    FROM NTW_OP.TB_ROLLOUT_ACESSO
+    WHERE PLANO = :ano
+      AND TECNOLOGIA IN ('4G', '5G')
+    GROUP BY
+        COD_IBGE,
+        TECNOLOGIA,
+        PRIORIDADE,
+        ID_MASTER_PIVOT
+),
+TOTAL_OCS AS (
+    SELECT SUM(NUM_OCS) AS TOTAL
+    FROM ROLLOUT_ALL
+),
+GEO AS (
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
+),
+ROLLOUT AS (
+    -- Só essa camada, que alimenta a soma exibida, recebe o filtro.
+    SELECT R.*
+    FROM ROLLOUT_ALL R
+    LEFT JOIN GEO g ON g.IBGE = R.COD_IBGE
+    WHERE 1=1
+    {uf_filter_g}
+    {municipio_filter_g}
+    {regional_filter_g}
+    {projeto_filter}
+),
+FINANCEIRO AS (
+    SELECT
+        UPPER(TIPO) AS TIPO,
+        SUM(VALOR_TOTAL) AS VALOR_TOTAL
+    FROM TB_NEXUS_FINANCEIRO
+    WHERE UPPER(TIPO) IN ('CAPEX', 'OPEX', 'LEASE')
+    GROUP BY
+        UPPER(TIPO)
+)
+SELECT
+    R.TECNOLOGIA AS TECH,
+    F.TIPO,
+    CASE WHEN F.TIPO = 'CAPEX' THEN 'CAPEX' ELSE 'OPEX/LEASE' END AS GRUPO,
+    SUM(ROUND((R.NUM_OCS / T.TOTAL) * (F.VALOR_TOTAL / 1000000), 6)) AS VALOR
+FROM ROLLOUT R
+CROSS JOIN TOTAL_OCS T
+CROSS JOIN FINANCEIRO F
+GROUP BY R.TECNOLOGIA, F.TIPO
+ORDER BY R.TECNOLOGIA, F.TIPO
+"""
+
+
+# ---------- Endereço por Tecnologia ----------
+# CAC (custo de aquisição) rateado por OC entre Casa Nova (CN) e Casa
+# Existente (CE), por tecnologia — fonte TB_NEXUS_CN_CE.
+R2_ENDERECO_POR_TECNOLOGIA = """
+WITH ROLLOUT_REFERENCIA_ALL AS (
+    -- Sem filtro geográfico: universo completo, denominador do rateio.
+    SELECT
+        R.COD_IBGE,
+        CASE
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
+            ELSE '4G'
+        END AS TECH,
+        CASE
+            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
+            ELSE 'CE'
+        END AS TIPO_CASA,
+        R.PRIORIDADE,
+        R.ID_MASTER_PIVOT,
+        COUNT(1) AS NUM_OCS
+    FROM NTW_OP.TB_ROLLOUT_ACESSO R
+    WHERE R.PLANO = :ano
+      AND R.TECNOLOGIA IN ('4G', '5G')
+    GROUP BY
+        R.COD_IBGE,
+        CASE
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
+            ELSE '4G'
+        END,
+        CASE
+            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
+            ELSE 'CE'
+        END,
+        R.PRIORIDADE,
+        R.ID_MASTER_PIVOT
+),
+GEO AS (
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
+),
+ROLLOUT_REFERENCIA AS (
+    SELECT RR.*
+    FROM ROLLOUT_REFERENCIA_ALL RR
+    LEFT JOIN GEO g ON g.IBGE = RR.COD_IBGE
+    WHERE 1=1
+    {uf_filter_g}
+    {municipio_filter_g}
+    {regional_filter_g}
+    {projeto_filter}
+),
+NEXUS_CN_CE AS (
+    SELECT
+        UPPER(TRIM(TECH)) AS TECH,
+        UPPER(TRIM(TIPO_CASA)) AS TIPO_CASA,
+        SUM(CAC) AS CAC_TOTAL
+    FROM TB_NEXUS_CN_CE
+    GROUP BY
+        UPPER(TRIM(TECH)),
+        UPPER(TRIM(TIPO_CASA))
+),
+TOTAL_OCS_GRUPO_ALL AS (
+    -- Denominador do rateio: sempre o universo completo (sem filtro
+    -- geográfico) — senão filtrar por UF faria aquele recorte "herdar"
+    -- 100% do orçamento nacional do grupo.
+    SELECT TECH, TIPO_CASA, SUM(NUM_OCS) AS TOTAL_OCS_GRUPO
+    FROM ROLLOUT_REFERENCIA_ALL
+    GROUP BY TECH, TIPO_CASA
+),
+BASE_RATEIO AS (
+    SELECT
+        RR.COD_IBGE,
+        RR.TECH,
+        RR.TIPO_CASA,
+        RR.ID_MASTER_PIVOT,
+        RR.NUM_OCS,
+        N.CAC_TOTAL,
+        G.TOTAL_OCS_GRUPO
+    FROM ROLLOUT_REFERENCIA RR
+    INNER JOIN NEXUS_CN_CE N
+        ON N.TECH = RR.TECH
+       AND N.TIPO_CASA = RR.TIPO_CASA
+    INNER JOIN TOTAL_OCS_GRUPO_ALL G
+        ON G.TECH = RR.TECH
+       AND G.TIPO_CASA = RR.TIPO_CASA
+),
+ROLLOUT_CE_CN AS (
+    SELECT
+        COD_IBGE,
+        TECH,
+        TIPO_CASA AS CLASSIFICACAO,
+        ID_MASTER_PIVOT,
+        CASE
+            WHEN TOTAL_OCS_GRUPO = 0 THEN 0
+            ELSE CAC_TOTAL * (NUM_OCS / TOTAL_OCS_GRUPO)
+        END AS VALOR
+    FROM BASE_RATEIO
+)
+SELECT
+    TECH,
+    CLASSIFICACAO,
+    SUM(VALOR) AS VALOR
+FROM ROLLOUT_CE_CN
+GROUP BY TECH, CLASSIFICACAO
+ORDER BY TECH, CLASSIFICACAO
+"""
+
+
+# ---------- Fornecedores do plano, ponderados pelo CAC do NEXUS ----------
+# Mesmo rateio de CAC da query acima (Casa Nova / Casa Existente por
+# tecnologia), mas a fatia "Casa Existente" é quebrada pelo fornecedor
+# dominante de cada município (mesma lógica de R2_VENDORS_NEW_SITES) —
+# o tamanho de cada fatia no gráfico passa a refletir R$, não OC bruta.
+R2_VENDORS_NEXUS = """
+WITH ROLLOUT_REFERENCIA_ALL AS (
+    -- Sem filtro geográfico: universo completo, denominador do rateio.
+    SELECT
+        R.COD_IBGE,
+        CASE
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
+            ELSE '4G'
+        END AS TECH,
+        CASE
+            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
+            ELSE 'CE'
+        END AS TIPO_CASA,
+        R.PRIORIDADE,
+        R.ID_MASTER_PIVOT,
+        COUNT(1) AS NUM_OCS
+    FROM NTW_OP.TB_ROLLOUT_ACESSO R
+    WHERE R.PLANO = :ano
+      AND R.TECNOLOGIA IN ('4G', '5G')
+    GROUP BY
+        R.COD_IBGE,
+        CASE
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
+            ELSE '4G'
+        END,
+        CASE
+            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
+            ELSE 'CE'
+        END,
+        R.PRIORIDADE,
+        R.ID_MASTER_PIVOT
+),
+GEO AS (
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
+),
+ROLLOUT_REFERENCIA AS (
+    SELECT RR.*
+    FROM ROLLOUT_REFERENCIA_ALL RR
+    LEFT JOIN GEO g ON g.IBGE = RR.COD_IBGE
+    WHERE 1=1
+    {uf_filter_g}
+    {municipio_filter_g}
+    {regional_filter_g}
+    {projeto_filter}
+),
+NEXUS_CN_CE AS (
+    SELECT
+        UPPER(TRIM(TECH)) AS TECH,
+        UPPER(TRIM(TIPO_CASA)) AS TIPO_CASA,
+        SUM(CAC) AS CAC_TOTAL
+    FROM TB_NEXUS_CN_CE
+    GROUP BY
+        UPPER(TRIM(TECH)),
+        UPPER(TRIM(TIPO_CASA))
+),
+TOTAL_OCS_GRUPO_ALL AS (
+    -- Denominador do rateio: sempre o universo completo (sem filtro
+    -- geográfico) — senão filtrar por UF faria aquele recorte "herdar"
+    -- 100% do orçamento nacional do grupo.
+    SELECT TECH, TIPO_CASA, SUM(NUM_OCS) AS TOTAL_OCS_GRUPO
+    FROM ROLLOUT_REFERENCIA_ALL
+    GROUP BY TECH, TIPO_CASA
+),
+BASE_RATEIO AS (
+    SELECT
+        RR.COD_IBGE,
+        RR.TECH,
+        RR.TIPO_CASA,
+        RR.ID_MASTER_PIVOT,
+        RR.NUM_OCS,
+        N.CAC_TOTAL,
+        G.TOTAL_OCS_GRUPO
+    FROM ROLLOUT_REFERENCIA RR
+    INNER JOIN NEXUS_CN_CE N
+        ON N.TECH = RR.TECH
+       AND N.TIPO_CASA = RR.TIPO_CASA
+    INNER JOIN TOTAL_OCS_GRUPO_ALL G
+        ON G.TECH = RR.TECH
+       AND G.TIPO_CASA = RR.TIPO_CASA
+),
+VALOR_POR_SITE AS (
+    SELECT
+        COD_IBGE,
+        TIPO_CASA,
+        CASE
+            WHEN TOTAL_OCS_GRUPO = 0 THEN 0
+            ELSE CAC_TOTAL * (NUM_OCS / TOTAL_OCS_GRUPO)
+        END AS VALOR
+    FROM BASE_RATEIO
+),
+-- Fornecedor dominante por município (mesma regra de R2_VENDORS_NEW_SITES)
+ALL_VENDORS AS (
+    SELECT
+        COD_IBGE,
+        COALESCE(
+            VENDOR_NR_3500, VENDOR_NR_26000, VENDOR_NR_2600DSS,
+            VENDOR_NR_2300, VENDOR_NR_2100DSS, VENDOR_NR_1800DSS, VENDOR_NR_700DSS,
+            VENDOR_LTE_2600P, VENDOR_LTE_2600, VENDOR_LTE_2600RS,
+            VENDOR_LTE_2300, VENDOR_LTE_2100, VENDOR_LTE_1800,
+            VENDOR_LTE_850, VENDOR_LTE_700,
+            VENDOR_UMTS_2100, VENDOR_UMTS_850,
+            VENDOR_GSM_1800, VENDOR_GSM_900
+        ) AS VENDOR
+    FROM NTW_MABE.BASE_TB_END_ID_NEW
+),
+DOMINANT_BY_CITY AS (
+    SELECT COD_IBGE, VENDOR
+    FROM (
+        SELECT
+            COD_IBGE,
+            UPPER(VENDOR) AS VENDOR,
+            ROW_NUMBER() OVER (
+                PARTITION BY COD_IBGE
+                ORDER BY COUNT(*) DESC
+            ) AS rn
+        FROM ALL_VENDORS
+        WHERE VENDOR IS NOT NULL
+        GROUP BY COD_IBGE, UPPER(VENDOR)
+    )
+    WHERE rn = 1
+)
+SELECT
+    CASE
+        WHEN v.TIPO_CASA = 'CN' THEN 'A Contratar (Casa Nova)'
+        WHEN d.VENDOR IS NOT NULL THEN d.VENDOR || ' (Existente)'
+        ELSE 'Sem info (Existente)'
+    END AS vendor,
+    SUM(v.VALOR) AS valor
+FROM VALOR_POR_SITE v
+LEFT JOIN DOMINANT_BY_CITY d ON d.COD_IBGE = v.COD_IBGE
+GROUP BY
+    CASE
+        WHEN v.TIPO_CASA = 'CN' THEN 'A Contratar (Casa Nova)'
+        WHEN d.VENDOR IS NOT NULL THEN d.VENDOR || ' (Existente)'
+        ELSE 'Sem info (Existente)'
+    END
+ORDER BY valor DESC
 """

@@ -87,19 +87,46 @@ FROM BASE
 """
 
 
-TABLE_TEMPLATE = """
+_STATUS_CASE = """
+    CASE
+        WHEN MES_DIV_{tec} IS NULL THEN NULL
+        WHEN MES_DIV_{tec} < TRUNC(SYSDATE, 'YYYY') THEN 'EOY_PREV'
+        WHEN MES_DIV_{tec} <= TRUNC(SYSDATE) THEN 'YTD'
+        WHEN MES_DIV_{tec} < ADD_MONTHS(TRUNC(SYSDATE, 'YYYY'), 12) THEN 'EOY_CURR'
+        ELSE NULL
+    END AS STATUS_{tec}"""
+
+# Fase de cada tecnologia por município: EOY_PREV (divulgado até 31/dez do ano
+# anterior), YTD (divulgado neste ano, até hoje) ou EOY_CURR (planejado até o
+# fim do ano corrente). O service traduz pros rótulos EOY25/YTD/EOY26.
+TABLE_TEMPLATE = (
+    """
 SELECT
-    UF,
     IBGE,
-    MUNICIPIO,
-    PRESENCA,
-    PRESENCA_5G,
-    PRESENCA_4G,
-    PRESENCA_3G,
-    PRESENCA_2G
+    UF,
+    MUNICIPIO,"""
+    + ",".join(_STATUS_CASE.format(tec=t) for t in ("5G", "4G", "3G", "2G"))
+    + """
 FROM BASE
 ORDER BY UF, MUNICIPIO
 """
+)
+
+
+# Velocímetros da aba Cidades: por tecnologia, quantos municípios estavam
+# divulgados no fechamento do ano anterior (EOY_PREV), quantos estão até hoje
+# (YTD) e quantos fecham o ano corrente (EOY_CURR, inclui os planejados).
+GAUGES_TEMPLATE = """
+SELECT
+    COUNT(*) AS total_municipios,
+    {metrics}
+FROM BASE
+"""
+
+GAUGE_METRIC = """
+    SUM(CASE WHEN MES_DIV_{tec} IS NOT NULL AND MES_DIV_{tec} < TRUNC(SYSDATE, 'YYYY') THEN 1 ELSE 0 END) AS eoy_prev_{tec},
+    SUM(CASE WHEN MES_DIV_{tec} IS NOT NULL AND MES_DIV_{tec} <= TRUNC(SYSDATE) THEN 1 ELSE 0 END) AS ytd_{tec},
+    SUM(CASE WHEN MES_DIV_{tec} IS NOT NULL AND MES_DIV_{tec} < ADD_MONTHS(TRUNC(SYSDATE, 'YYYY'), 12) THEN 1 ELSE 0 END) AS eoy_curr_{tec}"""
 
 
 UFS_QUERY = """
@@ -243,3 +270,23 @@ FROM (
 )
 ORDER BY TEC, PERIODO
 """
+
+GAUGE_TIM_METRIC = """
+    SUM(CASE WHEN LEAST(
+        NVL(MES_DIV_2G, DATE '9999-12-31'),
+        NVL(MES_DIV_3G, DATE '9999-12-31'),
+        NVL(MES_DIV_4G, DATE '9999-12-31'),
+        NVL(MES_DIV_5G, DATE '9999-12-31')
+    ) < TRUNC(SYSDATE, 'YYYY') THEN 1 ELSE 0 END) AS eoy_prev_tim,
+    SUM(CASE WHEN LEAST(
+        NVL(MES_DIV_2G, DATE '9999-12-31'),
+        NVL(MES_DIV_3G, DATE '9999-12-31'),
+        NVL(MES_DIV_4G, DATE '9999-12-31'),
+        NVL(MES_DIV_5G, DATE '9999-12-31')
+    ) <= TRUNC(SYSDATE) THEN 1 ELSE 0 END) AS ytd_tim,
+    SUM(CASE WHEN LEAST(
+        NVL(MES_DIV_2G, DATE '9999-12-31'),
+        NVL(MES_DIV_3G, DATE '9999-12-31'),
+        NVL(MES_DIV_4G, DATE '9999-12-31'),
+        NVL(MES_DIV_5G, DATE '9999-12-31')
+    ) < ADD_MONTHS(TRUNC(SYSDATE, 'YYYY'), 12) THEN 1 ELSE 0 END) AS eoy_curr_tim"""

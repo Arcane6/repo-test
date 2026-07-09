@@ -22,6 +22,9 @@ from modules.mobile_access.summary.queries import (
     R2_NEW_CITIES_BY_ANF,
     R2_VENDORS_NEW_SITES,
     R2_TOP_PROJECTS,
+    R2_ORCAMENTO_POR_TECNOLOGIA,
+    R2_ENDERECO_POR_TECNOLOGIA,
+    R2_VENDORS_NEXUS,
     R3_TOTAL_CITIES_BY_REGIONAL,
     YEARS_QUERY,
 )
@@ -74,15 +77,45 @@ def _prepare_params(filters):
     return {}, ano_int
 
 
+import string as _string
+
+
+def _template_fields(sql_template):
+    """Nomes de {placeholders} presentes num template."""
+    return {
+        name
+        for _, name, _, _ in _string.Formatter().parse(sql_template)
+        if name
+    }
+
+
 def _apply_geo_all(sql_template, filters, params,
-                    uf_field="UF", mun_field="MUNICIPIO",
-                    uf_key="uf_filter", mun_key="municipio_filter"):
-    """Injeta filtros geográficos genéricos num template."""
-    ufs = _normalize_list(filters.get("ufs"))
-    muns = _normalize_list(filters.get("municipios"))
-    uf_clause = _build_in_clause(uf_field, ufs, "uf", params)
-    mun_clause = _build_in_clause(mun_field, muns, "mun", params)
-    return sql_template.format(**{uf_key: uf_clause, mun_key: mun_clause})
+                   uf_field="UF", mun_field="MUNICIPIO",
+                   uf_key="uf_filter", mun_key="municipio_filter",
+                   regional_field="REGIONAL", regional_key="regional_filter",
+                   projeto_field="r.PRIORIDADE", projeto_key="projeto_filter"):
+    """
+    Injeta filtros (uf/município/regional/projeto) só nos placeholders que
+    o template realmente tem — cada visual referencia apenas os campos que
+    fazem sentido pra ele.
+    """
+    fields = _template_fields(sql_template)
+
+    # Só constrói a cláusula (e registra binds) para o placeholder que o
+    # template realmente tem — um bind sem placeholder correspondente
+    # dispararia ORA-01036.
+    spec = {
+        uf_key: (uf_field, _normalize_list(filters.get("ufs")), "uf"),
+        mun_key: (mun_field, _normalize_list(filters.get("municipios")), "mun"),
+        regional_key: (regional_field, _normalize_list(filters.get("regionais")), "reg"),
+        projeto_key: (projeto_field, _normalize_list(filters.get("projetos")), "proj"),
+    }
+    to_fill = {
+        key: _build_in_clause(field, values, prefix, params)
+        for key, (field, values, prefix) in spec.items()
+        if key in fields
+    }
+    return sql_template.format(**to_fill)
 
 
 def _tech_bars_payload(row):
@@ -129,6 +162,7 @@ def get_r1_sites_by_tech(filters):
     sql = _apply_geo_all(
         R1_SITES_BY_TECH, filters, params,
         uf_key="uf_filter_site", mun_key="municipio_filter_site",
+        regional_field="g.REGIONAL", regional_key="regional_filter_site",
     )
     row = (execute_query(sql, params) or [{}])[0]
     return {
@@ -161,7 +195,7 @@ def get_r1_vendors(filters):
     params, ano_int = _prepare_params(filters)
     params["baseline_date"] = _dt.date(ano_int - 1, 12, 31)
 
-    sql = _apply_geo_all(R1_VENDORS, filters, params)
+    sql = _apply_geo_all(R1_VENDORS, filters, params, regional_field="g.REGIONAL")
     rows = execute_query(sql, params) or []
     return _vendor_payload(rows)
 
@@ -178,6 +212,7 @@ def get_r2_sites_by_tech(filters):
         R2_SITES_BY_TECH, filters, params,
         uf_field="d.UF", mun_field="d.MUNICIPIO",
         uf_key="uf_filter_d", mun_key="municipio_filter_d",
+        regional_field="d.REGIONAL", regional_key="regional_filter_d",
     )
     row = (execute_query(sql, params) or [{}])[0]
 
@@ -239,6 +274,7 @@ def get_r2_vendors_new_sites(filters):
         R2_VENDORS_NEW_SITES, filters, params,
         uf_field="d.UF", mun_field="d.MUNICIPIO",
         uf_key="uf_filter_d", mun_key="municipio_filter_d",
+        regional_field="d.REGIONAL", regional_key="regional_filter_d",
     )
     rows = execute_query(sql, params) or []
 
@@ -268,12 +304,120 @@ def get_r2_top_projects(filters):
         R2_TOP_PROJECTS, filters, params,
         uf_field="d.UF", mun_field="d.MUNICIPIO",
         uf_key="uf_filter_d", mun_key="municipio_filter_d",
+        regional_field="d.REGIONAL", regional_key="regional_filter_d",
     )
     rows = execute_query(sql, params) or []
     return [
         {"projeto": r["prioridade"], "value": r.get("qtd", 0) or 0}
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# RAIA 2 — Financeiro (NEXUS)
+# ---------------------------------------------------------------------------
+
+def get_r2_orcamento_por_tecnologia(filters):
+    """CAPEX vs OPEX/LEASE do plano, rateado por OC e quebrado por
+    tecnologia (4G/5G) — fonte TB_NEXUS_FINANCEIRO."""
+    params, ano_int = _prepare_params(filters)
+    params["ano"] = ano_int
+
+    sql = _apply_geo_all(
+        R2_ORCAMENTO_POR_TECNOLOGIA, filters, params,
+        uf_field="g.UF", mun_field="g.MUNICIPIO",
+        uf_key="uf_filter_g", mun_key="municipio_filter_g",
+        regional_field="g.REGIONAL", regional_key="regional_filter_g",
+        projeto_field="R.PRIORIDADE",
+    )
+    rows = execute_query(sql, params) or []
+
+    techs = ["4G", "5G"]
+    grupos = ["CAPEX", "OPEX/LEASE"]
+    by_key = {(r["tech"], r["grupo"]): r.get("valor", 0) or 0 for r in rows}
+
+    return {
+        "categories": techs,
+        "series": [
+            {
+                "name": grupo,
+                "color": "#003399" if grupo == "CAPEX" else "#7DC242",
+                "data": [round(by_key.get((t, grupo), 0), 2) for t in techs],
+            }
+            for grupo in grupos
+        ],
+        "total": round(sum(by_key.values()), 2),
+    }
+
+
+def get_r2_endereco_por_tecnologia(filters):
+    """CAC (custo de aquisição) rateado por OC entre Casa Nova e Casa
+    Existente, por tecnologia — fonte TB_NEXUS_CN_CE."""
+    params, ano_int = _prepare_params(filters)
+    params["ano"] = ano_int
+
+    sql = _apply_geo_all(
+        R2_ENDERECO_POR_TECNOLOGIA, filters, params,
+        uf_field="g.UF", mun_field="g.MUNICIPIO",
+        uf_key="uf_filter_g", mun_key="municipio_filter_g",
+        regional_field="g.REGIONAL", regional_key="regional_filter_g",
+        projeto_field="RR.PRIORIDADE",
+    )
+    rows = execute_query(sql, params) or []
+
+    techs = ["4G", "5G"]
+    classificacoes = ["CN", "CE"]
+    labels = {"CN": "Casa Nova", "CE": "Casa Existente"}
+    by_key = {(r["tech"], r["classificacao"]): r.get("valor", 0) or 0 for r in rows}
+
+    return {
+        "categories": techs,
+        "series": [
+            {
+                "name": labels[c],
+                "color": "#26C281" if c == "CN" else "#1565C0",
+                "data": [round(by_key.get((t, c), 0), 2) for t in techs],
+            }
+            for c in classificacoes
+        ],
+        "total": round(sum(by_key.values()), 2),
+    }
+
+
+def get_r2_vendors_nexus(filters):
+    """Fornecedores do plano ponderados pelo CAC do NEXUS (mesmo rateio de
+    get_r2_endereco_por_tecnologia) — quebra 'Casa Existente' pelo
+    fornecedor dominante de cada município, batendo com o R$ do NEXUS."""
+    params, ano_int = _prepare_params(filters)
+    params["ano"] = ano_int
+
+    sql = _apply_geo_all(
+        R2_VENDORS_NEXUS, filters, params,
+        uf_field="g.UF", mun_field="g.MUNICIPIO",
+        uf_key="uf_filter_g", mun_key="municipio_filter_g",
+        regional_field="g.REGIONAL", regional_key="regional_filter_g",
+        projeto_field="RR.PRIORIDADE",
+    )
+    rows = execute_query(sql, params) or []
+
+    VENDOR_COLORS_NEXUS = {
+        "A CONTRATAR (CASA NOVA)": "#26C281",
+        "HUAWEI (EXISTENTE)": "#E60012",
+        "ERICSSON (EXISTENTE)": "#0082F0",
+        "NOKIA (EXISTENTE)": "#124191",
+        "ZTE (EXISTENTE)": "#3A67C1",
+        "SEM INFO (EXISTENTE)": "#adb5bd",
+    }
+
+    result = []
+    for r in rows:
+        name = r.get("vendor") or "Sem info (Existente)"
+        value = round(r.get("valor", 0) or 0, 2)
+        color = VENDOR_COLORS_NEXUS.get(name.upper(), "#888888")
+        result.append({"label": name, "value": value, "color": color})
+
+    result.sort(key=lambda x: x["value"], reverse=True)
+    return result
 
 
 # ---------------------------------------------------------------------------

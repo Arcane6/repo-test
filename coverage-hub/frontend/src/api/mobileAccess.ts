@@ -60,15 +60,30 @@ export interface VennResponse {
   total_municipios: number;
 }
 
+/** Fase de cada tecnologia no município: rótulo dinâmico (ex.: "EOY25",
+ * "YTD", "EOY26") ou null se a tecnologia não está prevista/divulgada. */
 export interface MunicipioRow {
+  ibge: string;
   uf: string;
   municipio: string;
-  ibge: string;
-  presenca: number;
-  presenca_5g: number;
-  presenca_4g: number;
-  presenca_3g: number;
-  presenca_2g: number;
+  status_5g: string | null;
+  status_4g: string | null;
+  status_3g: string | null;
+  status_2g: string | null;
+}
+
+export interface GaugeCard {
+  label: string;
+  color: string;
+  eoy_prev: number;
+  ytd: number;
+  eoy_curr: number;
+}
+
+export interface GaugesResponse {
+  labels: { prev: string; curr: string };
+  total_municipios: number;
+  cards: GaugeCard[];
 }
 
 export const mobileAccessApi = {
@@ -86,6 +101,9 @@ export const mobileAccessApi = {
   kpis: (filters: ActiveFilters) =>
     fetchJson<KpisResponse>(`${BASE}/kpis?${filtersToQuery(filters)}`),
 
+  gauges: (filters: ActiveFilters) =>
+    fetchJson<GaugesResponse>(`${BASE}/gauges?${filtersToQuery(filters)}`),
+
   venn: (filters: ActiveFilters) =>
     fetchJson<VennResponse>(`${BASE}/venn?${filtersToQuery(filters)}`),
 
@@ -97,4 +115,8 @@ export const mobileAccessApi = {
 
   table: (filters: ActiveFilters) =>
     fetchJson<MunicipioRow[]>(`${BASE}/table?${filtersToQuery(filters)}`),
+
+  /** Base completa (última carga), sem filtro — export sempre traz a
+   * versão mais recente inteira. */
+  tableExport: () => fetchJson<MunicipioRow[]>(`${BASE}/table/export`),
 };
