@@ -84,6 +84,7 @@ WITH BASE AS (
     AND TECNOLOGIA <> '-'
     {uf_filter_site}
     {municipio_filter_site}
+    {site_venn_filter}
 ),
 GEO AS (
     SELECT UF, MUNICIPIO, REGIONAL
@@ -114,6 +115,28 @@ LEFT JOIN GEO g ON g.UF = b.UF AND UPPER(g.MUNICIPIO) = UPPER(b.MUNICIPIO)
 WHERE 1=1
 {regional_filter_site}
 """
+
+# Combinação exata de tecnologias por fatia do Venn de 4 conjuntos — clicar
+# numa fatia filtra o próprio gráfico pela combinação exata (diferente de
+# "tem pelo menos uma dessas"), mesmo princípio do Venn de Presença da aba
+# Cidades.
+R1_SITES_VENN_REGION_CLAUSES = {
+    "only_2g": "HAS_2G=1 AND HAS_3G=0 AND HAS_4G=0 AND HAS_5G=0",
+    "only_3g": "HAS_2G=0 AND HAS_3G=1 AND HAS_4G=0 AND HAS_5G=0",
+    "only_4g": "HAS_2G=0 AND HAS_3G=0 AND HAS_4G=1 AND HAS_5G=0",
+    "only_5g": "HAS_2G=0 AND HAS_3G=0 AND HAS_4G=0 AND HAS_5G=1",
+    "i_23": "HAS_2G=1 AND HAS_3G=1 AND HAS_4G=0 AND HAS_5G=0",
+    "i_24": "HAS_2G=1 AND HAS_3G=0 AND HAS_4G=1 AND HAS_5G=0",
+    "i_25": "HAS_2G=1 AND HAS_3G=0 AND HAS_4G=0 AND HAS_5G=1",
+    "i_34": "HAS_2G=0 AND HAS_3G=1 AND HAS_4G=1 AND HAS_5G=0",
+    "i_35": "HAS_2G=0 AND HAS_3G=1 AND HAS_4G=0 AND HAS_5G=1",
+    "i_45": "HAS_2G=0 AND HAS_3G=0 AND HAS_4G=1 AND HAS_5G=1",
+    "i_234": "HAS_2G=1 AND HAS_3G=1 AND HAS_4G=1 AND HAS_5G=0",
+    "i_235": "HAS_2G=1 AND HAS_3G=1 AND HAS_4G=0 AND HAS_5G=1",
+    "i_245": "HAS_2G=1 AND HAS_3G=0 AND HAS_4G=1 AND HAS_5G=1",
+    "i_345": "HAS_2G=0 AND HAS_3G=1 AND HAS_4G=1 AND HAS_5G=1",
+    "i_2345": "HAS_2G=1 AND HAS_3G=1 AND HAS_4G=1 AND HAS_5G=1",
+}
 
 
 # ---------- Cidades cobertas por tecnologia (fechamento 25) ----------
