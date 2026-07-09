@@ -577,17 +577,14 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
  * filtro, perdendo a noção de proporção sobre o universo real). */
 export const TOTAL_MUNICIPIOS_BR = 5570;
 
-// Agulha simples (formato "pipa"), a mesma ideia de ponteiro clássico de
-// velocímetro — não um círculo/anel, uma agulha de verdade saindo do centro.
-const NEEDLE_ICON = "path://M2.9,0.6 L1,45 L-1,45 L-2.9,0.6 A3,3,0,1,1,2.9,0.6 Z";
-
 /**
  * Velocímetro (gauge) de progresso: meio-círculo padrão (abre pra baixo,
  * como um mostrador de velocímetro), valor baixo à esquerda e alto à
  * direita. O arco colorido marca os dois marcos fixos — o que já estava
  * fechado no ano anterior (piso, cinza) e o alvo do fechamento deste ano
  * (teto, cor da tecnologia); depois do alvo fica cinza-claro (ainda não
- * endereçado). A agulha aponta pro valor "até hoje" (YTD). Base sempre os
+ * endereçado). O marcador fica só na ponta, na posição do valor "até
+ * hoje" (YTD) — sem agulha visível saindo do centro. Base sempre os
  * 5.570 municípios do Brasil. Usado nos cards da aba Cidades no lugar do
  * KPI card antigo.
  */
@@ -612,10 +609,10 @@ export function gaugeOption(card: {
         radius: 108,
         center: ["50%", "92%"],
         pointer: {
-          icon: NEEDLE_ICON,
-          length: "72%",
-          width: 14,
-          itemStyle: { color: card.color },
+          icon: "circle",
+          length: "100%",
+          width: 18,
+          itemStyle: { color: "#fff", borderColor: card.color, borderWidth: 4 },
         },
         progress: { show: false },
         axisLine: {

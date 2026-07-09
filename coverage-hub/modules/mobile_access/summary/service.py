@@ -26,7 +26,6 @@ from modules.mobile_access.summary.queries import (
     R2_TOP_PROJECTS,
     R2_ORCAMENTO_POR_TECNOLOGIA,
     R2_ENDERECO_POR_TECNOLOGIA,
-    R2_VENDORS_NEXUS,
     R3_TOTAL_CITIES_BY_REGIONAL,
     YEARS_QUERY,
 )
@@ -421,42 +420,6 @@ def get_r2_endereco_por_tecnologia(filters):
         ],
         "total": round(sum(by_key.values()), 2),
     }
-
-
-def get_r2_vendors_nexus(filters):
-    """Fornecedores do plano ponderados pelo CAC do NEXUS (mesmo rateio de
-    get_r2_endereco_por_tecnologia) — quebra 'Casa Existente' pelo
-    fornecedor dominante de cada município, batendo com o R$ do NEXUS."""
-    params, ano_int = _prepare_params(filters)
-    params["ano"] = ano_int
-
-    sql = _apply_geo_all(
-        R2_VENDORS_NEXUS, filters, params,
-        uf_field="g.UF", mun_field="g.MUNICIPIO",
-        uf_key="uf_filter_g", mun_key="municipio_filter_g",
-        regional_field="g.REGIONAL", regional_key="regional_filter_g",
-        projeto_field="RR.PRIORIDADE",
-    )
-    rows = execute_query(sql, params) or []
-
-    VENDOR_COLORS_NEXUS = {
-        "A CONTRATAR (CASA NOVA)": "#26C281",
-        "HUAWEI (EXISTENTE)": "#E60012",
-        "ERICSSON (EXISTENTE)": "#0082F0",
-        "NOKIA (EXISTENTE)": "#124191",
-        "ZTE (EXISTENTE)": "#3A67C1",
-        "SEM INFO (EXISTENTE)": "#adb5bd",
-    }
-
-    result = []
-    for r in rows:
-        name = r.get("vendor") or "Sem info (Existente)"
-        value = round(r.get("valor", 0) or 0, 2)
-        color = VENDOR_COLORS_NEXUS.get(name.upper(), "#888888")
-        result.append({"label": name, "value": value, "color": color})
-
-    result.sort(key=lambda x: x["value"], reverse=True)
-    return result
 
 
 # ---------------------------------------------------------------------------

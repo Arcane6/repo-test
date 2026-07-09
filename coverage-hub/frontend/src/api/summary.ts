@@ -118,8 +118,6 @@ export const summaryApi = {
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/orcamento-por-tecnologia?${query(f)}`),
   r2EnderecoPorTecnologia: (f: SummaryFilters) =>
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/endereco-por-tecnologia?${query(f)}`),
-  r2VendorsNexus: (f: SummaryFilters) =>
-    fetchJson<LabeledValue[]>(`${BASE}/r2/vendors-nexus?${query(f)}`),
 
   r3SitesByTech: (f: SummaryFilters) =>
     fetchJson<StackedByTechResponse>(`${BASE}/r3/sites-by-tech?${query(f)}`),
