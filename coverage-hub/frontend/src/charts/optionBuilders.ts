@@ -577,15 +577,19 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
  * filtro, perdendo a noção de proporção sobre o universo real). */
 export const TOTAL_MUNICIPIOS_BR = 5570;
 
+// Agulha simples (formato "pipa"), a mesma ideia de ponteiro clássico de
+// velocímetro — não um círculo/anel, uma agulha de verdade saindo do centro.
+const NEEDLE_ICON = "path://M2.9,0.6 L1,45 L-1,45 L-2.9,0.6 A3,3,0,1,1,2.9,0.6 Z";
+
 /**
  * Velocímetro (gauge) de progresso: meio-círculo padrão (abre pra baixo,
- * como um "arco-íris"), valor baixo à esquerda e alto à direita. O arco
- * colorido marca os dois marcos fixos — o que já estava fechado no ano
- * anterior (piso, cinza) e o alvo do fechamento deste ano (teto, cor da
- * tecnologia); depois do alvo fica cinza-claro (ainda não endereçado).
- * O marcador (círculo com anel) fica sobre o arco na posição do valor
- * "até hoje" (YTD). Base sempre os 5.570 municípios do Brasil. Usado nos
- * cards da aba Cidades no lugar do KPI card antigo.
+ * como um mostrador de velocímetro), valor baixo à esquerda e alto à
+ * direita. O arco colorido marca os dois marcos fixos — o que já estava
+ * fechado no ano anterior (piso, cinza) e o alvo do fechamento deste ano
+ * (teto, cor da tecnologia); depois do alvo fica cinza-claro (ainda não
+ * endereçado). A agulha aponta pro valor "até hoje" (YTD). Base sempre os
+ * 5.570 municípios do Brasil. Usado nos cards da aba Cidades no lugar do
+ * KPI card antigo.
  */
 export function gaugeOption(card: {
   color: string;
@@ -608,10 +612,10 @@ export function gaugeOption(card: {
         radius: 108,
         center: ["50%", "92%"],
         pointer: {
-          icon: "circle",
-          length: "100%",
-          width: 22,
-          itemStyle: { color: "#fff", borderColor: card.color, borderWidth: 5 },
+          icon: NEEDLE_ICON,
+          length: "72%",
+          width: 14,
+          itemStyle: { color: card.color },
         },
         progress: { show: false },
         axisLine: {
@@ -624,10 +628,21 @@ export function gaugeOption(card: {
             ],
           },
         },
-        axisTick: { show: false },
-        splitLine: { show: false },
+        axisTick: {
+          show: true,
+          distance: -12,
+          length: 4,
+          splitNumber: 5,
+          lineStyle: { color: "auto", width: 1, opacity: 0.6 },
+        },
+        splitLine: {
+          show: true,
+          distance: -12,
+          length: 8,
+          lineStyle: { color: "auto", width: 2, opacity: 0.8 },
+        },
         axisLabel: { show: false },
-        anchor: { show: false },
+        anchor: { show: true, size: 7, itemStyle: { color: card.color } },
         title: { show: false },
         detail: {
           valueAnimation: true,

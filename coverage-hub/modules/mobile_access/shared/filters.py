@@ -18,7 +18,8 @@ def parse_filters():
         tecnologia      (multi)  ex.: ?tecnologia=5G
         regional        (multi)  ex.: ?regional=TSP  (cross-filter do Resumo)
         projeto         (multi)  ex.: ?projeto=X    (PRIORIDADE do rollout)
-        venn            (single) ex.: ?venn=only_2g (região exata do diagrama de Venn)
+        venn            (single) ex.: ?venn=only_2g (região exata do Venn de Presença — Cidades)
+        sitevenn        (single) ex.: ?sitevenn=i_2345 (região exata do Venn de Sites — Resumo R1)
         ano             (single) ex.: ?ano=2026
     """
     return {
@@ -28,5 +29,6 @@ def parse_filters():
         "regionais": request.args.getlist("regional"),
         "projetos": request.args.getlist("projeto"),
         "venn_region": request.args.get("venn"),
+        "site_venn_region": request.args.get("sitevenn"),
         "ano": request.args.get("ano"),
     }

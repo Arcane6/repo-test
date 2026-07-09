@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../api/summary";
 import { TECH_COLORS, TECH_ORDER } from "../theme";
@@ -7,37 +8,49 @@ import { downloadSheet } from "../utils/excelExport";
 
 /**
  * Diagrama de Venn de 4 conjuntos (2G/3G/4G/5G) — layout de 4 elipses
- * clássico, posições e raio fixos (calculados offline por amostragem de
- * pontos pra garantir que as 15 combinações não vazias fiquem visíveis e
- * com rótulo legível). Substitui "Total de Sites por Tecnologia": cada
- * site cai em exatamente uma fatia (a combinação exata que ele tem), sem
- * contar o mesmo site mais de uma vez.
+ * quase redondas, posições e raio fixos (calculados offline por amostragem
+ * de pontos pra garantir que as 15 combinações não vazias fiquem visíveis,
+ * com bom tamanho e rótulo legível). Substitui "Total de Sites por
+ * Tecnologia": cada site cai em exatamente uma fatia (a combinação exata
+ * que ele tem), sem contar o mesmo site mais de uma vez. Clicar numa
+ * fatia filtra o próprio gráfico pela combinação exata daquela fatia.
  */
 const ELLIPSES = [
-  { tec: "2G", cx: 166.6, cy: 205.1, rot: -112.0 },
-  { tec: "3G", cx: 194.0, cy: 189.4, rot: -38.5 },
-  { tec: "4G", cx: 306.0, cy: 189.4, rot: 38.5 },
-  { tec: "5G", cx: 333.4, cy: 205.1, rot: 112.0 },
+  { tec: "2G", cx: 226.4, cy: 208.3, rot: -128.0 },
+  { tec: "3G", cx: 229.2, cy: 190.3, rot: -44.0 },
+  { tec: "4G", cx: 270.8, cy: 190.3, rot: 44.0 },
+  { tec: "5G", cx: 273.6, cy: 208.3, rot: 128.0 },
 ];
-const RX = 130;
-const RY = 220;
+const RX = 170;
+const RY = 195.5;
 
 const REGION_POSITIONS: Record<string, { x: number; y: number; bold: boolean }> = {
-  only_2g: { x: 36.1, y: 268.8, bold: true },
-  only_3g: { x: 124.3, y: 76.7, bold: true },
-  only_4g: { x: 375.7, y: 76.7, bold: true },
-  only_5g: { x: 463.9, y: 268.8, bold: true },
-  i_23: { x: 98.8, y: 178.9, bold: false },
-  i_24: { x: 153.7, y: 335.8, bold: false },
-  i_25: { x: 250.0, y: 59.8, bold: false },
-  i_34: { x: 250.0, y: 345.3, bold: false },
-  i_35: { x: 346.3, y: 335.8, bold: false },
-  i_45: { x: 401.2, y: 178.9, bold: false },
-  i_234: { x: 176.0, y: 292.8, bold: false },
-  i_235: { x: 168.8, y: 124.1, bold: false },
-  i_245: { x: 331.2, y: 124.1, bold: false },
-  i_345: { x: 324.0, y: 292.8, bold: false },
-  i_2345: { x: 250.0, y: 193.5, bold: true },
+  only_2g: { x: 111.6, y: 321.8, bold: true },
+  only_3g: { x: 125.1, y: 61.8, bold: true },
+  only_4g: { x: 374.9, y: 61.8, bold: true },
+  only_5g: { x: 388.4, y: 321.8, bold: true },
+  i_23: { x: 82.4, y: 189.7, bold: false },
+  i_24: { x: 186.1, y: 359.6, bold: false },
+  i_25: { x: 250.0, y: 376.4, bold: false },
+  i_34: { x: 250.0, y: 24.3, bold: false },
+  i_35: { x: 313.9, y: 359.6, bold: false },
+  i_45: { x: 417.6, y: 189.7, bold: false },
+  i_234: { x: 131.5, y: 302.8, bold: false },
+  i_235: { x: 123.6, y: 110.4, bold: false },
+  i_245: { x: 376.4, y: 110.4, bold: false },
+  i_345: { x: 368.5, y: 302.8, bold: false },
+  i_2345: { x: 250.0, y: 199.2, bold: true },
+};
+
+/** Quais tecnologias cada fatia contém — usado pra somar o subtotal por
+ * tecnologia na legenda (soma de todas as fatias que incluem aquele tec). */
+const REGION_TECHS: Record<string, string[]> = {
+  only_2g: ["2G"], only_3g: ["3G"], only_4g: ["4G"], only_5g: ["5G"],
+  i_23: ["2G", "3G"], i_24: ["2G", "4G"], i_25: ["2G", "5G"],
+  i_34: ["3G", "4G"], i_35: ["3G", "5G"], i_45: ["4G", "5G"],
+  i_234: ["2G", "3G", "4G"], i_235: ["2G", "3G", "5G"],
+  i_245: ["2G", "4G", "5G"], i_345: ["3G", "4G", "5G"],
+  i_2345: ["2G", "3G", "4G", "5G"],
 };
 
 const REGION_LABELS: Record<string, string> = {
@@ -58,15 +71,30 @@ const REGION_LABELS: Record<string, string> = {
   i_2345: "2G + 3G + 4G + 5G",
 };
 
+const fmt = (v: number) => v.toLocaleString("pt-BR");
+
 export function SitesVennDiagram({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais, projetos } = filters;
+  const [selected, setSelected] = useState<string | null>(null);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["summary-r1-sites-venn", uf, municipio, ano, regionais, projetos],
-    queryFn: () => summaryApi.r1SitesVenn(filters),
+    queryKey: ["summary-r1-sites-venn", uf, municipio, ano, regionais, projetos, selected],
+    queryFn: () => summaryApi.r1SitesVenn(filters, selected),
   });
 
   const regions = data?.regions;
+
+  const techTotals: Record<string, number> = {};
+  for (const tec of TECH_ORDER) {
+    techTotals[tec] = Object.entries(REGION_TECHS).reduce(
+      (sum, [key, techs]) => sum + (techs.includes(tec) ? regions?.[key] ?? 0 : 0),
+      0,
+    );
+  }
+
+  function toggle(region: string) {
+    setSelected((prev) => (prev === region ? null : region));
+  }
 
   return (
     <div className="card shadow-sm h-100">
@@ -96,7 +124,9 @@ export function SitesVennDiagram({ filters }: { filters: SummaryFilters }) {
           />
         </div>
         <small className="text-muted d-block mb-2">
-          Cada site conta uma única vez, na combinação exata de tecnologias que possui
+          {selected
+            ? `Filtrando por ${REGION_LABELS[selected]} — clique de novo pra limpar`
+            : "Clique numa fatia pra filtrar; cada site conta uma única vez, na combinação exata que possui"}
         </small>
 
         <div className="d-flex justify-content-center gap-3 mb-2 flex-wrap">
@@ -111,14 +141,14 @@ export function SitesVennDiagram({ filters }: { filters: SummaryFilters }) {
                   background: TECH_COLORS[tec],
                 }}
               />
-              {tec}
+              {tec}: {fmt(techTotals[tec])}
             </span>
           ))}
         </div>
 
         <svg
-          viewBox="-120 -50 700 500"
-          style={{ width: "100%", height: 320 }}
+          viewBox="0 -20 500 440"
+          style={{ width: "100%", height: 300 }}
           opacity={isFetching ? 0.5 : 1}
         >
           {ELLIPSES.map((e) => (
@@ -135,21 +165,38 @@ export function SitesVennDiagram({ filters }: { filters: SummaryFilters }) {
               strokeWidth={1.5}
             />
           ))}
-          {Object.entries(REGION_POSITIONS).map(([key, pos]) => (
-            <text
-              key={key}
-              x={pos.x}
-              y={pos.y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontWeight={pos.bold ? 700 : 600}
-              fontSize={pos.bold ? 15 : 12}
-            >
-              <title>{REGION_LABELS[key]}</title>
-              {(regions?.[key] ?? 0).toLocaleString("pt-BR")}
-            </text>
-          ))}
+          {Object.entries(REGION_POSITIONS).map(([key, pos]) => {
+            const active = selected === key;
+            return (
+              <g
+                key={key}
+                onClick={() => toggle(key)}
+                style={{ cursor: "pointer" }}
+                opacity={selected && !active ? 0.4 : 1}
+              >
+                <title>{REGION_LABELS[key]} — clique para filtrar</title>
+                {active && (
+                  <circle cx={pos.x} cy={pos.y} r={26} fill="#fff" fillOpacity={0.6} stroke="#212529" strokeWidth={2} />
+                )}
+                <circle cx={pos.x} cy={pos.y} r={26} fill="transparent" />
+                <text
+                  x={pos.x}
+                  y={pos.y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontWeight={pos.bold ? 700 : 600}
+                  fontSize={pos.bold ? 15 : 12}
+                >
+                  {fmt(regions?.[key] ?? 0)}
+                </text>
+              </g>
+            );
+          })}
         </svg>
+
+        <div className="text-center small fw-bold mt-1">
+          Total: {fmt(data?.total_sites ?? 0)} sites
+        </div>
       </div>
     </div>
   );

@@ -93,8 +93,11 @@ export interface SitesVennResponse {
 export const summaryApi = {
   years: () => fetchJson<number[]>(`${BASE}/years`),
 
-  r1SitesVenn: (f: SummaryFilters) =>
-    fetchJson<SitesVennResponse>(`${BASE}/r1/sites-venn?${query(f)}`),
+  r1SitesVenn: (f: SummaryFilters, siteVennRegion?: string | null) => {
+    const params = query(f);
+    const extra = siteVennRegion ? `&sitevenn=${encodeURIComponent(siteVennRegion)}` : "";
+    return fetchJson<SitesVennResponse>(`${BASE}/r1/sites-venn?${params}${extra}`);
+  },
 
   r1SitesByTech: (f: SummaryFilters) =>
     fetchJson<TechBarsResponse>(`${BASE}/r1/sites-by-tech?${query(f)}`),

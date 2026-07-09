@@ -17,6 +17,7 @@ from modules.mobile_access.shared.constants import (
 from modules.mobile_access.summary.queries import (
     R1_SITES_BY_TECH,
     R1_SITES_VENN,
+    R1_SITES_VENN_REGION_CLAUSES,
     R1_CITIES_BY_TECH,
     R1_VENDORS,
     R2_SITES_BY_TECH,
@@ -183,15 +184,27 @@ VENN_REGION_KEYS = [
 ]
 
 
+def _build_site_venn_clause(region):
+    """Combinação exata de tecnologias (fatia clicada do Venn de 4
+    conjuntos). `region` vem de query param — só aceitamos valores do
+    whitelist R1_SITES_VENN_REGION_CLAUSES, sem risco de injeção."""
+    clause = R1_SITES_VENN_REGION_CLAUSES.get(region or "")
+    return f"AND {clause}" if clause else ""
+
+
 def get_r1_sites_venn(filters):
     """Sites por tecnologia como diagrama de Venn de 4 conjuntos — cada site
     conta uma única vez, na combinação exata de tecnologias que ele tem
     (não por cascata), fonte TB_FT_BASE_UNICA_SITES (mesma regra do
-    Power BI anterior: exclui roaming, só site móvel, tec informada)."""
+    Power BI anterior: exclui roaming, só site móvel, tec informada).
+    Clicar numa fatia filtra o próprio gráfico por aquela combinação exata."""
     params, _ = _prepare_params(filters)
 
+    venn_clause = _build_site_venn_clause(filters.get("site_venn_region"))
+    template = R1_SITES_VENN.replace("{site_venn_filter}", venn_clause)
+
     sql = _apply_geo_all(
-        R1_SITES_VENN, filters, params,
+        template, filters, params,
         uf_key="uf_filter_site", mun_key="municipio_filter_site",
         regional_field="g.REGIONAL", regional_key="regional_filter_site",
     )
