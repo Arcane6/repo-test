@@ -16,6 +16,7 @@ from modules.mobile_access.shared.constants import (
 )
 from modules.mobile_access.summary.queries import (
     R1_SITES_BY_TECH,
+    R1_SITES_VENN,
     R1_CITIES_BY_TECH,
     R1_VENDORS,
     R2_SITES_BY_TECH,
@@ -172,6 +173,32 @@ def get_r1_sites_by_tech(filters):
             for t in TECH_ORDER
         ],
         "total": row.get("total_sites", 0) or 0,
+    }
+
+
+VENN_REGION_KEYS = [
+    "only_2g", "only_3g", "only_4g", "only_5g",
+    "i_23", "i_24", "i_25", "i_34", "i_35", "i_45",
+    "i_234", "i_235", "i_245", "i_345", "i_2345",
+]
+
+
+def get_r1_sites_venn(filters):
+    """Sites por tecnologia como diagrama de Venn de 4 conjuntos — cada site
+    conta uma única vez, na combinação exata de tecnologias que ele tem
+    (não por cascata), fonte TB_FT_BASE_UNICA_SITES (mesma regra do
+    Power BI anterior: exclui roaming, só site móvel, tec informada)."""
+    params, _ = _prepare_params(filters)
+
+    sql = _apply_geo_all(
+        R1_SITES_VENN, filters, params,
+        uf_key="uf_filter_site", mun_key="municipio_filter_site",
+        regional_field="g.REGIONAL", regional_key="regional_filter_site",
+    )
+    row = (execute_query(sql, params) or [{}])[0]
+    return {
+        "regions": {key: row.get(key, 0) or 0 for key in VENN_REGION_KEYS},
+        "total_sites": row.get("total_sites", 0) or 0,
     }
 
 

@@ -107,6 +107,10 @@ def api_summary_years():
 def api_summary_r1_sites():
     return jsonify(summary.get_r1_sites_by_tech(parse_filters()))
 
+@mobile_access_bp.route("/api/summary/r1/sites-venn")
+def api_summary_r1_sites_venn():
+    return jsonify(summary.get_r1_sites_venn(parse_filters()))
+
 @mobile_access_bp.route("/api/summary/r1/cities-by-tech")
 def api_summary_r1_cities():
     return jsonify(summary.get_r1_cities_by_tech(parse_filters()))

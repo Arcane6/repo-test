@@ -578,12 +578,14 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
 export const TOTAL_MUNICIPIOS_BR = 5570;
 
 /**
- * Velocímetro (gauge) de progresso: ponteiro no valor "até hoje" (YTD),
- * com a faixa colorida do arco marcando os dois marcos fixos — o que já
- * estava fechado no ano anterior (piso) e o alvo do fechamento deste ano
- * (teto). Base sempre os 5.570 municípios do Brasil; o arco enche da
- * direita (0, EOY25) para a esquerda (máximo, EOY26). Usado nos cards da
- * aba Cidades no lugar do KPI card antigo.
+ * Velocímetro (gauge) de progresso: meio-círculo padrão (abre pra baixo,
+ * como um "arco-íris"), valor baixo à esquerda e alto à direita. O arco
+ * colorido marca os dois marcos fixos — o que já estava fechado no ano
+ * anterior (piso, cinza) e o alvo do fechamento deste ano (teto, cor da
+ * tecnologia); depois do alvo fica cinza-claro (ainda não endereçado).
+ * O marcador (círculo com anel) fica sobre o arco na posição do valor
+ * "até hoje" (YTD). Base sempre os 5.570 municípios do Brasil. Usado nos
+ * cards da aba Cidades no lugar do KPI card antigo.
  */
 export function gaugeOption(card: {
   color: string;
@@ -599,12 +601,18 @@ export function gaugeOption(card: {
     series: [
       {
         type: "gauge",
-        startAngle: -20,
-        endAngle: 200,
+        startAngle: 180,
+        endAngle: 0,
         min: 0,
         max,
-        radius: "88%",
-        pointer: { show: true, itemStyle: { color: card.color }, length: "55%", width: 5 },
+        radius: 108,
+        center: ["50%", "92%"],
+        pointer: {
+          icon: "circle",
+          length: "100%",
+          width: 22,
+          itemStyle: { color: "#fff", borderColor: card.color, borderWidth: 5 },
+        },
         progress: { show: false },
         axisLine: {
           lineStyle: {
@@ -619,11 +627,11 @@ export function gaugeOption(card: {
         axisTick: { show: false },
         splitLine: { show: false },
         axisLabel: { show: false },
-        anchor: { show: true, size: 10, itemStyle: { color: card.color, borderWidth: 0 } },
+        anchor: { show: false },
         title: { show: false },
         detail: {
           valueAnimation: true,
-          offsetCenter: [0, "65%"],
+          offsetCenter: [0, "-25%"],
           formatter: () => fmt(card.ytd),
           fontSize: 22,
           fontWeight: "bold",
