@@ -2,12 +2,19 @@ import { TECH_ORDER } from "../theme";
 import { SMALL_MULTIPLE_COLORS } from "../charts/optionBuilders";
 import type { StackedByTechResponse } from "../api/summary";
 
+interface SmallMultiplesTechProps {
+  data?: StackedByTechResponse;
+  focusedTec?: string | null;
+  onSelectTec?: (tec: string) => void;
+}
+
 /**
  * Grid de mini-cards por tecnologia com barrinhas de proporção — não é
  * um gráfico ECharts, é HTML/CSS puro (mais leve e mais fácil de ler
- * em espaços pequenos do que 4 gráficos de barra separados).
+ * em espaços pequenos do que 4 gráficos de barra separados). Clicável:
+ * participa do cross-filter de tecnologia entre as raias do Resumo.
  */
-export function SmallMultiplesTech({ data }: { data?: StackedByTechResponse }) {
+export function SmallMultiplesTech({ data, focusedTec, onSelectTec }: SmallMultiplesTechProps) {
   if (!data || data.series.length === 0) return null;
 
   const perTecMax = data.categories.map((_, i) =>
@@ -22,10 +29,16 @@ export function SmallMultiplesTech({ data }: { data?: StackedByTechResponse }) {
 
         const total = data.series.reduce((s, ser) => s + (ser.data[i] || 0), 0);
         const maxForCard = perTecMax[i];
+        const dimmed = focusedTec ? focusedTec !== tec : false;
 
         return (
           <div className="col-3" key={tec}>
-            <div className="sm-tec-card">
+            <button
+              type="button"
+              className={`sm-tec-card${focusedTec === tec ? " sm-tec-card--focused" : ""}`}
+              style={{ opacity: dimmed ? 0.45 : 1 }}
+              onClick={onSelectTec ? () => onSelectTec(tec) : undefined}
+            >
               <div className="sm-tec-title">{tec}</div>
               <div className="sm-tec-total">{total.toLocaleString("pt-BR")}</div>
               {data.series.map((ser) => {
@@ -41,7 +54,7 @@ export function SmallMultiplesTech({ data }: { data?: StackedByTechResponse }) {
                   </div>
                 );
               })}
-            </div>
+            </button>
           </div>
         );
       })}

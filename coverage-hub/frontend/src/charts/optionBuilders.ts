@@ -1,15 +1,46 @@
 import type { EChartsCoreOption } from "echarts/core";
 import type { LabeledValue, RegionalSeriesResponse, TechBar, TechSeries } from "../api/summary";
 
+/**
+ * Catálogo de "templates" de gráfico — funções puras que recebem dados
+ * já no formato da API e devolvem um `option` do ECharts pronto pra
+ * `<Chart/>`/`<ChartPanel/>`. A ideia: um gráfico novo quase sempre se
+ * encaixa numa dessas formas; ao invés de escrever `option` do zero,
+ * primeiro olhe se algum builder abaixo já serve (ajustando cor/rótulo),
+ * e só escreva um novo se a forma for genuinamente diferente.
+ *
+ *   barsByTechOption      barras verticais, uma por tecnologia
+ *   horizontalBarsOption  ranking (top N) em barras horizontais
+ *   donutOption           donut com legenda embaixo
+ *   pieOption             pizza cheia, paleta cíclica (categorias sem cor própria)
+ *   regionalSunburstOption donut com total no centro + legenda rica (2 séries empilhadas por categoria)
+ *   vendorDonutSideOption  donut com total no centro, legenda lateral simples
+ *   timeSeriesOption       linhas acumuladas ao longo do tempo, com Δ no tooltip
+ *
+ * Todos aceitam um parâmetro de destaque opcional (`focusedX`) que
+ * reduz a opacidade de tudo que não bate com o valor focado — é o que
+ * dá o cross-filter visual entre painéis sem precisar reconsultar a API.
+ */
+
 const CYCLIC_PALETTE = [
   "#003399", "#7DC242", "#F5C518", "#E53935", "#1E88E5",
   "#795548", "#7B1FA2", "#00897B", "#FB8C00", "#5D4037",
 ];
 
 const fmt = (v: number) => v.toLocaleString("pt-BR");
+const pct = (part: number, total: number) => (total ? ((part / total) * 100).toFixed(1) : "0");
 
-/** Barras verticais simples por tecnologia (R1 sites/cidades por tec). */
-export function barsByTechOption(bars: TechBar[]): EChartsCoreOption {
+/**
+ * Barras verticais simples por tecnologia (R1 sites/cidades por tec).
+ * `total` é o total real do universo (ex.: total de municípios) — não a
+ * soma das barras, porque um município pode contar em mais de uma
+ * tecnologia ao mesmo tempo (2G e 5G não são mutuamente exclusivos).
+ */
+export function barsByTechOption(
+  bars: TechBar[],
+  total: number,
+  focusedTec?: string | null,
+): EChartsCoreOption {
   if (bars.length === 0) return {};
   return {
     grid: { left: 45, right: 30, top: 20, bottom: 40 },
@@ -17,7 +48,7 @@ export function barsByTechOption(bars: TechBar[]): EChartsCoreOption {
       trigger: "axis",
       formatter: (params: unknown) => {
         const p = (params as { name: string; value: number }[])[0];
-        return `<b>${p.name}</b><br/>${fmt(p.value)}`;
+        return `<b>${p.name}</b><br/>${fmt(p.value)} <span style="opacity:0.65">(${pct(p.value, total)}% do total)</span>`;
       },
     },
     xAxis: { type: "category", data: bars.map((b) => b.tec), axisLabel: { fontWeight: "bold" } },
@@ -25,7 +56,13 @@ export function barsByTechOption(bars: TechBar[]): EChartsCoreOption {
     series: [
       {
         type: "bar",
-        data: bars.map((b) => ({ value: b.value, itemStyle: { color: b.color } })),
+        data: bars.map((b) => ({
+          value: b.value,
+          itemStyle: {
+            color: b.color,
+            opacity: !focusedTec || focusedTec === b.tec ? 1 : 0.3,
+          },
+        })),
         barMaxWidth: 40,
         label: { show: true, position: "top", fontWeight: "bold", formatter: (p: { value: number }) => fmt(p.value) },
       },
@@ -43,6 +80,7 @@ interface NamedValue {
 export function horizontalBarsOption(items: NamedValue[], limit = 12): EChartsCoreOption {
   if (items.length === 0) return {};
   const sliced = items.slice(0, limit).reverse();
+  const total = items.reduce((s, d) => s + (d.value || 0), 0);
   return {
     grid: { left: 140, right: 50, top: 10, bottom: 20 },
     tooltip: {
@@ -50,7 +88,7 @@ export function horizontalBarsOption(items: NamedValue[], limit = 12): EChartsCo
       axisPointer: { type: "shadow" },
       formatter: (params: unknown) => {
         const p = (params as { name: string; value: number }[])[0];
-        return `<b>${p.name}</b><br/>${fmt(p.value)}`;
+        return `<b>${p.name}</b><br/>${fmt(p.value)} <span style="opacity:0.65">(${pct(p.value, total)}% do total)</span>`;
       },
     },
     xAxis: { type: "value", axisLabel: { formatter: (v: number) => fmt(v) } },
@@ -105,7 +143,10 @@ export function donutOption(items: LabeledValue[]): EChartsCoreOption {
 }
 
 /** Pizza cheia com paleta cíclica (R2 novas cidades por regional). */
-export function pieOption(slices: { label: string; value: number }[]): EChartsCoreOption {
+export function pieOption(
+  slices: { label: string; value: number }[],
+  focusedLabel?: string | null,
+): EChartsCoreOption {
   if (slices.length === 0) return {};
   const total = slices.reduce((s, d) => s + (d.value || 0), 0);
   return {
@@ -134,7 +175,10 @@ export function pieOption(slices: { label: string; value: number }[]): EChartsCo
         data: slices.map((d, i) => ({
           name: d.label,
           value: d.value,
-          itemStyle: { color: CYCLIC_PALETTE[i % CYCLIC_PALETTE.length] },
+          itemStyle: {
+            color: CYCLIC_PALETTE[i % CYCLIC_PALETTE.length],
+            opacity: !focusedLabel || focusedLabel === d.label ? 1 : 0.35,
+          },
         })),
       },
     ],
@@ -142,7 +186,10 @@ export function pieOption(slices: { label: string; value: number }[]): EChartsCo
 }
 
 /** Donut com total no centro + legenda rica Base/Ganho (R3 cidades por regional). */
-export function regionalSunburstOption(data: RegionalSeriesResponse): EChartsCoreOption {
+export function regionalSunburstOption(
+  data: RegionalSeriesResponse,
+  focusedRegional?: string | null,
+): EChartsCoreOption {
   if (data.categories.length === 0) return {};
 
   const base = data.series.find((s) => s.name === "Base 25")?.data ?? [];
@@ -155,7 +202,10 @@ export function regionalSunburstOption(data: RegionalSeriesResponse): EChartsCor
       value: (base[i] || 0) + (ganho[i] || 0),
       base: base[i] || 0,
       ganho: ganho[i] || 0,
-      itemStyle: { color: CYCLIC_PALETTE[i % CYCLIC_PALETTE.length] },
+      itemStyle: {
+        color: CYCLIC_PALETTE[i % CYCLIC_PALETTE.length],
+        opacity: !focusedRegional || focusedRegional === cat ? 1 : 0.35,
+      },
     }))
     .sort((a, b) => b.value - a.value);
 
@@ -290,5 +340,82 @@ export const SMALL_MULTIPLE_COLORS: Record<string, string> = {
   "Casa Nova": "#26C281",
   "Casa Existente": "#1565C0",
 };
+
+export interface NamedTimeSeries {
+  name: string;
+  color: string;
+  values: number[];
+}
+
+/**
+ * Linhas ao longo do tempo (ex.: municípios acumulados por tecnologia).
+ * Tooltip mostra a variação vs. o período anterior de cada série — não
+ * só o nível, o movimento, que é o que interessa numa leitura executiva.
+ */
+export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): EChartsCoreOption {
+  if (series.length === 0 || periods.length === 0) return {};
+
+  return {
+    grid: { left: 55, right: 30, top: 30, bottom: 60 },
+    tooltip: {
+      trigger: "axis",
+      formatter: (raw: unknown) => {
+        const params = raw as {
+          seriesIndex: number;
+          dataIndex: number;
+          seriesName: string;
+          value: number;
+          color: string;
+          axisValue: string;
+        }[];
+        if (!params.length) return "";
+        const rows = [...params]
+          .sort((a, b) => b.value - a.value)
+          .map((p) => {
+            const prev = series[p.seriesIndex]?.values[p.dataIndex - 1];
+            const delta = prev !== undefined ? p.value - prev : null;
+            const deltaHtml =
+              delta === null
+                ? ""
+                : delta === 0
+                  ? ` <span style="opacity:0.55">(sem variação)</span>`
+                  : ` <span style="color:${delta > 0 ? "#2e7d32" : "#c62828"}">(${delta > 0 ? "+" : ""}${fmt(delta)} no período)</span>`;
+            return `<div style="display:flex; align-items:center; gap:8px; margin:2px 0;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
+              <b>${p.seriesName}</b>
+              <span style="margin-left:auto; font-weight:bold;">${fmt(p.value)}</span>
+              ${deltaHtml}
+            </div>`;
+          })
+          .join("");
+        return `<div style="font-weight:bold; margin-bottom:4px;">${params[0].axisValue}</div>${rows}`;
+      },
+    },
+    legend: {
+      data: series.map((s) => s.name),
+      bottom: 0,
+      icon: "circle",
+      textStyle: { fontWeight: "bold" },
+    },
+    xAxis: {
+      type: "category",
+      data: periods,
+      boundaryGap: false,
+      axisLine: { lineStyle: { color: "#999" } },
+    },
+    yAxis: { type: "value", splitLine: { lineStyle: { color: "#eee" } } },
+    series: series.map((s) => ({
+      name: s.name,
+      type: "line",
+      step: "end",
+      showSymbol: false,
+      lineStyle: { width: 2, color: s.color },
+      itemStyle: { color: s.color },
+      areaStyle: { color: s.color, opacity: 0.25 },
+      emphasis: { focus: "series" },
+      data: s.values,
+    })),
+  };
+}
 
 export type { TechSeries };

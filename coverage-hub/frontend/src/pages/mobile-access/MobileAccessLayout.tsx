@@ -1,12 +1,14 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { PageHeader } from "../../components/PageHeader";
 
 export function MobileAccessLayout() {
   return (
     <div className="container-fluid mt-4">
-      <div className="mb-4">
-        <h3 className="fw-bold mb-1">Acesso Móvel</h3>
-        <small className="text-muted">Cobertura por município, tecnologia e frequência</small>
-      </div>
+      <PageHeader
+        icon="bi bi-broadcast-pin"
+        title="Acesso Móvel"
+        subtitle="Cobertura por município, tecnologia e frequência"
+      />
 
       <ul className="nav nav-tabs mb-4" role="tablist">
         <li className="nav-item" role="presentation">

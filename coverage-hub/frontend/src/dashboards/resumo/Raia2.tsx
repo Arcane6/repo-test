@@ -5,9 +5,12 @@ import { ChartPanel } from "../../components/ChartPanel";
 import { SmallMultiplesTech } from "../../components/SmallMultiplesTech";
 import { ChartToolbar } from "../../components/ChartToolbar";
 import { downloadSheet } from "../../utils/excelExport";
+import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia2({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano } = filters;
+  const { tecnologia: focusedTec, regional: focusedRegional, toggleTecnologia, toggleRegional } =
+    useResumoFocusStore();
 
   const { data: sites } = useQuery({
     queryKey: ["summary-r2-sites", uf, municipio, ano],
@@ -45,7 +48,8 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
                 <div>
                   <h6 className="fw-bold mb-2">OCs do Plano por Tecnologia</h6>
                   <small className="text-muted d-block mb-3">
-                    Ações do rollout · Casa Nova cria site novo · Casa Existente é upgrade
+                    Ações do rollout · Casa Nova cria site novo · Casa Existente é upgrade —
+                    clique numa tecnologia pra destacar nas outras raias
                   </small>
                 </div>
                 <ChartToolbar
@@ -70,7 +74,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
                 />
               </div>
 
-              <SmallMultiplesTech data={sites} />
+              <SmallMultiplesTech data={sites} focusedTec={focusedTec} onSelectTec={toggleTecnologia} />
 
               <div className="d-flex justify-content-center gap-3 mt-3 small">
                 <span><i className="sm-legend-box" style={{ background: "#26C281" }} /> Casa Nova</span>
@@ -83,9 +87,11 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-3">
           <ChartPanel
             title="Novas Cidades por Regional"
+            subtitle="Clique numa fatia pra destacar o regional na Raia 3"
             height={340}
-            option={pieOption(citiesAnf?.slices ?? [])}
+            option={pieOption(citiesAnf?.slices ?? [], focusedRegional)}
             loading={loadingCitiesAnf}
+            onClick={(e) => toggleRegional(e.name)}
             imageFilename="r2-novas-cidades-por-regional.png"
             exportSheet={{
               name: "R2 Novas Cidades por Regional",
