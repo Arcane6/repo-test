@@ -185,6 +185,73 @@ export function pieOption(
   };
 }
 
+export interface StackedSeriesInput {
+  name: string;
+  color: string;
+  data: number[];
+}
+
+/**
+ * Barras empilhadas, verticais ou horizontais, com uma categoria por
+ * segmento e a série (tecnologia, tipo de gasto, etc.) na legenda. Usado
+ * pelo ex-Venn (horizontal), frequências por tecnologia e os gráficos de
+ * rateio NEXUS (verticais).
+ */
+export function stackedBarsOption(
+  categories: string[],
+  series: StackedSeriesInput[],
+  opts: { horizontal?: boolean; valueFormatter?: (v: number) => string } = {},
+): EChartsCoreOption {
+  if (categories.length === 0 || series.length === 0) return {};
+  const { horizontal = false, valueFormatter = fmt } = opts;
+
+  const categoryAxis = {
+    type: "category" as const,
+    data: categories,
+    axisTick: { show: false },
+    axisLine: { lineStyle: { color: "#999" } },
+    axisLabel: { fontWeight: "bold" as const },
+  };
+  const valueAxis = { type: "value" as const, show: false };
+
+  return {
+    grid: horizontal
+      ? { left: 60, right: 30, top: 20, bottom: 40 }
+      : { left: 20, right: 20, top: 30, bottom: 60 },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (raw: unknown) => {
+        const params = raw as { seriesName: string; value: number; color: string; axisValue: string }[];
+        if (!params.length) return "";
+        const total = params.reduce((s, p) => s + (p.value || 0), 0);
+        const rows = params
+          .filter((p) => p.value)
+          .map(
+            (p) =>
+              `<div style="display:flex;align-items:center;gap:8px;margin:2px 0;">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color}"></span>
+                <b>${p.seriesName}</b>
+                <span style="margin-left:auto;font-weight:bold;">${valueFormatter(p.value)}</span>
+              </div>`,
+          )
+          .join("");
+        return `<div style="font-weight:bold;margin-bottom:4px;">${params[0].axisValue}</div>${rows}<div style="margin-top:4px;opacity:0.65;">Total: ${valueFormatter(total)}</div>`;
+      },
+    },
+    legend: { data: series.map((s) => s.name), bottom: 0, icon: "circle", textStyle: { fontWeight: "bold" } },
+    xAxis: horizontal ? valueAxis : categoryAxis,
+    yAxis: horizontal ? categoryAxis : valueAxis,
+    series: series.map((s) => ({
+      name: s.name,
+      type: "bar",
+      stack: "total",
+      itemStyle: { color: s.color },
+      data: s.data,
+    })),
+  };
+}
+
 /** Donut com total no centro + legenda rica Base/Ganho (R3 cidades por regional). */
 export function regionalSunburstOption(
   data: RegionalSeriesResponse,
@@ -272,6 +339,80 @@ export function regionalSunburstOption(
         },
         labelLine: { show: false },
         data: donutData,
+      },
+    ],
+  };
+}
+
+/**
+ * Donut com total no centro + legenda lateral, paleta cíclica por
+ * categoria — mesmo estilo visual de `regionalSunburstOption` (R3
+ * Cidades 5G por Regional), mas para séries de valor único (sem
+ * breakdown Base/Ganho). Usado em "Novas Cidades por Regional" (R2).
+ */
+export function regionalDonutOption(
+  slices: { label: string; value: number }[],
+  totalLabel: string,
+  focusedLabel?: string | null,
+): EChartsCoreOption {
+  if (slices.length === 0) return {};
+  const total = slices.reduce((s, d) => s + (d.value || 0), 0);
+  const sorted = [...slices].sort((a, b) => b.value - a.value);
+
+  return {
+    title: {
+      text: fmt(total),
+      subtext: totalLabel,
+      left: "32%",
+      top: "42%",
+      textAlign: "center",
+      textStyle: { fontSize: 22, fontWeight: "bold", color: "#003399" },
+      subtextStyle: { fontSize: 10 },
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: (p: unknown) => {
+        const d = p as { name: string; value: number };
+        const pct = total ? ((d.value / total) * 100).toFixed(1) : "0";
+        return `<b>${d.name}</b><br/>${fmt(d.value)} (${pct}%)`;
+      },
+    },
+    legend: {
+      type: "scroll",
+      orient: "vertical",
+      right: 8,
+      top: "center",
+      itemGap: 10,
+      icon: "circle",
+      textStyle: { fontSize: 10 },
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["52%", "82%"],
+        center: ["32%", "52%"],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 4, borderColor: "#fff", borderWidth: 2 },
+        label: {
+          show: true,
+          position: "inside",
+          fontWeight: "bold",
+          color: "#fff",
+          fontSize: 11,
+          formatter: (p: { value: number }) => {
+            const pct = total ? (p.value / total) * 100 : 0;
+            return pct < 5 ? "" : fmt(p.value);
+          },
+        },
+        labelLine: { show: false },
+        data: sorted.map((d, i) => ({
+          name: d.label,
+          value: d.value,
+          itemStyle: {
+            color: CYCLIC_PALETTE[i % CYCLIC_PALETTE.length],
+            opacity: !focusedLabel || focusedLabel === d.label ? 1 : 0.35,
+          },
+        })),
       },
     ],
   };
@@ -402,8 +543,11 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
       data: periods,
       boundaryGap: false,
       axisLine: { lineStyle: { color: "#999" } },
+      axisLabel: {
+        formatter: (value: string) => (value.endsWith("-01") ? value.slice(0, 4) : ""),
+      },
     },
-    yAxis: { type: "value", splitLine: { lineStyle: { color: "#eee" } } },
+    yAxis: { type: "value", show: false },
     series: series.map((s) => ({
       name: s.name,
       type: "line",
@@ -415,6 +559,62 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
       emphasis: { focus: "series" },
       data: s.values,
     })),
+  };
+}
+
+/**
+ * Velocímetro (gauge) de progresso: ponteiro no valor "até hoje" (YTD),
+ * com a faixa colorida do arco marcando os dois marcos fixos — o que já
+ * estava fechado no ano anterior (piso) e o alvo do fechamento deste ano
+ * (teto). Usado nos cards da aba Cidades no lugar do KPI card antigo.
+ */
+export function gaugeOption(card: {
+  color: string;
+  eoy_prev: number;
+  ytd: number;
+  eoy_curr: number;
+}): EChartsCoreOption {
+  const max = Math.max(card.eoy_curr, card.ytd, card.eoy_prev, 1);
+  const prevRatio = Math.min(card.eoy_prev / max, 1);
+  const currRatio = Math.min(Math.max(card.eoy_curr / max, prevRatio), 1);
+
+  return {
+    series: [
+      {
+        type: "gauge",
+        startAngle: 200,
+        endAngle: -20,
+        min: 0,
+        max,
+        radius: "88%",
+        pointer: { show: true, itemStyle: { color: card.color }, length: "55%", width: 5 },
+        progress: { show: false },
+        axisLine: {
+          lineStyle: {
+            width: 12,
+            color: [
+              [prevRatio, "#c7d2e0"],
+              [currRatio, card.color],
+              [1, "rgba(0,0,0,0.06)"],
+            ],
+          },
+        },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: { show: false },
+        anchor: { show: true, size: 10, itemStyle: { color: card.color, borderWidth: 0 } },
+        title: { show: false },
+        detail: {
+          valueAnimation: true,
+          offsetCenter: [0, "65%"],
+          formatter: () => fmt(card.ytd),
+          fontSize: 22,
+          fontWeight: "bold",
+          color: card.color,
+        },
+        data: [{ value: card.ytd }],
+      },
+    ],
   };
 }
 

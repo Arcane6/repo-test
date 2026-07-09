@@ -2,11 +2,15 @@ import { fetchJson } from "./client";
 
 const BASE = "/mobile-access/api/summary";
 
-/** Resumo não usa filtro de tecnologia (é "N/A" nessa aba) — só geo + ano. */
+/** Resumo não usa filtro de tecnologia (é "N/A" nessa aba) — geo + ano +
+ * regional/projeto (cross-filter: clicar num regional ou projeto refiltra
+ * todos os gráficos da aba, não só realça visualmente). */
 export interface SummaryFilters {
   uf: string[];
   municipio: string[];
   ano: string | null;
+  regionais?: string[];
+  projetos?: string[];
 }
 
 function query(filters: SummaryFilters): string {
@@ -14,6 +18,8 @@ function query(filters: SummaryFilters): string {
   filters.uf.forEach((v) => params.append("uf", v));
   filters.municipio.forEach((v) => params.append("municipio", v));
   if (filters.ano) params.append("ano", filters.ano);
+  (filters.regionais ?? []).forEach((v) => params.append("regional", v));
+  (filters.projetos ?? []).forEach((v) => params.append("projeto", v));
   return params.toString();
 }
 
@@ -71,6 +77,12 @@ export interface ProjectItem {
   value: number;
 }
 
+export interface StackedByGroupResponse {
+  categories: string[];
+  series: { name: string; color: string; data: number[] }[];
+  total: number;
+}
+
 export const summaryApi = {
   years: () => fetchJson<number[]>(`${BASE}/years`),
 
@@ -89,6 +101,12 @@ export const summaryApi = {
     fetchJson<LabeledValue[]>(`${BASE}/r2/vendors-new-sites?${query(f)}`),
   r2TopProjects: (f: SummaryFilters) =>
     fetchJson<ProjectItem[]>(`${BASE}/r2/top-projects?${query(f)}`),
+  r2OrcamentoPorTecnologia: (f: SummaryFilters) =>
+    fetchJson<StackedByGroupResponse>(`${BASE}/r2/orcamento-por-tecnologia?${query(f)}`),
+  r2EnderecoPorTecnologia: (f: SummaryFilters) =>
+    fetchJson<StackedByGroupResponse>(`${BASE}/r2/endereco-por-tecnologia?${query(f)}`),
+  r2VendorsNexus: (f: SummaryFilters) =>
+    fetchJson<LabeledValue[]>(`${BASE}/r2/vendors-nexus?${query(f)}`),
 
   r3SitesByTech: (f: SummaryFilters) =>
     fetchJson<StackedByTechResponse>(`${BASE}/r3/sites-by-tech?${query(f)}`),

@@ -395,3 +395,34 @@ body {
 [data-theme="dark"] .tim-page-header-icon {
   color: #7d9cff;
 }
+
+/* =============================================================================
+ * SourceBadge — "de onde vem esse número"
+ * ============================================================================= */
+
+.tim-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--tim-text-muted);
+  background: var(--tim-hover-bg);
+  border: 1px solid var(--tim-card-border);
+  white-space: nowrap;
+}
+
+.tim-source-badge i {
+  font-size: 0.7rem;
+}
+
+.tim-source-badge-ref {
+  font-weight: 700;
+  color: var(--tim-navbar-bg-1);
+}
+
+[data-theme="dark"] .tim-source-badge-ref {
+  color: #7d9cff;
+}

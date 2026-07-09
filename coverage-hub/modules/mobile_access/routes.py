@@ -9,6 +9,7 @@ from flask import jsonify
 from flask import request
 
 from modules.mobile_access.shared.filters import parse_filters
+from modules.mobile_access.shared.refs import get_refs
 from modules.mobile_access.actual import service as actual
 from modules.mobile_access.summary import service as summary
 
@@ -18,6 +19,15 @@ mobile_access_bp = Blueprint(
     __name__,
     url_prefix="/mobile-access",
 )
+
+
+# ---------------------------------------------------------------------------
+# API — referências das tabelas-fonte (badge "de onde vem esse número")
+# ---------------------------------------------------------------------------
+
+@mobile_access_bp.route("/api/refs")
+def api_refs():
+    return jsonify(get_refs())
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +44,11 @@ def api_actual_kpis():
     return jsonify(actual.get_kpis(**_net_filters()))
 
 
+@mobile_access_bp.route("/api/actual/gauges")
+def api_actual_gauges():
+    return jsonify(actual.get_gauges(**_net_filters()))
+
+
 @mobile_access_bp.route("/api/actual/venn")
 def api_actual_venn():
     return jsonify(actual.get_venn(**_net_filters()))
@@ -42,6 +57,13 @@ def api_actual_venn():
 @mobile_access_bp.route("/api/actual/table")
 def api_actual_table():
     return jsonify(actual.get_table(**_net_filters()))
+
+
+@mobile_access_bp.route("/api/actual/table/export")
+def api_actual_table_export():
+    """Base completa (última carga), sem filtro — o export sempre entrega
+    a versão mais recente inteira, não o recorte filtrado na tela."""
+    return jsonify(actual.get_full_base())
 
 
 @mobile_access_bp.route("/api/actual/timeseries")
@@ -105,6 +127,18 @@ def api_summary_r2_vendors():
 @mobile_access_bp.route("/api/summary/r2/top-projects")
 def api_summary_r2_projects():
     return jsonify(summary.get_r2_top_projects(parse_filters()))
+
+@mobile_access_bp.route("/api/summary/r2/orcamento-por-tecnologia")
+def api_summary_r2_orcamento():
+    return jsonify(summary.get_r2_orcamento_por_tecnologia(parse_filters()))
+
+@mobile_access_bp.route("/api/summary/r2/endereco-por-tecnologia")
+def api_summary_r2_endereco():
+    return jsonify(summary.get_r2_endereco_por_tecnologia(parse_filters()))
+
+@mobile_access_bp.route("/api/summary/r2/vendors-nexus")
+def api_summary_r2_vendors_nexus():
+    return jsonify(summary.get_r2_vendors_nexus(parse_filters()))
 
 
 # Raia 3 — Fechamento 26

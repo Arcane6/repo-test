@@ -7,6 +7,7 @@ import { Skeleton } from "./Skeleton";
 import { downloadChartImage } from "../charts/exportImage";
 import { downloadSheet, type SheetSpec } from "../utils/excelExport";
 import type { ChartClickEvent } from "../charts/types";
+import { SourceBadge } from "./SourceBadge";
 
 interface ChartPanelProps {
   title: string;
@@ -19,6 +20,8 @@ interface ChartPanelProps {
   imageFilename?: string;
   /** Base bruta por trás do gráfico, pra exportar em Excel. Omitir esconde o botão. */
   exportSheet?: SheetSpec;
+  /** Tabela(s)-fonte do gráfico — mostra o badge "de onde vem esse número" ao lado do título. */
+  sourceTable?: string | string[];
 }
 
 /**
@@ -35,6 +38,7 @@ export function ChartPanel({
   onClick,
   imageFilename,
   exportSheet,
+  sourceTable,
 }: ChartPanelProps) {
   const instanceRef = useRef<echarts.ECharts | null>(null);
 
@@ -49,7 +53,10 @@ export function ChartPanel({
       <div className="card-body d-flex flex-column">
         <div className="d-flex justify-content-between align-items-start mb-1">
           <div>
-            <h6 className="fw-bold mb-1">{title}</h6>
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <h6 className="fw-bold mb-0">{title}</h6>
+              {sourceTable && <SourceBadge table={sourceTable} />}
+            </div>
             {subtitle && <small className="text-muted d-block mb-2">{subtitle}</small>}
           </div>
           <ChartToolbar

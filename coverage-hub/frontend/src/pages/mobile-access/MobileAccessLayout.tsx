@@ -4,11 +4,7 @@ import { PageHeader } from "../../components/PageHeader";
 export function MobileAccessLayout() {
   return (
     <div className="container-fluid mt-4">
-      <PageHeader
-        icon="bi bi-broadcast-pin"
-        title="Acesso Móvel"
-        subtitle="Cobertura por município, tecnologia e frequência"
-      />
+      <PageHeader icon="bi bi-broadcast-pin" title="Acesso Móvel" />
 
       <ul className="nav nav-tabs mb-4" role="tablist">
         <li className="nav-item" role="presentation">

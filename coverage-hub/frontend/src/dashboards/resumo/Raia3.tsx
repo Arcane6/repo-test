@@ -4,31 +4,37 @@ import { horizontalBarsOption, regionalSunburstOption, vendorDonutSideOption } f
 import { ChartPanel } from "../../components/ChartPanel";
 import { SmallMultiplesTech } from "../../components/SmallMultiplesTech";
 import { ChartToolbar } from "../../components/ChartToolbar";
+import { SourceBadge } from "../../components/SourceBadge";
 import { downloadSheet } from "../../utils/excelExport";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia3({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano } = filters;
-  const { tecnologia: focusedTec, regional: focusedRegional, toggleTecnologia, toggleRegional } =
-    useResumoFocusStore();
+  const { uf, municipio, ano, regionais, projetos } = filters;
+  const {
+    tecnologia: focusedTec,
+    regional: focusedRegional,
+    toggleTecnologia,
+    toggleRegional,
+    toggleProjeto,
+  } = useResumoFocusStore();
 
   const { data: sites } = useQuery({
-    queryKey: ["summary-r3-sites", uf, municipio, ano],
+    queryKey: ["summary-r3-sites", uf, municipio, ano, regionais, projetos],
     queryFn: () => summaryApi.r3SitesByTech(filters),
   });
 
   const { data: citiesAnf, isFetching: loadingCitiesAnf } = useQuery({
-    queryKey: ["summary-r3-cities-anf", uf, municipio, ano],
+    queryKey: ["summary-r3-cities-anf", uf, municipio, ano, regionais],
     queryFn: () => summaryApi.r3NewCitiesByAnf(filters),
   });
 
   const { data: vendors, isFetching: loadingVendors } = useQuery({
-    queryKey: ["summary-r3-vendors", uf, municipio, ano],
+    queryKey: ["summary-r3-vendors", uf, municipio, ano, regionais, projetos],
     queryFn: () => summaryApi.r3Vendors(filters),
   });
 
   const { data: projects, isFetching: loadingProjects } = useQuery({
-    queryKey: ["summary-r3-projects", uf, municipio, ano],
+    queryKey: ["summary-r3-projects", uf, municipio, ano, regionais, projetos],
     queryFn: () => summaryApi.r3TopProjects(filters),
   });
 
@@ -42,11 +48,40 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
 
       <div className="row g-3">
         <div className="col-lg-3">
+          <ChartPanel
+            title="Cidades 5G por Regional (Projeção EoY)"
+            subtitle="Clique num regional pra filtrar toda a aba"
+            sourceTable="MUNICIPIOS_FECHAMENTO"
+            height={340}
+            option={citiesAnf ? regionalSunburstOption(citiesAnf, focusedRegional) : {}}
+            loading={loadingCitiesAnf}
+            onClick={(e) => toggleRegional(e.name)}
+            imageFilename="r3-cidades-5g-por-regional.png"
+            exportSheet={{
+              name: "R3 Cidades por Regional",
+              columns: [
+                { header: "Regional", key: "regional" },
+                { header: "Base 25", key: "base" },
+                { header: "Ganho 26", key: "ganho" },
+              ],
+              rows: (citiesAnf?.categories ?? []).map((regional, i) => ({
+                regional,
+                base: citiesAnf?.series[0]?.data[i] ?? 0,
+                ganho: citiesAnf?.series[1]?.data[i] ?? 0,
+              })),
+            }}
+          />
+        </div>
+
+        <div className="col-lg-3">
           <div className="card shadow-sm h-100">
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-start mb-1">
                 <div>
-                  <h6 className="fw-bold mb-2">Sites Físicos EoY 26</h6>
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <h6 className="fw-bold mb-0">Sites Físicos EoY 26</h6>
+                    <SourceBadge table={["TB_FT_BASE_UNICA_SITES", "TB_ROLLOUT_ACESSO"]} />
+                  </div>
                   <small className="text-muted d-block mb-3">
                     Base 25 + Casa Nova · Upgrades não somam (já existem na Base)
                   </small>
@@ -88,33 +123,9 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
 
         <div className="col-lg-3">
           <ChartPanel
-            title="Cidades 5G por Regional (Projeção EoY)"
-            subtitle="Clique num regional pra destacar na Raia 2"
-            height={340}
-            option={citiesAnf ? regionalSunburstOption(citiesAnf, focusedRegional) : {}}
-            loading={loadingCitiesAnf}
-            onClick={(e) => toggleRegional(e.name)}
-            imageFilename="r3-cidades-5g-por-regional.png"
-            exportSheet={{
-              name: "R3 Cidades por Regional",
-              columns: [
-                { header: "Regional", key: "regional" },
-                { header: "Base 25", key: "base" },
-                { header: "Ganho 26", key: "ganho" },
-              ],
-              rows: (citiesAnf?.categories ?? []).map((regional, i) => ({
-                regional,
-                base: citiesAnf?.series[0]?.data[i] ?? 0,
-                ganho: citiesAnf?.series[1]?.data[i] ?? 0,
-              })),
-            }}
-          />
-        </div>
-
-        <div className="col-lg-3">
-          <ChartPanel
             title="Fornecedores EoY 26"
             subtitle="Sites físicos · Base 25 existentes + Casa Nova a contratar"
+            sourceTable={["BASE_TB_END_ID_NEW", "TB_ROLLOUT_ACESSO"]}
             height={340}
             option={vendorDonutSideOption(vendors ?? [])}
             loading={loadingVendors}
@@ -133,9 +144,12 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-3">
           <ChartPanel
             title="Top 10 Projetos"
+            subtitle="Clique num projeto pra filtrar toda a aba"
+            sourceTable="TB_ROLLOUT_ACESSO"
             height={340}
             option={horizontalBarsOption((projects ?? []).map((p) => ({ name: p.projeto, value: p.value })))}
             loading={loadingProjects}
+            onClick={(e) => toggleProjeto(e.name)}
             imageFilename="r3-top-projetos.png"
             exportSheet={{
               name: "R3 Top Projetos",

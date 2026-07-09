@@ -7,19 +7,31 @@ import { Raia3 } from "./resumo/Raia3";
 
 export function ResumoDashboard() {
   const { uf, municipio, ano } = useFilterStore();
-  const filters = { uf, municipio, ano };
-  const { tecnologia: focusedTec, regional: focusedRegional, clear: clearFocus } = useResumoFocusStore();
-  const hasFocus = Boolean(focusedTec || focusedRegional);
+  const {
+    tecnologia: focusedTec,
+    regional: focusedRegional,
+    projeto: focusedProjeto,
+    clear: clearFocus,
+  } = useResumoFocusStore();
+  const filters = {
+    uf,
+    municipio,
+    ano,
+    regionais: focusedRegional ? [focusedRegional] : [],
+    projetos: focusedProjeto ? [focusedProjeto] : [],
+  };
+  const hasFocus = Boolean(focusedTec || focusedRegional || focusedProjeto);
 
   return (
     <div>
       <div className="mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <p className="text-muted mb-0">Visão executiva: fechamento 25, plano 26 e projeção EoY 26</p>
+        <p className="text-muted mb-0">Resumo executivo</p>
         {hasFocus && (
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFocus}>
             <i className="bi bi-x-lg" /> Limpar destaque
             {focusedTec && <span className="badge bg-secondary ms-2">{focusedTec}</span>}
             {focusedRegional && <span className="badge bg-secondary ms-2">{focusedRegional}</span>}
+            {focusedProjeto && <span className="badge bg-secondary ms-2">{focusedProjeto}</span>}
           </button>
         )}
       </div>

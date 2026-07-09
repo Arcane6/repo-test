@@ -40,7 +40,8 @@ export function TimelineChart() {
   return (
     <ChartPanel
       title="Linha do Tempo"
-      subtitle="Municípios acumulados por tecnologia"
+      subtitle="Municípios acumulados por tecnologia — últimos 10 anos"
+      sourceTable="MUNICIPIOS_FECHAMENTO"
       option={option}
       loading={isFetching}
       height={420}

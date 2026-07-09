@@ -1,34 +1,40 @@
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
-import { donutOption, horizontalBarsOption, pieOption } from "../../charts/optionBuilders";
+import { horizontalBarsOption, regionalDonutOption, stackedBarsOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
-import { SmallMultiplesTech } from "../../components/SmallMultiplesTech";
-import { ChartToolbar } from "../../components/ChartToolbar";
-import { downloadSheet } from "../../utils/excelExport";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia2({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano } = filters;
-  const { tecnologia: focusedTec, regional: focusedRegional, toggleTecnologia, toggleRegional } =
-    useResumoFocusStore();
-
-  const { data: sites } = useQuery({
-    queryKey: ["summary-r2-sites", uf, municipio, ano],
-    queryFn: () => summaryApi.r2SitesByTech(filters),
-  });
+  const { uf, municipio, ano, regionais, projetos } = filters;
+  const {
+    regional: focusedRegional,
+    projeto: focusedProjeto,
+    toggleRegional,
+    toggleProjeto,
+  } = useResumoFocusStore();
 
   const { data: citiesAnf, isFetching: loadingCitiesAnf } = useQuery({
-    queryKey: ["summary-r2-cities-anf", uf, municipio, ano],
+    queryKey: ["summary-r2-cities-anf", uf, municipio, ano, regionais, projetos],
     queryFn: () => summaryApi.r2NewCitiesByAnf(filters),
   });
 
-  const { data: vendors, isFetching: loadingVendors } = useQuery({
-    queryKey: ["summary-r2-vendors", uf, municipio, ano],
-    queryFn: () => summaryApi.r2VendorsNewSites(filters),
+  const { data: orcamento, isFetching: loadingOrcamento } = useQuery({
+    queryKey: ["summary-r2-orcamento", uf, municipio, ano, regionais, projetos],
+    queryFn: () => summaryApi.r2OrcamentoPorTecnologia(filters),
+  });
+
+  const { data: endereco, isFetching: loadingEndereco } = useQuery({
+    queryKey: ["summary-r2-endereco", uf, municipio, ano, regionais, projetos],
+    queryFn: () => summaryApi.r2EnderecoPorTecnologia(filters),
+  });
+
+  const { data: vendorsNexus, isFetching: loadingVendorsNexus } = useQuery({
+    queryKey: ["summary-r2-vendors-nexus", uf, municipio, ano, regionais, projetos],
+    queryFn: () => summaryApi.r2VendorsNexus(filters),
   });
 
   const { data: projects, isFetching: loadingProjects } = useQuery({
-    queryKey: ["summary-r2-projects", uf, municipio, ano],
+    queryKey: ["summary-r2-projects", uf, municipio, ano, regionais, projetos],
     queryFn: () => summaryApi.r2TopProjects(filters),
   });
 
@@ -42,54 +48,12 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
 
       <div className="row g-3">
         <div className="col-lg-3">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-start mb-1">
-                <div>
-                  <h6 className="fw-bold mb-2">OCs do Plano por Tecnologia</h6>
-                  <small className="text-muted d-block mb-3">
-                    Ações do rollout · Casa Nova cria site novo · Casa Existente é upgrade —
-                    clique numa tecnologia pra destacar nas outras raias
-                  </small>
-                </div>
-                <ChartToolbar
-                  onExportData={
-                    sites
-                      ? () =>
-                          downloadSheet("r2-ocs-por-tecnologia.xlsx", {
-                            name: "R2 OCs por Tecnologia",
-                            columns: [
-                              { header: "Tecnologia", key: "tec" },
-                              { header: "Casa Nova", key: "nova" },
-                              { header: "Casa Existente", key: "existente" },
-                            ],
-                            rows: sites.categories.map((tec, i) => ({
-                              tec,
-                              nova: sites.series[0]?.data[i] ?? 0,
-                              existente: sites.series[1]?.data[i] ?? 0,
-                            })),
-                          })
-                      : undefined
-                  }
-                />
-              </div>
-
-              <SmallMultiplesTech data={sites} focusedTec={focusedTec} onSelectTec={toggleTecnologia} />
-
-              <div className="d-flex justify-content-center gap-3 mt-3 small">
-                <span><i className="sm-legend-box" style={{ background: "#26C281" }} /> Casa Nova</span>
-                <span><i className="sm-legend-box" style={{ background: "#1565C0" }} /> Casa Existente</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-lg-3">
           <ChartPanel
             title="Novas Cidades por Regional"
-            subtitle="Clique numa fatia pra destacar o regional na Raia 3"
+            subtitle="Clique num regional pra filtrar toda a aba"
+            sourceTable="MUNICIPIOS_FECHAMENTO"
             height={340}
-            option={pieOption(citiesAnf?.slices ?? [], focusedRegional)}
+            option={regionalDonutOption(citiesAnf?.slices ?? [], "Novas cidades", focusedRegional)}
             loading={loadingCitiesAnf}
             onClick={(e) => toggleRegional(e.name)}
             imageFilename="r2-novas-cidades-por-regional.png"
@@ -106,29 +70,93 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
 
         <div className="col-lg-3">
           <ChartPanel
-            title="OCs do Plano por Fornecedor"
-            subtitle="Casa Nova a contratar · Upgrades pelo vendor do site existente"
+            title="Orçamento por Tecnologia"
+            subtitle="CAPEX x OPEX/LEASE rateado por OC (R$ milhões)"
+            sourceTable={["TB_ROLLOUT_ACESSO", "TB_NEXUS_FINANCEIRO"]}
             height={340}
-            option={donutOption(vendors ?? [])}
-            loading={loadingVendors}
-            imageFilename="r2-ocs-por-fornecedor.png"
+            option={stackedBarsOption(
+              orcamento?.categories ?? [],
+              orcamento?.series ?? [],
+              { valueFormatter: (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) },
+            )}
+            loading={loadingOrcamento}
+            imageFilename="r2-orcamento-por-tecnologia.png"
             exportSheet={{
-              name: "R2 Fornecedores",
+              name: "R2 Orçamento por Tecnologia",
               columns: [
-                { header: "Fornecedor", key: "label" },
-                { header: "OCs", key: "value" },
+                { header: "Tecnologia", key: "tech" },
+                { header: "CAPEX (R$ mi)", key: "capex" },
+                { header: "OPEX/LEASE (R$ mi)", key: "opex" },
               ],
-              rows: vendors ?? [],
+              rows: (orcamento?.categories ?? []).map((tech, i) => ({
+                tech,
+                capex: orcamento?.series[0]?.data[i] ?? 0,
+                opex: orcamento?.series[1]?.data[i] ?? 0,
+              })),
             }}
           />
         </div>
 
         <div className="col-lg-3">
           <ChartPanel
-            title="Top 10 Projetos"
+            title="Endereço por Tecnologia"
+            subtitle="CAC rateado por OC — Casa Nova x Casa Existente (R$ milhões)"
+            sourceTable={["TB_ROLLOUT_ACESSO", "TB_NEXUS_CN_CE"]}
             height={340}
+            option={stackedBarsOption(
+              endereco?.categories ?? [],
+              endereco?.series ?? [],
+              { valueFormatter: (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) },
+            )}
+            loading={loadingEndereco}
+            imageFilename="r2-endereco-por-tecnologia.png"
+            exportSheet={{
+              name: "R2 Endereço por Tecnologia",
+              columns: [
+                { header: "Tecnologia", key: "tech" },
+                { header: "Casa Nova (R$ mi)", key: "nova" },
+                { header: "Casa Existente (R$ mi)", key: "existente" },
+              ],
+              rows: (endereco?.categories ?? []).map((tech, i) => ({
+                tech,
+                nova: endereco?.series[0]?.data[i] ?? 0,
+                existente: endereco?.series[1]?.data[i] ?? 0,
+              })),
+            }}
+          />
+        </div>
+
+        <div className="col-lg-3">
+          <ChartPanel
+            title="OCs do Plano por Fornecedor"
+            subtitle="Ponderado pelo CAC do NEXUS (R$) — mesmo rateio do Endereço por Tecnologia"
+            sourceTable={["TB_ROLLOUT_ACESSO", "TB_NEXUS_CN_CE"]}
+            height={340}
+            option={vendorDonutSideOption(vendorsNexus ?? [])}
+            loading={loadingVendorsNexus}
+            imageFilename="r2-ocs-por-fornecedor.png"
+            exportSheet={{
+              name: "R2 Fornecedores (NEXUS)",
+              columns: [
+                { header: "Fornecedor", key: "label" },
+                { header: "R$ milhões", key: "value" },
+              ],
+              rows: vendorsNexus ?? [],
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="row g-3 mt-1">
+        <div className="col-12">
+          <ChartPanel
+            title="Top 10 Projetos"
+            subtitle="Clique num projeto pra filtrar toda a aba"
+            sourceTable="TB_ROLLOUT_ACESSO"
+            height={320}
             option={horizontalBarsOption((projects ?? []).map((p) => ({ name: p.projeto, value: p.value })))}
             loading={loadingProjects}
+            onClick={(e) => toggleProjeto(e.name)}
             imageFilename="r2-top-projetos.png"
             exportSheet={{
               name: "R2 Top Projetos",
@@ -139,6 +167,11 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
               rows: projects ?? [],
             }}
           />
+          {focusedProjeto && (
+            <small className="text-muted d-block mt-1">
+              Filtrando toda a aba pelo projeto <b>{focusedProjeto}</b>
+            </small>
+          )}
         </div>
       </div>
     </div>
