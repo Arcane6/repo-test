@@ -3,16 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { barsByTechOption, horizontalBarsOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
+import { SitesVennDiagram } from "../../components/SitesVennDiagram";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia1({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais } = filters;
   const { tecnologia: focusedTec, toggleTecnologia } = useResumoFocusStore();
-
-  const { data: sites, isFetching: loadingSites } = useQuery({
-    queryKey: ["summary-r1-sites", uf, municipio, ano, regionais],
-    queryFn: () => summaryApi.r1SitesByTech(filters),
-  });
 
   const { data: cities, isFetching: loadingCities } = useQuery({
     queryKey: ["summary-r1-cities", uf, municipio, ano, regionais],
@@ -53,23 +49,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
           />
         </div>
         <div className="col-lg-4">
-          <ChartPanel
-            title="Total de Sites por Tecnologia"
-            subtitle="Clique numa barra pra destacar a tecnologia nas outras raias"
-            sourceTable="TB_FT_BASE_UNICA_SITES"
-            option={barsByTechOption(sites?.bars ?? [], sites?.total ?? 0, focusedTec)}
-            loading={loadingSites}
-            onClick={(e) => toggleTecnologia(e.name)}
-            imageFilename="r1-sites-por-tecnologia.png"
-            exportSheet={{
-              name: "R1 Sites por Tecnologia",
-              columns: [
-                { header: "Tecnologia", key: "tec" },
-                { header: "Sites", key: "value" },
-              ],
-              rows: sites?.bars ?? [],
-            }}
-          />
+          <SitesVennDiagram filters={filters} />
         </div>
         <div className="col-lg-4">
           <ChartPanel

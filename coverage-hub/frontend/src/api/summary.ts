@@ -83,8 +83,18 @@ export interface StackedByGroupResponse {
   total: number;
 }
 
+/** Contagem de sites por combinação exata de tecnologias (2G/3G/4G/5G) —
+ * as 15 regiões não vazias de um diagrama de Venn de 4 conjuntos. */
+export interface SitesVennResponse {
+  regions: Record<string, number>;
+  total_sites: number;
+}
+
 export const summaryApi = {
   years: () => fetchJson<number[]>(`${BASE}/years`),
+
+  r1SitesVenn: (f: SummaryFilters) =>
+    fetchJson<SitesVennResponse>(`${BASE}/r1/sites-venn?${query(f)}`),
 
   r1SitesByTech: (f: SummaryFilters) =>
     fetchJson<TechBarsResponse>(`${BASE}/r1/sites-by-tech?${query(f)}`),
