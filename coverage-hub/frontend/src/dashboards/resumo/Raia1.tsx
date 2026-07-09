@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { barsByTechOption, horizontalBarsOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
-import { SitesVennDiagram } from "../../components/SitesVennDiagram";
+import { SitesComboChart } from "../../components/SitesComboChart";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia1({ filters }: { filters: SummaryFilters }) {
@@ -49,7 +49,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
           />
         </div>
         <div className="col-lg-4">
-          <SitesVennDiagram filters={filters} />
+          <SitesComboChart filters={filters} />
         </div>
         <div className="col-lg-4">
           <ChartPanel

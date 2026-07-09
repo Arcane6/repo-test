@@ -145,11 +145,6 @@ def api_summary_r2_orcamento():
 def api_summary_r2_endereco():
     return jsonify(summary.get_r2_endereco_por_tecnologia(parse_filters()))
 
-@mobile_access_bp.route("/api/summary/r2/vendors-nexus")
-def api_summary_r2_vendors_nexus():
-    return jsonify(summary.get_r2_vendors_nexus(parse_filters()))
-
-
 # Raia 3 — Fechamento 26
 @mobile_access_bp.route("/api/summary/r3/sites-by-tech")
 def api_summary_r3_sites():

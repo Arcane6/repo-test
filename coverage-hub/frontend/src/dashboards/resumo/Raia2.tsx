@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
-import { regionalDonutOption, stackedBarsOption, vendorDonutSideOption } from "../../charts/optionBuilders";
+import { regionalDonutOption, stackedBarsOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
@@ -24,11 +24,6 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
     queryFn: () => summaryApi.r2EnderecoPorTecnologia(filters),
   });
 
-  const { data: vendorsNexus, isFetching: loadingVendorsNexus } = useQuery({
-    queryKey: ["summary-r2-vendors-nexus", uf, municipio, ano, regionais, projetos],
-    queryFn: () => summaryApi.r2VendorsNexus(filters),
-  });
-
   const valorFmt = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
   return (
@@ -40,7 +35,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
       </div>
 
       <div className="row g-3">
-        <div className="col-lg-3">
+        <div className="col-lg-4">
           <ChartPanel
             title="Novas Cidades por Regional"
             subtitle="Clique num regional pra filtrar toda a aba"
@@ -61,7 +56,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
           />
         </div>
 
-        <div className="col-lg-3">
+        <div className="col-lg-4">
           <ChartPanel
             title="Orçamento por Tecnologia"
             subtitle="CAPEX x OPEX/LEASE rateado por OC (R$ milhões)"
@@ -90,7 +85,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
           />
         </div>
 
-        <div className="col-lg-3">
+        <div className="col-lg-4">
           <ChartPanel
             title="Endereço por Tecnologia"
             subtitle="CAC rateado por OC — Casa Nova (CN) x Casa Existente (CE)"
@@ -115,26 +110,6 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
                 g4: endereco?.series[0]?.data[i] ?? 0,
                 g5: endereco?.series[1]?.data[i] ?? 0,
               })),
-            }}
-          />
-        </div>
-
-        <div className="col-lg-3">
-          <ChartPanel
-            title="OCs do Plano por Fornecedor"
-            subtitle="Ponderado pelo CAC do NEXUS (R$) — mesmo rateio do Endereço por Tecnologia"
-            sourceTable={["TB_ROLLOUT_ACESSO", "TB_NEXUS_CN_CE"]}
-            height={340}
-            option={vendorDonutSideOption(vendorsNexus ?? [])}
-            loading={loadingVendorsNexus}
-            imageFilename="r2-ocs-por-fornecedor.png"
-            exportSheet={{
-              name: "R2 Fornecedores (NEXUS)",
-              columns: [
-                { header: "Fornecedor", key: "label" },
-                { header: "R$ milhões", key: "value" },
-              ],
-              rows: vendorsNexus ?? [],
             }}
           />
         </div>
