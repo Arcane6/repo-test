@@ -63,6 +63,7 @@ export interface VennResponse {
 export interface MunicipioRow {
   uf: string;
   municipio: string;
+  ibge: string;
   presenca: number;
   presenca_5g: number;
   presenca_4g: number;

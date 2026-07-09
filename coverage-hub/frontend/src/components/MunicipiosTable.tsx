@@ -7,7 +7,7 @@ import { Skeleton } from "./Skeleton";
 import { downloadSheet } from "../utils/excelExport";
 import { municipiosColumns, municipiosToRows } from "../utils/municipiosColumns";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 20;
 
 function Badge({ value }: { value: number }) {
   return value === 1 ? (
@@ -80,6 +80,7 @@ export function MunicipiosTable() {
               <tr>
                 <th>UF</th>
                 <th>Município</th>
+                <th>IBGE</th>
                 <th className="text-center">TIM</th>
                 <th className="text-center">5G</th>
                 <th className="text-center">4G</th>
@@ -93,6 +94,7 @@ export function MunicipiosTable() {
                     <tr key={i}>
                       <td><Skeleton height={12} width="70%" /></td>
                       <td><Skeleton height={12} width="85%" /></td>
+                      <td><Skeleton height={12} width="85%" /></td>
                       <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
                       <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
                       <td className="text-center"><Skeleton height={18} width={36} className="mx-auto" /></td>
@@ -104,6 +106,7 @@ export function MunicipiosTable() {
                     <tr key={`${r.uf}-${r.municipio}`}>
                       <td>{r.uf}</td>
                       <td>{r.municipio}</td>
+                      <td>{r.ibge}</td>
                       <td className="text-center"><Badge value={r.presenca} /></td>
                       <td className="text-center"><Badge value={r.presenca_5g} /></td>
                       <td className="text-center"><Badge value={r.presenca_4g} /></td>
