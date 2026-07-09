@@ -1,17 +1,13 @@
+import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
-import { horizontalBarsOption, regionalDonutOption, stackedBarsOption, vendorDonutSideOption } from "../../charts/optionBuilders";
+import { regionalDonutOption, stackedBarsOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia2({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais, projetos } = filters;
-  const {
-    regional: focusedRegional,
-    projeto: focusedProjeto,
-    toggleRegional,
-    toggleProjeto,
-  } = useResumoFocusStore();
+  const { regional: focusedRegional, toggleRegional } = useResumoFocusStore();
 
   const { data: citiesAnf, isFetching: loadingCitiesAnf } = useQuery({
     queryKey: ["summary-r2-cities-anf", uf, municipio, ano, regionais, projetos],
@@ -33,13 +29,10 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
     queryFn: () => summaryApi.r2VendorsNexus(filters),
   });
 
-  const { data: projects, isFetching: loadingProjects } = useQuery({
-    queryKey: ["summary-r2-projects", uf, municipio, ano, regionais, projetos],
-    queryFn: () => summaryApi.r2TopProjects(filters),
-  });
+  const valorFmt = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
   return (
-    <div className="summary-raia mb-4">
+    <div className="summary-raia mb-4" style={{ "--raia-color": "#F5C518" } as CSSProperties}>
       <div className="d-flex align-items-center mb-3">
         <span className="raia-badge me-2" style={{ background: "#F5C518", color: "#000" }}>R2</span>
         <h5 className="fw-bold mb-0">Plano 26</h5>
@@ -77,7 +70,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
             option={stackedBarsOption(
               orcamento?.categories ?? [],
               orcamento?.series ?? [],
-              { valueFormatter: (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) },
+              { valueFormatter: valorFmt, showValueLabels: true },
             )}
             loading={loadingOrcamento}
             imageFilename="r2-orcamento-por-tecnologia.png"
@@ -100,27 +93,27 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-3">
           <ChartPanel
             title="Endereço por Tecnologia"
-            subtitle="CAC rateado por OC — Casa Nova x Casa Existente (R$ milhões)"
+            subtitle="CAC rateado por OC — Casa Nova (CN) x Casa Existente (CE)"
             sourceTable={["TB_ROLLOUT_ACESSO", "TB_NEXUS_CN_CE"]}
             height={340}
             option={stackedBarsOption(
               endereco?.categories ?? [],
               endereco?.series ?? [],
-              { valueFormatter: (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) },
+              { valueFormatter: valorFmt, showValueLabels: true },
             )}
             loading={loadingEndereco}
             imageFilename="r2-endereco-por-tecnologia.png"
             exportSheet={{
               name: "R2 Endereço por Tecnologia",
               columns: [
-                { header: "Tecnologia", key: "tech" },
-                { header: "Casa Nova (R$ mi)", key: "nova" },
-                { header: "Casa Existente (R$ mi)", key: "existente" },
+                { header: "Classificação", key: "classificacao" },
+                { header: "4G (R$ mi)", key: "g4" },
+                { header: "5G (R$ mi)", key: "g5" },
               ],
-              rows: (endereco?.categories ?? []).map((tech, i) => ({
-                tech,
-                nova: endereco?.series[0]?.data[i] ?? 0,
-                existente: endereco?.series[1]?.data[i] ?? 0,
+              rows: (endereco?.categories ?? []).map((classificacao, i) => ({
+                classificacao,
+                g4: endereco?.series[0]?.data[i] ?? 0,
+                g5: endereco?.series[1]?.data[i] ?? 0,
               })),
             }}
           />
@@ -144,34 +137,6 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
               rows: vendorsNexus ?? [],
             }}
           />
-        </div>
-      </div>
-
-      <div className="row g-3 mt-1">
-        <div className="col-12">
-          <ChartPanel
-            title="Top 10 Projetos"
-            subtitle="Clique num projeto pra filtrar toda a aba"
-            sourceTable="TB_ROLLOUT_ACESSO"
-            height={320}
-            option={horizontalBarsOption((projects ?? []).map((p) => ({ name: p.projeto, value: p.value })))}
-            loading={loadingProjects}
-            onClick={(e) => toggleProjeto(e.name)}
-            imageFilename="r2-top-projetos.png"
-            exportSheet={{
-              name: "R2 Top Projetos",
-              columns: [
-                { header: "Projeto", key: "projeto" },
-                { header: "OCs", key: "value" },
-              ],
-              rows: projects ?? [],
-            }}
-          />
-          {focusedProjeto && (
-            <small className="text-muted d-block mt-1">
-              Filtrando toda a aba pelo projeto <b>{focusedProjeto}</b>
-            </small>
-          )}
         </div>
       </div>
     </div>

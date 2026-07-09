@@ -15,11 +15,11 @@ const fmt = (v: number) => v.toLocaleString("pt-BR");
  * e o alvo do fechamento deste ano. Substitui o KPI card antigo.
  */
 export function GaugeCards() {
-  const { uf, municipio, tecnologia } = useFilterStore();
+  const { uf, municipio, tecnologia, vennRegion } = useFilterStore();
 
   const { data } = useQuery({
-    queryKey: ["actual-gauges", uf, municipio, tecnologia],
-    queryFn: () => mobileAccessApi.gauges({ uf, municipio, tecnologia }),
+    queryKey: ["actual-gauges", uf, municipio, tecnologia, vennRegion],
+    queryFn: () => mobileAccessApi.gauges({ uf, municipio, tecnologia, vennRegion }),
   });
 
   if (!data) {

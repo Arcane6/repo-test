@@ -367,18 +367,17 @@ def get_r2_endereco_por_tecnologia(filters):
 
     techs = ["4G", "5G"]
     classificacoes = ["CN", "CE"]
-    labels = {"CN": "Casa Nova", "CE": "Casa Existente"}
     by_key = {(r["tech"], r["classificacao"]): r.get("valor", 0) or 0 for r in rows}
 
     return {
-        "categories": techs,
+        "categories": classificacoes,
         "series": [
             {
-                "name": labels[c],
-                "color": "#26C281" if c == "CN" else "#1565C0",
-                "data": [round(by_key.get((t, c), 0), 2) for t in techs],
+                "name": t,
+                "color": TECH_COLORS[t],
+                "data": [round(by_key.get((t, c), 0), 2) for c in classificacoes],
             }
-            for c in classificacoes
+            for t in techs
         ],
         "total": round(sum(by_key.values()), 2),
     }

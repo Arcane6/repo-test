@@ -251,8 +251,11 @@ body {
 }
 
 .summary-raia {
-  border-left: 4px solid var(--tim-card-border);
-  padding-left: 16px;
+  --raia-color: var(--tim-card-border);
+  border-left: 4px solid var(--raia-color);
+  padding: 14px 16px 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--raia-color) 5%, var(--tim-card-bg));
 }
 
 .sm-tec-card {

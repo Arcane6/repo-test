@@ -18,6 +18,7 @@ def parse_filters():
         tecnologia      (multi)  ex.: ?tecnologia=5G
         regional        (multi)  ex.: ?regional=TSP  (cross-filter do Resumo)
         projeto         (multi)  ex.: ?projeto=X    (PRIORIDADE do rollout)
+        venn            (single) ex.: ?venn=only_2g (região exata do diagrama de Venn)
         ano             (single) ex.: ?ano=2026
     """
     return {
@@ -26,5 +27,6 @@ def parse_filters():
         "tecs": request.args.getlist("tecnologia"),
         "regionais": request.args.getlist("regional"),
         "projetos": request.args.getlist("projeto"),
+        "venn_region": request.args.get("venn"),
         "ano": request.args.get("ano"),
     }
