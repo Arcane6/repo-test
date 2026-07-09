@@ -52,7 +52,7 @@ export function barsByTechOption(
       },
     },
     xAxis: { type: "category", data: bars.map((b) => b.tec), axisLabel: { fontWeight: "bold" } },
-    yAxis: { type: "value", splitLine: { lineStyle: { color: "#eee" } } },
+    yAxis: { type: "value" },
     series: [
       {
         type: "bar",
@@ -200,10 +200,10 @@ export interface StackedSeriesInput {
 export function stackedBarsOption(
   categories: string[],
   series: StackedSeriesInput[],
-  opts: { horizontal?: boolean; valueFormatter?: (v: number) => string } = {},
+  opts: { horizontal?: boolean; valueFormatter?: (v: number) => string; showValueLabels?: boolean } = {},
 ): EChartsCoreOption {
   if (categories.length === 0 || series.length === 0) return {};
-  const { horizontal = false, valueFormatter = fmt } = opts;
+  const { horizontal = false, valueFormatter = fmt, showValueLabels = false } = opts;
 
   const categoryAxis = {
     type: "category" as const,
@@ -247,6 +247,16 @@ export function stackedBarsOption(
       type: "bar",
       stack: "total",
       itemStyle: { color: s.color },
+      label: showValueLabels
+        ? {
+            show: true,
+            position: "inside" as const,
+            fontWeight: "bold" as const,
+            fontSize: 10,
+            color: "#fff",
+            formatter: (p: { value: number }) => (p.value ? valueFormatter(p.value) : ""),
+          }
+        : undefined,
       data: s.data,
     })),
   };
@@ -562,11 +572,18 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
   };
 }
 
+/** Total de municípios do Brasil — teto fixo dos velocímetros da aba
+ * Cidades, não o maior valor do card (senão o arco "encolhe" conforme o
+ * filtro, perdendo a noção de proporção sobre o universo real). */
+export const TOTAL_MUNICIPIOS_BR = 5570;
+
 /**
  * Velocímetro (gauge) de progresso: ponteiro no valor "até hoje" (YTD),
  * com a faixa colorida do arco marcando os dois marcos fixos — o que já
  * estava fechado no ano anterior (piso) e o alvo do fechamento deste ano
- * (teto). Usado nos cards da aba Cidades no lugar do KPI card antigo.
+ * (teto). Base sempre os 5.570 municípios do Brasil; o arco enche da
+ * direita (0, EOY25) para a esquerda (máximo, EOY26). Usado nos cards da
+ * aba Cidades no lugar do KPI card antigo.
  */
 export function gaugeOption(card: {
   color: string;
@@ -574,7 +591,7 @@ export function gaugeOption(card: {
   ytd: number;
   eoy_curr: number;
 }): EChartsCoreOption {
-  const max = Math.max(card.eoy_curr, card.ytd, card.eoy_prev, 1);
+  const max = TOTAL_MUNICIPIOS_BR;
   const prevRatio = Math.min(card.eoy_prev / max, 1);
   const currRatio = Math.min(Math.max(card.eoy_curr / max, prevRatio), 1);
 
@@ -582,8 +599,8 @@ export function gaugeOption(card: {
     series: [
       {
         type: "gauge",
-        startAngle: 200,
-        endAngle: -20,
+        startAngle: -20,
+        endAngle: 200,
         min: 0,
         max,
         radius: "88%",

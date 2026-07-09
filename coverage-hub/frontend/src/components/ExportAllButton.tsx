@@ -23,7 +23,9 @@ export function ExportAllButton() {
         mobileAccessApi.kpis(filters),
         mobileAccessApi.frequencies(filters),
         mobileAccessApi.timeseries(filters),
-        mobileAccessApi.table(filters),
+        // Municípios sempre exporta a base completa (última carga), não o
+        // recorte filtrado na tela — mesma regra do botão da própria tabela.
+        mobileAccessApi.tableExport(),
       ]);
 
       const { columns: tsColumns, rows: tsRows } = timeseriesToRows(timeseries);

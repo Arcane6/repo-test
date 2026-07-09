@@ -18,11 +18,11 @@ function bandaSortKey(banda: string): [number, string] {
  * — clicar de novo remove o filtro.
  */
 export function FrequencyChart() {
-  const { uf, municipio, tecnologia, toggle } = useFilterStore();
+  const { uf, municipio, tecnologia, vennRegion, toggle } = useFilterStore();
 
   const { data, isFetching } = useQuery({
-    queryKey: ["actual-frequencies", uf, municipio, tecnologia],
-    queryFn: () => mobileAccessApi.frequencies({ uf, municipio, tecnologia }),
+    queryKey: ["actual-frequencies", uf, municipio, tecnologia, vennRegion],
+    queryFn: () => mobileAccessApi.frequencies({ uf, municipio, tecnologia, vennRegion }),
   });
 
   const bars = data?.bars ?? [];

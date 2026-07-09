@@ -42,9 +42,13 @@ GEO AS (
     )
 )
 SELECT
-    SUM(CASE WHEN TECNOLOGIA LIKE '%2G%' THEN 1 ELSE 0 END) AS sites_2g,
-    SUM(CASE WHEN TECNOLOGIA LIKE '%3G%' THEN 1 ELSE 0 END) AS sites_3g,
-    SUM(CASE WHEN TECNOLOGIA LIKE '%4G%' THEN 1 ELSE 0 END) AS sites_4g,
+    -- Cada site conta uma única vez, na tecnologia mais nova que ele tem
+    -- (cascata 5G > 4G > 3G > 2G) — um site 5G/4G/3G/2G é só 5G, um
+    -- 4G/3G/2G é só 4G, e assim por diante. Sem isso, um mesmo site com
+    -- várias tecnologias era somado uma vez em cada contagem.
+    SUM(CASE WHEN TECNOLOGIA NOT LIKE '%5G%' AND TECNOLOGIA NOT LIKE '%4G%' AND TECNOLOGIA NOT LIKE '%3G%' AND TECNOLOGIA LIKE '%2G%' THEN 1 ELSE 0 END) AS sites_2g,
+    SUM(CASE WHEN TECNOLOGIA NOT LIKE '%5G%' AND TECNOLOGIA NOT LIKE '%4G%' AND TECNOLOGIA LIKE '%3G%' THEN 1 ELSE 0 END) AS sites_3g,
+    SUM(CASE WHEN TECNOLOGIA NOT LIKE '%5G%' AND TECNOLOGIA LIKE '%4G%' THEN 1 ELSE 0 END) AS sites_4g,
     SUM(CASE WHEN TECNOLOGIA LIKE '%5G%' THEN 1 ELSE 0 END) AS sites_5g,
     COUNT(DISTINCT END_ID) AS total_sites
 FROM BASE b

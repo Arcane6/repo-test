@@ -3,6 +3,8 @@ export interface ActiveFilters {
   municipio: string[];
   tecnologia?: string[];
   ano?: string | null;
+  /** Região exata do diagrama de Venn (ex.: "only_2g", "inter_all"). */
+  vennRegion?: string | null;
 }
 
 export function filtersToQuery(filters: ActiveFilters): string {
@@ -11,6 +13,7 @@ export function filtersToQuery(filters: ActiveFilters): string {
   filters.municipio.forEach((v) => params.append("municipio", v));
   filters.tecnologia?.forEach((v) => params.append("tecnologia", v));
   if (filters.ano) params.append("ano", filters.ano);
+  if (filters.vennRegion) params.append("venn", filters.vennRegion);
   return params.toString();
 }
 

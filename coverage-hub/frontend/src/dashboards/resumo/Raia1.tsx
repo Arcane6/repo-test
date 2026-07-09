@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { barsByTechOption, horizontalBarsOption } from "../../charts/optionBuilders";
@@ -24,7 +25,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
   });
 
   return (
-    <div className="summary-raia mb-4">
+    <div className="summary-raia mb-4" style={{ "--raia-color": "#003399" } as CSSProperties}>
       <div className="d-flex align-items-center mb-3">
         <span className="raia-badge me-2" style={{ background: "#003399" }}>R1</span>
         <h5 className="fw-bold mb-0">Fechamento 25</h5>

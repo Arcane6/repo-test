@@ -28,14 +28,14 @@ function StatusBadge({ value }: { value: string | null }) {
 }
 
 export function MunicipiosTable() {
-  const { uf, municipio, tecnologia } = useFilterStore();
+  const { uf, municipio, tecnologia, vennRegion } = useFilterStore();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["actual-table", uf, municipio, tecnologia],
-    queryFn: () => mobileAccessApi.table({ uf, municipio, tecnologia }),
+    queryKey: ["actual-table", uf, municipio, tecnologia, vennRegion],
+    queryFn: () => mobileAccessApi.table({ uf, municipio, tecnologia, vennRegion }),
   });
   const rows = data ?? [];
 

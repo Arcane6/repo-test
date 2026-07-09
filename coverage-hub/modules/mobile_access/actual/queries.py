@@ -54,8 +54,23 @@ BASE AS (
     {uf_filter}
     {municipio_filter}
     {tecnologia_filter}
+    {venn_filter}
 )
 """
+
+# Combinação exata de presença 2G/3G/5G por região do diagrama de Venn (4G
+# fica de fora do diagrama, como já era — ver VENN_TEMPLATE). Clicar numa
+# fatia filtra a base inteira para exatamente essa combinação, diferente
+# do filtro de tecnologia (que é "tem pelo menos uma dessas").
+VENN_REGION_CLAUSES = {
+    "only_2g":     "PRESENCA_2G = 1 AND PRESENCA_3G = 0 AND PRESENCA_5G = 0",
+    "only_3g":     "PRESENCA_2G = 0 AND PRESENCA_3G = 1 AND PRESENCA_5G = 0",
+    "only_5g":     "PRESENCA_2G = 0 AND PRESENCA_3G = 0 AND PRESENCA_5G = 1",
+    "inter_2g_3g": "PRESENCA_2G = 1 AND PRESENCA_3G = 1 AND PRESENCA_5G = 0",
+    "inter_2g_5g": "PRESENCA_2G = 1 AND PRESENCA_3G = 0 AND PRESENCA_5G = 1",
+    "inter_3g_5g": "PRESENCA_2G = 0 AND PRESENCA_3G = 1 AND PRESENCA_5G = 1",
+    "inter_all":   "PRESENCA_2G = 1 AND PRESENCA_3G = 1 AND PRESENCA_5G = 1",
+}
 
 
 KPIS_TEMPLATE = """

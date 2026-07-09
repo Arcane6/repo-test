@@ -81,7 +81,12 @@ export function applyChartTheme(
         lineStyle: { color: p.axisLine, ...((ax.axisLine as AnyRecord)?.lineStyle as AnyRecord) },
       },
       axisLabel: { color: p.text, ...(ax.axisLabel as AnyRecord) },
+      // Nenhum gráfico deve nascer com grade de linha — é aplicado aqui,
+      // centralizado, em vez de cada option builder lembrar de desligar.
+      // Um builder que realmente precise de grade pode reativar passando
+      // `splitLine: { show: true }` explicitamente na sua option.
       splitLine: {
+        show: false,
         ...(ax.splitLine as AnyRecord),
         lineStyle: { color: p.splitLine, ...((ax.splitLine as AnyRecord)?.lineStyle as AnyRecord) },
       },

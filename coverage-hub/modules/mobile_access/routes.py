@@ -36,7 +36,12 @@ def api_refs():
 
 def _net_filters():
     f = parse_filters()
-    return {"ufs": f["ufs"], "municipios": f["municipios"], "tecs": f["tecs"]}
+    return {
+        "ufs": f["ufs"],
+        "municipios": f["municipios"],
+        "tecs": f["tecs"],
+        "venn_region": f["venn_region"],
+    }
 
 
 @mobile_access_bp.route("/api/actual/kpis")
