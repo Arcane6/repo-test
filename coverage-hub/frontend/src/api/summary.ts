@@ -44,14 +44,6 @@ export interface TechSeries {
   name: string;
   color: string;
   data: number[];
-  is_info_only?: boolean;
-}
-
-export interface StackedByTechResponse {
-  categories: string[];
-  series: TechSeries[];
-  total: number;
-  total_com_upgrades?: number;
 }
 
 export interface Slice {
@@ -99,15 +91,11 @@ export const summaryApi = {
     return fetchJson<SitesVennResponse>(`${BASE}/r1/sites-venn?${params}${extra}`);
   },
 
-  r1SitesByTech: (f: SummaryFilters) =>
-    fetchJson<TechBarsResponse>(`${BASE}/r1/sites-by-tech?${query(f)}`),
   r1CitiesByTech: (f: SummaryFilters) =>
     fetchJson<TechBarsResponse>(`${BASE}/r1/cities-by-tech?${query(f)}`),
   r1Vendors: (f: SummaryFilters) =>
     fetchJson<LabeledValue[]>(`${BASE}/r1/vendors?${query(f)}`),
 
-  r2SitesByTech: (f: SummaryFilters) =>
-    fetchJson<StackedByTechResponse>(`${BASE}/r2/sites-by-tech?${query(f)}`),
   r2NewCitiesByAnf: (f: SummaryFilters) =>
     fetchJson<SlicesResponse>(`${BASE}/r2/new-cities-by-anf?${query(f)}`),
   r2VendorsNewSites: (f: SummaryFilters) =>
@@ -119,8 +107,6 @@ export const summaryApi = {
   r2EnderecoPorTecnologia: (f: SummaryFilters) =>
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/endereco-por-tecnologia?${query(f)}`),
 
-  r3SitesByTech: (f: SummaryFilters) =>
-    fetchJson<StackedByTechResponse>(`${BASE}/r3/sites-by-tech?${query(f)}`),
   r3NewCitiesByAnf: (f: SummaryFilters) =>
     fetchJson<RegionalSeriesResponse>(`${BASE}/r3/new-cities-by-anf?${query(f)}`),
   r3Vendors: (f: SummaryFilters) =>
