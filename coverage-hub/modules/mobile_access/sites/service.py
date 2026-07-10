@@ -15,6 +15,7 @@ from modules.mobile_access.sites.queries import (
     SITES_BY_MAX_TECH,
     SITES_BY_TECNOLOGIA,
     SITES_PIVOT,
+    SITES_GEO_POINTS,
     SITES_TIPO,
 )
 
@@ -124,6 +125,30 @@ def get_sites_pivot(filters):
                 "tec_4g": r.get("tec_4g", 0) or 0,
                 "tec_5g": r.get("tec_5g", 0) or 0,
                 "total_sites": r.get("total_sites", 0) or 0,
+            }
+            for r in rows
+        ],
+    }
+
+
+def get_sites_geo_points(filters):
+    """Um ponto por site (END_ID, lat/long, tecnologia máxima) — alimenta
+    os mapas (Brasil e múndi). Ainda sem consumidor no frontend: falta
+    decidir o asset de GeoJSON (contorno Brasil/mundo) antes de desenhar
+    o mapa de verdade."""
+    params = {}
+    sql = _apply_geo(SITES_GEO_POINTS, filters, params)
+    rows = execute_query(sql, params) or []
+    return {
+        "points": [
+            {
+                "end_id": r.get("end_id"),
+                "uf": r.get("uf"),
+                "municipio": r.get("municipio"),
+                "lat": r.get("latitude"),
+                "lon": r.get("longitude"),
+                "tech": r.get("max_tech"),
+                "color": TECH_COLORS.get(r.get("max_tech"), "#6c757d"),
             }
             for r in rows
         ],

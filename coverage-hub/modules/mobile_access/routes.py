@@ -180,6 +180,11 @@ def api_sites_pivot():
     return jsonify(sites.get_sites_pivot(_sites_filters()))
 
 
+@mobile_access_bp.route("/api/sites/geo-points")
+def api_sites_geo_points():
+    return jsonify(sites.get_sites_geo_points(_sites_filters()))
+
+
 @mobile_access_bp.route("/api/sites/tipo")
 def api_sites_tipo():
     return jsonify(sites.get_sites_tipo(_sites_filters()))

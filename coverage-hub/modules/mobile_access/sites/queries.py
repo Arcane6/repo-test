@@ -97,6 +97,33 @@ GROUP BY g.REGIONAL, b.UF, b.MUNICIPIO
 ORDER BY g.REGIONAL, b.UF, b.MUNICIPIO
 """
 
+# ---------- Sites com coordenada — um ponto por site, com a tecnologia ----------
+# máxima (mesma cascata 5G>4G>3G>2G) como cor. Alimenta os mapas (Brasil e
+# múndi — a TIM tem site fora do território nacional). Descarta site sem
+# lat/long (não dá pra plotar).
+SITES_GEO_POINTS = """
+SELECT
+    END_ID, UF, MUNICIPIO,
+    LATITUDE, LONGITUDE,
+    CASE
+        WHEN TECNOLOGIA LIKE '%5G%' THEN '5G'
+        WHEN TECNOLOGIA LIKE '%4G%' THEN '4G'
+        WHEN TECNOLOGIA LIKE '%3G%' THEN '3G'
+        WHEN TECNOLOGIA LIKE '%2G%' THEN '2G'
+    END AS MAX_TECH
+FROM NTW_OP.TB_FT_BASE_UNICA_SITES
+WHERE MES_REF = (
+    SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES
+)
+AND TIPO_SITE <> 'ROAMING VIVO'
+AND MOBILE_SITE = 'SIM'
+AND TECNOLOGIA <> '-'
+AND LATITUDE IS NOT NULL
+AND LONGITUDE IS NOT NULL
+{uf_filter_site}
+{municipio_filter_site}
+"""
+
 # ---------- Tipo de site — universo diferente das queries acima: aqui ----------
 # NÃO filtra MOBILE_SITE = 'SIM' (é justamente uma das dimensões
 # mostradas), só STATUS_END_ID = 'ATIVADO' e exclui roaming. Cruza

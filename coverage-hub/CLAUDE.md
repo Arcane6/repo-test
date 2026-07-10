@@ -92,31 +92,35 @@ reabrir essa porta aqui sem uma coluna de dedup confiável).
 
 ### Pendências conhecidas desta aba (não implementadas ainda)
 
-- **Fornecedor por site**: o M-query antigo do Power BI usa uma fonte
-  separada (`"VW03 || RF DESIGN PROFILE (VENDOR_2)"`) que dá **vendor
-  por combinação (site, tecnologia)**, não um vendor único por site
-  (diferente do padrão cascata/`COALESCE` já usado em
-  `BASE_TB_END_ID_NEW` pro Resumo). Ainda não sabemos se essa fonte
-  também depende só de `TB_FT_BASE_UNICA_SITES` (resposta do usuário foi
-  ambígua) ou é uma view separada — **perguntar de novo, com nome real
-  da tabela/view Oracle**, antes de implementar. O `FillDown` do
-  M-query original (preenche vendor nulo com o valor da linha anterior,
-  ordenado por TECH+END_ID) é lógica frágil de Power Query — **não
-  replicar em SQL sem confirmar o motivo de negócio**; o combinado com o
-  usuário é fazer join direto, sem fill down, mostrando "sem fornecedor"
-  quando não houver match.
-- **Mapa do Brasil** (sites individuais coloridos por tecnologia):
-  usuário confirmou que existe lat/long em algum lugar, mas ainda falta
-  o **nome exato das colunas** antes de escrever a query.
-  Provavelmente precisa de `echarts.registerMap()` com GeoJSON do
-  Brasil — dependência nova, ainda não usada no projeto.
-- **Mapa múndi**: não é engano — a TIM tem site na Antártida, fora do
-  território nacional. Também bloqueado pelas mesmas colunas de
-  lat/long do item acima.
+- **Fornecedor por site**: confirmado que a coluna vem de dentro da
+  própria `TB_FT_BASE_UNICA_SITES` (não é uma view separada — a leitura
+  anterior de "VW03 || RF DESIGN PROFILE (VENDOR_2)" era só o nome
+  "bonito" do Power Query). **Ainda falta o nome exato da(s) coluna(s)**
+  — uma só (tipo `VENDOR`) ou uma por tecnologia (`VENDOR_2G`/`VENDOR_3G`/
+  `VENDOR_4G`/`VENDOR_5G`, no estilo de `BASE_TB_END_ID_NEW`)? Não
+  implementar sem essa confirmação — não dá pra adivinhar nome de
+  coluna. O `FillDown` do M-query original (preenche vendor nulo com o
+  valor da linha anterior, ordenado por TECH+END_ID) é lógica frágil de
+  Power Query — **não replicar em SQL**; o combinado com o usuário é
+  fazer join direto, sem fill down, mostrando "sem fornecedor" quando
+  não houver match.
+- **Mapas (Brasil + múndi)**: colunas de coordenada confirmadas —
+  `LATITUDE`/`LONGITUDE`, ambas em `TB_FT_BASE_UNICA_SITES`. Backend já
+  pronto: `SITES_GEO_POINTS` (`sites/queries.py`) +
+  `get_sites_geo_points` (`sites/service.py`) + rota
+  `/api/sites/geo-points` — devolve um ponto por site (END_ID, UF,
+  MUNICIPIO, lat, lon, tecnologia máxima, cor). Descarta site sem
+  lat/long. **O que falta é só o desenho**: nenhum componente de mapa no
+  frontend ainda consome esse endpoint. Vai precisar de
+  `GeoComponent`/`ScatterChart` do ECharts (não registrados em
+  `charts/Chart.tsx` hoje) e de um asset GeoJSON de contorno (Brasil +
+  mundo) — ainda não decidido de onde vem esse asset. Mapa múndi não é
+  engano: a TIM tem site na Antártida, fora do território nacional (por
+  isso o mapa do Brasil sozinho não cobre 100% dos sites).
 
-Nenhuma dessas três pendências foi implementada ainda — "Sites" hoje
-tem só as 4 visões confirmadas (max-tech, por-tecnologia, pivot,
-tipo de site).
+"Sites" hoje tem as 4 visões visuais confirmadas (max-tech,
+por-tecnologia, pivot, tipo de site) + o endpoint de geo-points pronto
+sem consumidor visual ainda.
 
 ## Convenções de backend
 
@@ -198,7 +202,7 @@ tipo de site).
 | Tabela/View | Uso | Observações |
 |---|---|---|
 | `NTW_OP.MUNICIPIOS_FECHAMENTO` | Presença 2G/3G/4G/5G por município (aba Cidades), Cidades por Regional | Sempre filtrar `TRUNC(DT_CARGA) = MAX(DT_CARGA)` — carga histórica, não só o último dia |
-| `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | Filtrar `MES_REF = MAX(MES_REF)`. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado) e, segundo o usuário, lat/long (nome exato da coluna ainda não confirmado) |
+| `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | Filtrar `MES_REF = MAX(MES_REF)`. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado), `LATITUDE`/`LONGITUDE` (coordenada do site, confirmadas — usadas em `SITES_GEO_POINTS`) e, segundo o usuário, coluna(s) de fornecedor por tecnologia (nome exato ainda não confirmado) |
 | `NTW_MABE.BASE_TB_END_ID_NEW` | Fornecedor (vendor) dominante por site | Cascata de colunas `VENDOR_NR_*`/`VENDOR_LTE_*`/`VENDOR_UMTS_*`/`VENDOR_GSM_*` via `COALESCE`, maior banda primeiro dentro de cada tec |
 | `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente |
 | `TB_NEXUS_FINANCEIRO` | CAPEX/OPEX/LEASE por tipo | Usada só no rateio "Orçamento por Tecnologia" — sem schema/join direto, rateada por nº de OCs |
