@@ -578,15 +578,17 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
 export const TOTAL_MUNICIPIOS_BR = 5570;
 
 /**
- * Velocímetro (gauge) de progresso: meio-círculo padrão (abre pra baixo,
- * como um mostrador de velocímetro), valor baixo à esquerda e alto à
- * direita. O arco colorido marca os dois marcos fixos — o que já estava
- * fechado no ano anterior (piso, cinza) e o alvo do fechamento deste ano
- * (teto, cor da tecnologia); depois do alvo fica cinza-claro (ainda não
- * endereçado). O marcador fica só na ponta, na posição do valor "até
- * hoje" (YTD) — sem agulha visível saindo do centro. Base sempre os
- * 5.570 municípios do Brasil. Usado nos cards da aba Cidades no lugar do
- * KPI card antigo.
+ * Velocímetro (gauge) no molde "gauge-simple" do ECharts
+ * (https://echarts.apache.org/examples/en/editor.html?c=gauge-simple):
+ * arco de progresso preenchido até o valor YTD, trilho cinza-neutro por
+ * trás, marcações/ticks ao redor e um número grande no centro. O
+ * preenchimento, o ponteiro e a âncora central usam a cor da tecnologia
+ * do card — mesma paleta usada em todo o resto do portal. Base sempre os
+ * 5.570 municípios do Brasil (não o maior valor do card, senão o arco
+ * "encolhe" conforme o filtro). Os marcos de piso (fechamento anterior)
+ * e alvo (fechamento deste ano) continuam visíveis como texto abaixo do
+ * gauge (`GaugeCards.tsx`), não mais como faixas coloridas no arco — o
+ * arco ficou mais limpo, só a leitura de "quanto já foi divulgado".
  */
 export function gaugeOption(card: {
   color: string;
@@ -595,57 +597,49 @@ export function gaugeOption(card: {
   eoy_curr: number;
 }): EChartsCoreOption {
   const max = TOTAL_MUNICIPIOS_BR;
-  const prevRatio = Math.min(card.eoy_prev / max, 1);
-  const currRatio = Math.min(Math.max(card.eoy_curr / max, prevRatio), 1);
 
   return {
     series: [
       {
         type: "gauge",
-        startAngle: 180,
-        endAngle: 0,
         min: 0,
         max,
-        radius: 108,
-        center: ["50%", "92%"],
-        pointer: {
-          icon: "circle",
-          length: "100%",
-          width: 18,
-          itemStyle: { color: "#fff", borderColor: card.color, borderWidth: 4 },
+        radius: "92%",
+        center: ["50%", "58%"],
+        progress: {
+          show: true,
+          width: 14,
+          itemStyle: { color: card.color },
         },
-        progress: { show: false },
         axisLine: {
           lineStyle: {
-            width: 12,
-            color: [
-              [prevRatio, "#c7d2e0"],
-              [currRatio, card.color],
-              [1, "rgba(0,0,0,0.06)"],
-            ],
+            width: 14,
+            color: [[1, "rgba(127,127,127,0.18)"]],
           },
         },
-        axisTick: {
-          show: true,
-          distance: -12,
-          length: 4,
-          splitNumber: 5,
-          lineStyle: { color: "auto", width: 1, opacity: 0.6 },
-        },
+        axisTick: { show: false },
         splitLine: {
-          show: true,
-          distance: -12,
-          length: 8,
-          lineStyle: { color: "auto", width: 2, opacity: 0.8 },
+          length: 12,
+          lineStyle: { width: 2, color: "rgba(127,127,127,0.5)" },
         },
         axisLabel: { show: false },
-        anchor: { show: true, size: 7, itemStyle: { color: card.color } },
+        pointer: {
+          width: 4,
+          length: "55%",
+          itemStyle: { color: card.color },
+        },
+        anchor: {
+          show: true,
+          showAbove: true,
+          size: 10,
+          itemStyle: { color: card.color, borderWidth: 3, borderColor: "#fff" },
+        },
         title: { show: false },
         detail: {
           valueAnimation: true,
-          offsetCenter: [0, "-25%"],
+          offsetCenter: [0, "68%"],
           formatter: () => fmt(card.ytd),
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: "bold",
           color: card.color,
         },

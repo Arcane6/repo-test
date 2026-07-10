@@ -4,7 +4,11 @@ import { PageHeader } from "../../components/PageHeader";
 export function MobileAccessLayout() {
   return (
     <div className="container-fluid mt-4">
-      <PageHeader icon="bi bi-broadcast-pin" title="Acesso Móvel" />
+      <PageHeader
+        icon="bi bi-broadcast-pin"
+        title="Acesso Móvel"
+        breadcrumb={[{ label: "Home", to: "/" }, { label: "Acesso Móvel" }]}
+      />
 
       <ul className="nav nav-tabs mb-4" role="tablist">
         <li className="nav-item" role="presentation">
