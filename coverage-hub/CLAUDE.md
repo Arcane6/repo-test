@@ -197,32 +197,38 @@ ORDER BY SOURCE_AJUSTADO DESC, DLV_LEVEL_1 DESC
   `DLV_LEVEL_1, SOURCE_AJUSTADO, DLV_LEVEL_3`, descartando `DLV_LEVEL_2`
   depois do filtro `<> 'ACORDO VIVO'`).
 
-**Novo bloqueador identificado (não estava mapeado antes) — precisa
-confirmar antes de integrar**: nenhuma query de `TB_ROLLOUT_ACESSO` no
-repo hoje tem uma coluna que distinga TIM de B2B Mobile (não existe
-`SEGMENTO`/`SOURCE`/equivalente em nenhum dos SELECTs de
-`summary/queries.py`). Se o rateio geográfico continuar sendo feito
-"proporção de OCs de `TB_ROLLOUT_ACESSO`" (como em
-`R2_ENDERECO_POR_TECNOLOGIA` hoje), e o numerador (OCs) não separa TIM de
-B2B Mobile, mas o denominador financeiro (`VW_CAPEX_MASTER_FULL`, com
-B2B incluído por decisão de negócio) sim — isso é um **descasamento de
-escopo entre numerador e denominador**, a mesma classe de bug que a regra
-"denominador sem filtro geográfico" já existe pra evitar: se
-`TB_ROLLOUT_ACESSO` for só rede TIM (sem sites/OCs de B2B Mobile) e o
-KPI ratedo incluir orçamento de B2B Mobile, o valor por OC fica inflado
-artificialmente (rateando um total maior sobre um conjunto de sites que
-não inclui a parte B2B daquele total). **Perguntar ao usuário**: os
-registros de `TB_ROLLOUT_ACESSO` cobrem sites/OCs de B2B Mobile também,
-ou é só rede TIM consumidor? Se for só TIM, como tratar a fatia de
-orçamento B2B Mobile no rateio (excluir do numerador financeiro depois
-de tudo, ratear separado, ou é aceitável misturar)?
+**Escopo TIM×B2B em `TB_ROLLOUT_ACESSO` — resolvido pelo usuário**: os
+registros de B2B Mobile **estão** em `TB_ROLLOUT_ACESSO`, identificados
+por `PRIORIDADE = 'B2B MOBILE'`. Ou seja, a coluna `PRIORIDADE` é
+**sobrecarregada** — pra maioria das linhas ela é o nome do projeto
+(o que alimenta "Top 10 Projetos"), mas pra linhas de B2B Mobile ela
+carrega o valor fixo `'B2B MOBILE'` no lugar de um nome de projeto. Isso
+resolve o bloqueador do rateio: o numerador (OCs) pode ser separado por
+`SOURCE_AJUSTADO` via `CASE WHEN R.PRIORIDADE = 'B2B MOBILE' THEN
+'B2B MOBILE' ELSE 'TIM' END`, casando com os dois valores de
+`SOURCE_AJUSTADO` na view.
+
+**Inconsistência nova que isso revelou — sinalizar, não corrigir sem
+confirmar**: `R2_TOP_PROJECTS` (`SELECT r.PRIORIDADE, COUNT(*) ... GROUP
+BY r.PRIORIDADE ... WHERE r.PRIORIDADE IS NOT NULL`, usada por
+"Top 10 Projetos" em Raia 2 e Raia 3 via `get_r3_top_projects` que só
+chama `get_r2_top_projects`) **não exclui `PRIORIDADE = 'B2B MOBILE'`**.
+Como agora sabemos que esse valor não é nome de projeto e sim um
+marcador de segmento, se o volume de OCs de B2B Mobile for alto o
+suficiente, `'B2B MOBILE'` pode aparecer como uma das barras do
+"Top 10 Projetos" — misturando um segmento de negócio dentro de um
+ranking que deveria ser só nomes de projeto. **Perguntar ao usuário**:
+"Top 10 Projetos" deve excluir `PRIORIDADE = 'B2B MOBILE'` (só projetos
+de verdade) ou faz sentido esse valor aparecer ali como uma categoria a
+mais?
 
 **Ainda em aberto / bloqueadores restantes antes de integrar**:
 1. Valores distintos reais de `DLV_LEVEL_1` e `DLV_LEVEL_3` (um `SELECT
    DISTINCT` resolve) — pra confirmar que os 3 valores de `LAYERS`
    batem exatamente com essas strings e que `TIPO_CASA` mapeia pra
    CN/CE sem surpresa.
-2. Escopo TIM×B2B em `TB_ROLLOUT_ACESSO` (ver acima — bloqueador novo).
+2. Se "Top 10 Projetos" deve excluir `PRIORIDADE = 'B2B MOBILE'` (ver
+   inconsistência acima).
 3. Unidade de `KPI` (R$ / R$ milhões / outra).
 4. Se `SCENARIO = '2026 CAC (26-28) V02'` deve ficar fixo no código ou
    virar filtro (nome de cenário parece mudar por ciclo de
