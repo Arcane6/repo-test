@@ -103,10 +103,6 @@ def api_summary_years():
 
 
 # Raia 1 — Fechamento 25
-@mobile_access_bp.route("/api/summary/r1/sites-by-tech")
-def api_summary_r1_sites():
-    return jsonify(summary.get_r1_sites_by_tech(parse_filters()))
-
 @mobile_access_bp.route("/api/summary/r1/sites-venn")
 def api_summary_r1_sites_venn():
     return jsonify(summary.get_r1_sites_venn(parse_filters()))
@@ -121,10 +117,6 @@ def api_summary_r1_vendors():
 
 
 # Raia 2 — Plano 26
-@mobile_access_bp.route("/api/summary/r2/sites-by-tech")
-def api_summary_r2_sites():
-    return jsonify(summary.get_r2_sites_by_tech(parse_filters()))
-
 @mobile_access_bp.route("/api/summary/r2/new-cities-by-anf")
 def api_summary_r2_cities_anf():
     return jsonify(summary.get_r2_new_cities_by_anf(parse_filters()))
@@ -146,10 +138,6 @@ def api_summary_r2_endereco():
     return jsonify(summary.get_r2_endereco_por_tecnologia(parse_filters()))
 
 # Raia 3 — Fechamento 26
-@mobile_access_bp.route("/api/summary/r3/sites-by-tech")
-def api_summary_r3_sites():
-    return jsonify(summary.get_r3_sites_by_tech(parse_filters()))
-
 @mobile_access_bp.route("/api/summary/r3/new-cities-by-anf")
 def api_summary_r3_cities_anf():
     return jsonify(summary.get_r3_new_cities_by_anf(parse_filters()))

@@ -3,26 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { horizontalBarsOption, regionalSunburstOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
-import { SmallMultiplesTech } from "../../components/SmallMultiplesTech";
-import { ChartToolbar } from "../../components/ChartToolbar";
-import { SourceBadge } from "../../components/SourceBadge";
-import { downloadSheet } from "../../utils/excelExport";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia3({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais, projetos } = filters;
   const {
-    tecnologia: focusedTec,
     regional: focusedRegional,
-    toggleTecnologia,
     toggleRegional,
     toggleProjeto,
   } = useResumoFocusStore();
-
-  const { data: sites } = useQuery({
-    queryKey: ["summary-r3-sites", uf, municipio, ano, regionais, projetos],
-    queryFn: () => summaryApi.r3SitesByTech(filters),
-  });
 
   const { data: citiesAnf, isFetching: loadingCitiesAnf } = useQuery({
     queryKey: ["summary-r3-cities-anf", uf, municipio, ano, regionais],
@@ -48,7 +37,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
       </div>
 
       <div className="row g-3">
-        <div className="col-lg-3">
+        <div className="col-lg-4">
           <ChartPanel
             title="Cidades 5G por Regional (Projeção EoY)"
             subtitle="Clique num regional pra filtrar toda a aba"
@@ -74,75 +63,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
           />
         </div>
 
-        <div className="col-lg-3">
-          <div className="card shadow-sm h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-start mb-1">
-                <div>
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <h6 className="fw-bold mb-0">Sites Físicos EoY 26</h6>
-                    <SourceBadge table={["TB_FT_BASE_UNICA_SITES", "TB_ROLLOUT_ACESSO"]} />
-                  </div>
-                  <small className="text-muted d-block mb-3">
-                    Base 25 + Casa Nova · Upgrades não somam (já existem na Base)
-                  </small>
-                </div>
-                <ChartToolbar
-                  onExportData={
-                    sites
-                      ? () =>
-                          downloadSheet("r3-sites-fisicos-eoy26.xlsx", {
-                            name: "R3 Sites Físicos EoY 26",
-                            columns: [
-                              { header: "Tecnologia", key: "tec" },
-                              { header: "Base 25", key: "base" },
-                              { header: "Casa Nova", key: "nova" },
-                              { header: "Upgrade (Casa Existente)", key: "upgrade" },
-                            ],
-                            rows: sites.categories.map((tec, i) => ({
-                              tec,
-                              base: sites.series[0]?.data[i] ?? 0,
-                              nova: sites.series[1]?.data[i] ?? 0,
-                              upgrade: sites.series[2]?.data[i] ?? 0,
-                            })),
-                          })
-                      : undefined
-                  }
-                />
-              </div>
-
-              <SmallMultiplesTech data={sites} focusedTec={focusedTec} onSelectTec={toggleTecnologia} />
-
-              <div className="d-flex justify-content-center gap-2 mt-3 small flex-wrap">
-                <span><i className="sm-legend-box" style={{ background: "#B0BEC5" }} /> Base 25</span>
-                <span><i className="sm-legend-box" style={{ background: "#26C281" }} /> Nova</span>
-                <span><i className="sm-legend-box" style={{ background: "#1565C0" }} /> Existente</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-lg-3">
-          <ChartPanel
-            title="Fornecedores EoY 26"
-            subtitle="Sites físicos · Base 25 existentes + Casa Nova a contratar"
-            sourceTable={["BASE_TB_END_ID_NEW", "TB_ROLLOUT_ACESSO"]}
-            height={340}
-            option={vendorDonutSideOption(vendors ?? [])}
-            loading={loadingVendors}
-            imageFilename="r3-fornecedores-eoy26.png"
-            exportSheet={{
-              name: "R3 Fornecedores",
-              columns: [
-                { header: "Fornecedor", key: "label" },
-                { header: "Sites", key: "value" },
-              ],
-              rows: vendors ?? [],
-            }}
-          />
-        </div>
-
-        <div className="col-lg-3">
+        <div className="col-lg-4">
           <ChartPanel
             title="Top 10 Projetos"
             subtitle="Clique num projeto pra filtrar toda a aba"
@@ -159,6 +80,26 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
                 { header: "OCs", key: "value" },
               ],
               rows: projects ?? [],
+            }}
+          />
+        </div>
+
+        <div className="col-lg-4">
+          <ChartPanel
+            title="Fornecedores EoY 26"
+            subtitle="Sites físicos · Base 25 existentes + Casa Nova a contratar"
+            sourceTable={["BASE_TB_END_ID_NEW", "TB_ROLLOUT_ACESSO"]}
+            height={340}
+            option={vendorDonutSideOption(vendors ?? [])}
+            loading={loadingVendors}
+            imageFilename="r3-fornecedores-eoy26.png"
+            exportSheet={{
+              name: "R3 Fornecedores",
+              columns: [
+                { header: "Fornecedor", key: "label" },
+                { header: "Sites", key: "value" },
+              ],
+              rows: vendors ?? [],
             }}
           />
         </div>

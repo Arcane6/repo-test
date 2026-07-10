@@ -17,47 +17,6 @@ Filtros globais compartilhados (aplicados via placeholders):
 # RAIA 1 — FECHAMENTO 25 (baseline até 31/dez do ano-1)
 # ===========================================================================
 
-# ---------- Sites por tecnologia (fechamento 25) ----------
-# Fonte: TB_FT_BASE_UNICA_SITES + regra:
-#   pega o último MES_REF ≤ baseline_date
-#   agrupa por tecnologia via LIKE (a coluna vem "2G/3G/4G/5G")
-
-R1_SITES_BY_TECH = """
-WITH BASE AS (
-    SELECT END_ID, UF, MUNICIPIO, TECNOLOGIA
-    FROM NTW_OP.TB_FT_BASE_UNICA_SITES
-    WHERE MES_REF = (
-        SELECT MAX(MES_REF)
-        FROM NTW_OP.TB_FT_BASE_UNICA_SITES
-        WHERE MES_REF <= :baseline_date
-    )
-    {uf_filter_site}
-    {municipio_filter_site}
-),
-GEO AS (
-    SELECT UF, MUNICIPIO, REGIONAL
-    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    WHERE TRUNC(DT_CARGA) = (
-        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    )
-)
-SELECT
-    -- Cada site conta uma única vez, na tecnologia mais nova que ele tem
-    -- (cascata 5G > 4G > 3G > 2G) — um site 5G/4G/3G/2G é só 5G, um
-    -- 4G/3G/2G é só 4G, e assim por diante. Sem isso, um mesmo site com
-    -- várias tecnologias era somado uma vez em cada contagem.
-    SUM(CASE WHEN TECNOLOGIA NOT LIKE '%5G%' AND TECNOLOGIA NOT LIKE '%4G%' AND TECNOLOGIA NOT LIKE '%3G%' AND TECNOLOGIA LIKE '%2G%' THEN 1 ELSE 0 END) AS sites_2g,
-    SUM(CASE WHEN TECNOLOGIA NOT LIKE '%5G%' AND TECNOLOGIA NOT LIKE '%4G%' AND TECNOLOGIA LIKE '%3G%' THEN 1 ELSE 0 END) AS sites_3g,
-    SUM(CASE WHEN TECNOLOGIA NOT LIKE '%5G%' AND TECNOLOGIA LIKE '%4G%' THEN 1 ELSE 0 END) AS sites_4g,
-    SUM(CASE WHEN TECNOLOGIA LIKE '%5G%' THEN 1 ELSE 0 END) AS sites_5g,
-    COUNT(DISTINCT END_ID) AS total_sites
-FROM BASE b
-LEFT JOIN GEO g ON g.UF = b.UF AND UPPER(g.MUNICIPIO) = UPPER(b.MUNICIPIO)
-WHERE 1=1
-{regional_filter_site}
-"""
-
-
 # ---------- Sites por tecnologia — diagrama de Venn de 4 conjuntos ----------
 # Mesma fonte/filtro do M-query do Power BI que alimentava essa visão antes
 # da migração: TB_FT_BASE_UNICA_SITES, no MES_REF mais recente, excluindo
@@ -229,58 +188,6 @@ ORDER BY qtd DESC
 # ===========================================================================
 # RAIA 2 — PLANO 26 (só o delta do ano)
 # ===========================================================================
-
-# ---------- Sites por tecnologia (plano 26) ----------
-# Fonte: TB_ROLLOUT_ACESSO 2026 ACTIVATED, agrupado por tecnologia
-
-R2_SITES_BY_TECH = """
-SELECT
-    -- Casa Nova = NEW SITE + CO SITE CASA NOVA
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '2G'
-              AND r.CLASSIFICACAO_CASA IN ('NEW SITE', 'CO SITE CASA NOVA')
-             THEN 1 ELSE 0 END) AS nova_2g,
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '3G'
-              AND r.CLASSIFICACAO_CASA IN ('NEW SITE', 'CO SITE CASA NOVA')
-             THEN 1 ELSE 0 END) AS nova_3g,
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '4G'
-              AND r.CLASSIFICACAO_CASA IN ('NEW SITE', 'CO SITE CASA NOVA')
-             THEN 1 ELSE 0 END) AS nova_4g,
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '5G'
-              AND r.CLASSIFICACAO_CASA IN ('NEW SITE', 'CO SITE CASA NOVA')
-             THEN 1 ELSE 0 END) AS nova_5g,
-    -- Casa Existente = tudo que não é nova (upgrade em site que já existe)
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '2G'
-              AND (r.CLASSIFICACAO_CASA IS NULL
-                   OR r.CLASSIFICACAO_CASA NOT IN ('NEW SITE', 'CO SITE CASA NOVA'))
-             THEN 1 ELSE 0 END) AS existente_2g,
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '3G'
-              AND (r.CLASSIFICACAO_CASA IS NULL
-                   OR r.CLASSIFICACAO_CASA NOT IN ('NEW SITE', 'CO SITE CASA NOVA'))
-             THEN 1 ELSE 0 END) AS existente_3g,
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '4G'
-              AND (r.CLASSIFICACAO_CASA IS NULL
-                   OR r.CLASSIFICACAO_CASA NOT IN ('NEW SITE', 'CO SITE CASA NOVA'))
-             THEN 1 ELSE 0 END) AS existente_4g,
-    SUM(CASE WHEN UPPER(REPLACE(REPLACE(r.TECNOLOGIA,'"',''),'''','')) = '5G'
-              AND (r.CLASSIFICACAO_CASA IS NULL
-                   OR r.CLASSIFICACAO_CASA NOT IN ('NEW SITE', 'CO SITE CASA NOVA'))
-             THEN 1 ELSE 0 END) AS existente_5g,
-    COUNT(*) AS total_sites
-FROM NTW_OP.TB_ROLLOUT_ACESSO r
-LEFT JOIN (
-    SELECT IBGE, UF, MUNICIPIO, REGIONAL
-    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    WHERE TRUNC(DT_CARGA) = (
-        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    )
-) d ON d.IBGE = r.COD_IBGE
-WHERE r.PLANO = :ano
-  AND r.STATUS_OC = 'ACTIVATED'
-  {uf_filter_d}
-  {municipio_filter_d}
-  {regional_filter_d}
-  {projeto_filter}
-"""
 
 # ---------- Novas cidades por regional (ANF) — plano 26 ----------
 # Fonte: MUNICIPIOS_FECHAMENTO com MES_DIV_5G no ano-plano

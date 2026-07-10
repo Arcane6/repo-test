@@ -15,12 +15,10 @@ from modules.mobile_access.shared.constants import (
     TECH_COLORS, TECH_ORDER, DEFAULT_PLAN_YEAR,
 )
 from modules.mobile_access.summary.queries import (
-    R1_SITES_BY_TECH,
     R1_SITES_VENN,
     R1_SITES_VENN_REGION_CLAUSES,
     R1_CITIES_BY_TECH,
     R1_VENDORS,
-    R2_SITES_BY_TECH,
     R2_NEW_CITIES_BY_ANF,
     R2_VENDORS_NEW_SITES,
     R2_TOP_PROJECTS,
@@ -156,26 +154,6 @@ def get_years():
 # RAIA 1 — Fechamento 25
 # ---------------------------------------------------------------------------
 
-def get_r1_sites_by_tech(filters):
-    params, ano_int = _prepare_params(filters)
-    params["baseline_date"] = _dt.date(ano_int - 1, 12, 31)
-
-    sql = _apply_geo_all(
-        R1_SITES_BY_TECH, filters, params,
-        uf_key="uf_filter_site", mun_key="municipio_filter_site",
-        regional_field="g.REGIONAL", regional_key="regional_filter_site",
-    )
-    row = (execute_query(sql, params) or [{}])[0]
-    return {
-        "bars": [
-            {"tec": t, "value": row.get(f"sites_{t.lower()}", 0) or 0,
-             "color": TECH_COLORS[t]}
-            for t in TECH_ORDER
-        ],
-        "total": row.get("total_sites", 0) or 0,
-    }
-
-
 VENN_REGION_KEYS = [
     "only_2g", "only_3g", "only_4g", "only_5g",
     "i_23", "i_24", "i_25", "i_34", "i_35", "i_45",
@@ -242,36 +220,6 @@ def get_r1_vendors(filters):
 # ---------------------------------------------------------------------------
 # RAIA 2 — Plano 26
 # ---------------------------------------------------------------------------
-
-def get_r2_sites_by_tech(filters):
-    params, ano_int = _prepare_params(filters)
-    params["ano"] = ano_int
-
-    sql = _apply_geo_all(
-        R2_SITES_BY_TECH, filters, params,
-        uf_field="d.UF", mun_field="d.MUNICIPIO",
-        uf_key="uf_filter_d", mun_key="municipio_filter_d",
-        regional_field="d.REGIONAL", regional_key="regional_filter_d",
-    )
-    row = (execute_query(sql, params) or [{}])[0]
-
-    return {
-        "categories": TECH_ORDER,  # ["2G","3G","4G","5G"]
-        "series": [
-            {
-                "name": "Casa Nova",
-                "color": "#7DC242",  # verde
-                "data": [row.get(f"nova_{t.lower()}", 0) or 0 for t in TECH_ORDER],
-            },
-            {
-                "name": "Casa Existente",
-                "color": "#003399",  # azul TIM
-                "data": [row.get(f"existente_{t.lower()}", 0) or 0 for t in TECH_ORDER],
-            },
-        ],
-        "total": row.get("total_sites", 0) or 0,
-    }
-
 
 def get_r2_new_cities_by_anf(filters):
     """
@@ -425,64 +373,6 @@ def get_r2_endereco_por_tecnologia(filters):
 # ---------------------------------------------------------------------------
 # RAIA 3 — Fechamento 26 = Raia 1 + Raia 2 (composição)
 # ---------------------------------------------------------------------------
-
-def get_r3_sites_by_tech(filters):
-    """
-    Sites físicos no fechamento EoY 26.
-
-    IMPORTANTE — Regra conceitual:
-        - Base 25   = sites físicos EXISTENTES (tec ativas em cada um)
-        - Casa Nova = sites físicos NOVOS a serem construídos (só esses somam!)
-        - Casa Existente NÃO ENTRA aqui porque é upgrade tecnológico
-          (adiciona tec num site que já existe — não soma unidade nova).
-
-    O card gráfico mostra as 3 séries pra dar visibilidade, MAS a soma real
-    do "total de sites físicos EoY 26" = Base 25 + Casa Nova.
-    """
-    r1 = get_r1_sites_by_tech(filters)      # baseline por tec (sites reais)
-    r2 = get_r2_sites_by_tech(filters)      # plano stacked (nova + existente)
-
-    # Extrai só a série "Casa Nova" do plano
-    casa_nova_series = next(
-        (s for s in r2["series"] if s["name"] == "Casa Nova"),
-        {"name": "Casa Nova", "color": "#26C281", "data": [0, 0, 0, 0]},
-    )
-    casa_existente_series = next(
-        (s for s in r2["series"] if s["name"] == "Casa Existente"),
-        {"name": "Casa Existente", "color": "#1565C0", "data": [0, 0, 0, 0]},
-    )
-
-    # Base 25 (renomeada pra clareza)
-    base_series = {
-        "name": "Base 25",
-        "color": "#B0BEC5",
-        "data": [b["value"] for b in r1["bars"]],
-    }
-
-    # Total físico = Base 25 + Casa Nova (Casa Existente NÃO soma)
-    total_fisico = (
-        sum(base_series["data"])
-        + sum(casa_nova_series["data"])
-    )
-
-    return {
-        "categories": TECH_ORDER,
-        "series": [
-            base_series,
-            casa_nova_series,
-            {
-                # Upgrades entram como série informativa, mas NÃO soma no total
-                "name": "Upgrade (Casa Existente)",
-                "color": "#dee2e6",
-                "data": casa_existente_series["data"],
-                "is_info_only": True,  # flag pro frontend não somar
-            },
-        ],
-        "total": total_fisico,
-        # Total inflado (com upgrade) fica separado pra caso queira exibir
-        "total_com_upgrades": r1["total"] + r2["total"],
-    }
-
 
 def get_r3_new_cities_by_anf(filters):
     """

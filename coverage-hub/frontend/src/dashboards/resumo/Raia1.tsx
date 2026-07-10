@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
-import { barsByTechOption, horizontalBarsOption } from "../../charts/optionBuilders";
+import { barsByTechOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { SitesComboChart } from "../../components/SitesComboChart";
 import { useResumoFocusStore } from "../../store/resumoFocus";
@@ -55,9 +55,8 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
           <ChartPanel
             title="Fornecedor por Site"
             sourceTable="BASE_TB_END_ID_NEW"
-            option={horizontalBarsOption(
-              (vendors ?? []).map((v) => ({ name: v.label, value: v.value, color: v.color })),
-            )}
+            height={340}
+            option={vendorDonutSideOption(vendors ?? [])}
             loading={loadingVendors}
             imageFilename="r1-fornecedor-por-site.png"
             exportSheet={{
