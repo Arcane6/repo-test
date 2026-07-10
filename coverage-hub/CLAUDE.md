@@ -187,10 +187,35 @@ prioridades (não confundir com `TB_ROLLOUT_ACESSO.PRIORIDADE`, que é o
 nome do projeto/"Top 10 Projetos" — aqui parece ser uma classificação de
 criticidade, não o nome do projeto).
 
-**Ainda não sabemos**: pra que visual essa base vai alimentar, nem como
-ela se relaciona (join key) com `TB_ROLLOUT_ACESSO`/`MUNICIPIOS_FECHAMENTO`
-— não tem UF/município na query dada. Quando for integrar, comece
-perguntando isso em vez de assumir.
+**Mapeamento com o que já existe** (confirmado pelo usuário): esta view é
+essencialmente **`TB_NEXUS_CN_CE` aberta por projeto, sem `IBGE`**. Ou
+seja, é a mesma família de dado do rateio "Endereço por Tecnologia"
+(`R2_ENDERECO_POR_TECNOLOGIA`), só que com uma dimensão a mais:
+
+| `TB_NEXUS_CN_CE` (em uso hoje) | `VW_CAPEX_MASTER_FULL` (mapeada) | Equivalência |
+|---|---|---|
+| `TECH` (`'4G'`/`'5G'`, 2 valores) | `DLV_LEVEL_1` (`'5G LAYERS'`, `'4G LAYERS'`, `'4G/5G LAYERS'`, `'5G B2C LAYERS'`, 4 valores) | **Parcial, não confirmada.** `TECH` já vem normalizado em 2 buckets; `DLV_LEVEL_1` tem 2 valores a mais (`4G/5G LAYERS` combinado, `5G B2C LAYERS` — talvez outro produto/segmento). Não dá pra assumir `4G/5G LAYERS` → soma nas duas tecs nem que `5G B2C` → `5G` sem confirmar com valores reais. |
+| `TIPO_CASA` (CN/CE) | `DLV_LEVEL_3` (`TIPO_CASA`) | Mesmo conceito, nomenclatura própria do NEXUS — **confirmar os valores reais** antes de assumir que mapeiam 1:1 pra CN/CE. |
+| (não existe) | `SOURCE_AJUSTADO` (`'TIM'` vs `'B2B MOBILE'`) | Dimensão nova, sem equivalente em `TB_NEXUS_CN_CE` hoje. Mobile Access é hoje só rede TIM consumidor — **precisa confirmar se B2B Mobile deve ser excluído** do rateio deste módulo ou se `TB_NEXUS_CN_CE` já mistura os dois sem essa distinção. |
+| (não existe — `CAC_TOTAL` é só nacional por TECH×TIPO_CASA) | `DLV_LEVEL_2` (`PROJETO`) | A dimensão nova que o usuário apontou. Permitiria um rateio bem mais preciso: em vez de ratear o valor nacional de CN/CE só por proporção de OCs (TECH×TIPO_CASA), dava pra ratear por TECH×TIPO_CASA×**projeto**, casando com `R.PRIORIDADE` de `TB_ROLLOUT_ACESSO` (a mesma coluna que alimenta "Top 10 Projetos"). **Precisa confirmar se os nomes de projeto em `DLV_LEVEL_2` batem string-a-string com `R.PRIORIDADE`**, ou se precisa de uma tabela de-para. |
+| `CAC` | `KPI` | Mesma função (valor a ratear); unidade ainda não confirmada (ver abaixo). |
+| (nenhuma coluna geo) | (nenhuma coluna geo) | **Mesma limitação nas duas** — nem `TB_NEXUS_CN_CE` nem `VW_CAPEX_MASTER_FULL` têm UF/município/IBGE. Isso não é um problema novo: o rateio geográfico já é feito hoje via proporção de OCs de `TB_ROLLOUT_ACESSO` (que tem `COD_IBGE`), nunca por join direto na base financeira. O mesmo padrão (`ROLLOUT_REFERENCIA_ALL` sem filtro = denominador, `ROLLOUT_REFERENCIA` filtrado = numerador) se aplicaria aqui sem mudança de abordagem. |
+
+**Ainda não sabemos / bloqueadores antes de integrar**:
+1. Valores distintos reais de `DLV_LEVEL_1`, `DLV_LEVEL_3` e
+   `SOURCE_AJUSTADO` (um `SELECT DISTINCT` simples resolve) — sem isso,
+   qualquer `CASE WHEN` de normalização seria chute.
+2. Se `DLV_LEVEL_2` (nome do projeto) casa com `TB_ROLLOUT_ACESSO.PRIORIDADE`
+   sem transformação.
+3. Se o rateio deste módulo deve incluir `SOURCE_AJUSTADO = 'B2B MOBILE'`
+   ou só `'TIM'`.
+4. Unidade de `KPI` (R$ / R$ milhões / outra).
+5. Se `SCENARIO = '2026 CAC (26-28) V02'` deve ficar fixo no código ou
+   virar filtro (nome de cenário parece mudar por ciclo de planejamento).
+
+Quando for integrar, comece confirmando esses 5 pontos em vez de assumir
+— o rateio financeiro é a área do projeto onde já erramos antes (rateio
+com denominador filtrado por engano), então mais vale perguntar de novo.
 
 ## Questões em aberto (não resolvidas ainda)
 
