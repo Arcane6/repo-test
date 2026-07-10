@@ -150,7 +150,13 @@ Frontend espelha isso em `frontend/src/dashboards/` (`CidadesDashboard`,
 
 View de CAPEX/orçamento consolidado do NEXUS, acessada via database link
 (não é uma tabela local — não precisa de schema prefix tipo `NTW_OP.`).
-Query de referência dada pelo usuário:
+É essencialmente **`TB_NEXUS_CN_CE` aberta por `SOURCE_AJUSTADO`
+(TIM/B2B Mobile), sem `IBGE`** — mesma família de dado do rateio
+"Endereço por Tecnologia" (`R2_ENDERECO_POR_TECNOLOGIA`), com uma
+dimensão de segmento a mais e uma camada tecnológica a mais.
+
+Query de referência, já com as decisões de negócio confirmadas pelo
+usuário aplicadas:
 
 ```sql
 SELECT
@@ -163,7 +169,7 @@ FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
 WHERE SCENARIO = '2026 CAC (26-28) V02'
   AND PRIORIDADE = 'IMPRESCINDÍVEL'
   AND LAYER_SUBAREA = 'MOBILE ACCESS'
-  AND DLV_LEVEL_1 IN ('5G LAYERS', '4G LAYERS', '4G/5G LAYERS', '5G B2C LAYERS')
+  AND DLV_LEVEL_1 IN ('5G LAYERS', '4G LAYERS', '4G/5G LAYERS')
   AND DLV_LEVEL_2 <> 'ACORDO VIVO'
   AND DLV_LEVEL_3 <> 'RAN SHARING'
   AND DLV_LEVEL_3 <> 'DROP'
@@ -172,25 +178,58 @@ GROUP BY DLV_LEVEL_1, SOURCE_AJUSTADO, DLV_LEVEL_2, DLV_LEVEL_3
 ORDER BY SOURCE_AJUSTADO DESC, DLV_LEVEL_1 DESC
 ```
 
-Colunas observadas: `DLV_LEVEL_1` (camada tecnológica: 5G/4G/4G-5G/5G
-B2C), `SOURCE_AJUSTADO` (TIM vs B2B Mobile), `DLV_LEVEL_2` (projeto),
-`DLV_LEVEL_3` (tipo de casa — mesmo conceito de Casa Nova/Existente, mas
-nomenclatura própria do NEXUS, não confundir com `CLASSIFICACAO_CASA` do
-`TB_ROLLOUT_ACESSO`), `KPI` (valor numérico — provavelmente R$, mas
-**confirmar unidade antes de usar**; nas outras tabelas NEXUS os valores
-já vieram sem unidade explícita e tivemos que inferir R$ milhões pelo
-contexto). `SCENARIO` fixo em `'2026 CAC (26-28) V02'` — nome de cenário
-específico, provavelmente muda por ciclo de planejamento; **perguntar
-antes de fixar no código se deve ser hardcoded ou vir de filtro**.
-Filtro `PRIORIDADE = 'IMPRESCINDÍVEL'` sugere que existem outras
-prioridades (não confundir com `TB_ROLLOUT_ACESSO.PRIORIDADE`, que é o
-nome do projeto/"Top 10 Projetos" — aqui parece ser uma classificação de
-criticidade, não o nome do projeto).
+**Decisões de negócio já confirmadas pelo usuário** (não re-perguntar):
 
-**Ainda não sabemos**: pra que visual essa base vai alimentar, nem como
-ela se relaciona (join key) com `TB_ROLLOUT_ACESSO`/`MUNICIPIOS_FECHAMENTO`
-— não tem UF/município na query dada. Quando for integrar, comece
-perguntando isso em vez de assumir.
+- `DLV_LEVEL_1` (`LAYERS`) fica com **3 baldes distintos, sem fundir**:
+  `5G LAYERS`, `4G LAYERS`, `4G/5G LAYERS`. O combinado (`4G/5G LAYERS`)
+  **não** deve ser somado dentro de `5G` nem de `4G` — é uma categoria
+  própria.
+- `5G B2C LAYERS` foi **removido do escopo** (tirado do `IN (...)`) — não
+  faz parte do rateio deste módulo.
+- `SOURCE_AJUSTADO`: **B2B Mobile não deve ser excluído** — o rateio
+  inclui TIM e B2B Mobile juntos (`IN ('TIM', 'B2B MOBILE')` mantido).
+- `DLV_LEVEL_2` (`PROJETO`): **os nomes nunca batem** com
+  `TB_ROLLOUT_ACESSO.PRIORIDADE` (confirmado pelo usuário) — a ideia de
+  ratear por projeto real fica descartada. `DLV_LEVEL_2` deve ser tratado
+  como não-join-ável; ao consumir esta base, **agregar (somar) por cima
+  dela** em vez de manter como dimensão de saída (ou seja, o `GROUP BY`
+  efetivo pra qualquer query nova deveria ser só
+  `DLV_LEVEL_1, SOURCE_AJUSTADO, DLV_LEVEL_3`, descartando `DLV_LEVEL_2`
+  depois do filtro `<> 'ACORDO VIVO'`).
+
+**Escopo TIM×B2B em `TB_ROLLOUT_ACESSO` — resolvido pelo usuário**: os
+registros de B2B Mobile **estão** em `TB_ROLLOUT_ACESSO`, identificados
+por `PRIORIDADE = 'B2B MOBILE'`. Ou seja, a coluna `PRIORIDADE` é
+**sobrecarregada** — pra maioria das linhas ela é o nome do projeto
+(o que alimenta "Top 10 Projetos"), mas pra linhas de B2B Mobile ela
+carrega o valor fixo `'B2B MOBILE'` no lugar de um nome de projeto. Isso
+resolve o bloqueador do rateio: o numerador (OCs) pode ser separado por
+`SOURCE_AJUSTADO` via `CASE WHEN R.PRIORIDADE = 'B2B MOBILE' THEN
+'B2B MOBILE' ELSE 'TIM' END`, casando com os dois valores de
+`SOURCE_AJUSTADO` na view.
+
+**Inconsistência corrigida**: `R2_TOP_PROJECTS` (usada por "Top 10
+Projetos" em Raia 2 e Raia 3, via `get_r3_top_projects` que só chama
+`get_r2_top_projects`) misturava `PRIORIDADE = 'B2B MOBILE'` (marcador
+de segmento, não nome de projeto) no ranking de projetos. Corrigido com
+`AND r.PRIORIDADE <> 'B2B MOBILE'` no WHERE — "Top 10 Projetos" agora só
+mostra nomes de projeto de verdade.
+
+**Ainda em aberto / bloqueadores restantes antes de integrar**:
+1. Valores distintos reais de `DLV_LEVEL_1` e `DLV_LEVEL_3` (um `SELECT
+   DISTINCT` resolve) — pra confirmar que os 3 valores de `LAYERS`
+   batem exatamente com essas strings e que `TIPO_CASA` mapeia pra
+   CN/CE sem surpresa.
+2. Se "Top 10 Projetos" deve excluir `PRIORIDADE = 'B2B MOBILE'` (ver
+   inconsistência acima).
+3. Unidade de `KPI` (R$ / R$ milhões / outra).
+4. Se `SCENARIO = '2026 CAC (26-28) V02'` deve ficar fixo no código ou
+   virar filtro (nome de cenário parece mudar por ciclo de
+   planejamento).
+
+Quando for integrar, comece confirmando esses pontos em vez de assumir
+— o rateio financeiro é a área do projeto onde já erramos antes (rateio
+com denominador filtrado por engano), então mais vale perguntar de novo.
 
 ## Questões em aberto (não resolvidas ainda)
 

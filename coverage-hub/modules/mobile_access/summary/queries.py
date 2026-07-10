@@ -314,6 +314,7 @@ LEFT JOIN (
 WHERE r.PLANO = :ano
   AND r.STATUS_OC = 'ACTIVATED'
   AND r.PRIORIDADE IS NOT NULL
+  AND r.PRIORIDADE <> 'B2B MOBILE'
   {uf_filter_d}
   {municipio_filter_d}
   {regional_filter_d}
