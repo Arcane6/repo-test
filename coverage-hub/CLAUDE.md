@@ -208,19 +208,12 @@ resolve o bloqueador do rateio: o numerador (OCs) pode ser separado por
 'B2B MOBILE' ELSE 'TIM' END`, casando com os dois valores de
 `SOURCE_AJUSTADO` na view.
 
-**Inconsistência nova que isso revelou — sinalizar, não corrigir sem
-confirmar**: `R2_TOP_PROJECTS` (`SELECT r.PRIORIDADE, COUNT(*) ... GROUP
-BY r.PRIORIDADE ... WHERE r.PRIORIDADE IS NOT NULL`, usada por
-"Top 10 Projetos" em Raia 2 e Raia 3 via `get_r3_top_projects` que só
-chama `get_r2_top_projects`) **não exclui `PRIORIDADE = 'B2B MOBILE'`**.
-Como agora sabemos que esse valor não é nome de projeto e sim um
-marcador de segmento, se o volume de OCs de B2B Mobile for alto o
-suficiente, `'B2B MOBILE'` pode aparecer como uma das barras do
-"Top 10 Projetos" — misturando um segmento de negócio dentro de um
-ranking que deveria ser só nomes de projeto. **Perguntar ao usuário**:
-"Top 10 Projetos" deve excluir `PRIORIDADE = 'B2B MOBILE'` (só projetos
-de verdade) ou faz sentido esse valor aparecer ali como uma categoria a
-mais?
+**Inconsistência corrigida**: `R2_TOP_PROJECTS` (usada por "Top 10
+Projetos" em Raia 2 e Raia 3, via `get_r3_top_projects` que só chama
+`get_r2_top_projects`) misturava `PRIORIDADE = 'B2B MOBILE'` (marcador
+de segmento, não nome de projeto) no ranking de projetos. Corrigido com
+`AND r.PRIORIDADE <> 'B2B MOBILE'` no WHERE — "Top 10 Projetos" agora só
+mostra nomes de projeto de verdade.
 
 **Ainda em aberto / bloqueadores restantes antes de integrar**:
 1. Valores distintos reais de `DLV_LEVEL_1` e `DLV_LEVEL_3` (um `SELECT
