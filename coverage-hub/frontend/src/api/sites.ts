@@ -57,11 +57,19 @@ export interface SitesTipoResponse {
   total_sites: number;
 }
 
+export interface LabeledValue {
+  label: string;
+  value: number;
+  color: string;
+}
+
 export const sitesApi = {
   byMaxTech: (f: SitesFilters) =>
     fetchJson<TechBarsResponse>(`${BASE}/by-max-tech?${query(f)}`),
   byTecnologia: (f: SitesFilters) =>
     fetchJson<TechBarsResponse>(`${BASE}/by-tecnologia?${query(f)}`),
+  vendors: (f: SitesFilters) =>
+    fetchJson<LabeledValue[]>(`${BASE}/vendors?${query(f)}`),
   pivot: (f: SitesFilters) =>
     fetchJson<SitesPivotResponse>(`${BASE}/pivot?${query(f)}`),
   tipo: (f: SitesFilters) =>

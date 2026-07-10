@@ -175,6 +175,11 @@ def api_sites_by_tecnologia():
     return jsonify(sites.get_sites_by_tecnologia(_sites_filters()))
 
 
+@mobile_access_bp.route("/api/sites/vendors")
+def api_sites_vendors():
+    return jsonify(sites.get_sites_vendors(_sites_filters()))
+
+
 @mobile_access_bp.route("/api/sites/pivot")
 def api_sites_pivot():
     return jsonify(sites.get_sites_pivot(_sites_filters()))

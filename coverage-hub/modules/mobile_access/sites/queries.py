@@ -97,6 +97,58 @@ GROUP BY g.REGIONAL, b.UF, b.MUNICIPIO
 ORDER BY g.REGIONAL, b.UF, b.MUNICIPIO
 """
 
+# ---------- Fornecedor dominante por site ----------
+# Fonte: NTW_MABE.BASE_TB_END_ID_NEW — mesma tabela e mesma cascata de
+# colunas VENDOR_* (maior banda primeiro dentro de cada tec) já usada em
+# R1_VENDORS (summary/queries.py), confirmada pelo usuário via query real
+# do Power BI antigo (Odbc.Query em NTW_MABE.BASE_TB_END_ID_NEW). Aqui o
+# join é feito DENTRO do universo de sites já filtrado desta aba (BASE),
+# não como query independente — assim o total de "sites com fornecedor"
+# bate com o total das outras visões da mesma tela, em vez de ter dois
+# universos de sites diferentes na mesma aba.
+SITES_VENDORS = SITES_BASE_CTE + """,
+VENDOR_BASE AS (
+    SELECT
+        END_ID,
+        -- Cascata 5G (maior banda primeiro): 3500 > 26000 > 2600 > 2300 > 2100 > 1800 > 700
+        COALESCE(
+            VENDOR_NR_3500, VENDOR_NR_26000, VENDOR_NR_2600DSS,
+            VENDOR_NR_2300, VENDOR_NR_2100DSS, VENDOR_NR_1800DSS, VENDOR_NR_700DSS
+        ) AS VENDOR_5G,
+        -- Cascata 4G: 2600P > 2600 > 2600RS > 2300 > 2100 > 1800 > 850 > 700
+        COALESCE(
+            VENDOR_LTE_2600P, VENDOR_LTE_2600, VENDOR_LTE_2600RS,
+            VENDOR_LTE_2300, VENDOR_LTE_2100, VENDOR_LTE_1800,
+            VENDOR_LTE_850, VENDOR_LTE_700
+        ) AS VENDOR_4G,
+        -- Cascata 3G: 2100 > 850
+        COALESCE(VENDOR_UMTS_2100, VENDOR_UMTS_850) AS VENDOR_3G,
+        -- Cascata 2G: 1800 > 900
+        COALESCE(VENDOR_GSM_1800, VENDOR_GSM_900) AS VENDOR_2G
+    FROM NTW_MABE.BASE_TB_END_ID_NEW
+    WHERE REF = (
+        SELECT REF
+        FROM (
+            SELECT REF
+            FROM NTW_MABE.BASE_TB_END_ID_NEW
+            GROUP BY REF
+            ORDER BY TO_DATE(REF, 'MM-YYYY') DESC
+        )
+        WHERE ROWNUM = 1
+    )
+)
+SELECT
+    COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G) AS VENDOR,
+    COUNT(*) AS qtd
+FROM BASE b
+LEFT JOIN GEO g ON g.IBGE = b.IBGE
+LEFT JOIN VENDOR_BASE vb ON vb.END_ID = b.END_ID
+WHERE 1=1
+{regional_filter_site}
+GROUP BY COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G)
+ORDER BY qtd DESC
+"""
+
 # ---------- Sites com coordenada — um ponto por site, com a tecnologia ----------
 # máxima (mesma cascata 5G>4G>3G>2G) como cor. Alimenta os mapas (Brasil e
 # múndi — a TIM tem site fora do território nacional). Descarta site sem

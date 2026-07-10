@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FilterBar } from "../components/FilterBar";
 import { ChartPanel } from "../components/ChartPanel";
 import { SitesPivotTable } from "../components/SitesPivotTable";
-import { barsByTechOption, donutOption } from "../charts/optionBuilders";
+import { barsByTechOption, donutOption, vendorDonutSideOption } from "../charts/optionBuilders";
 import { sitesApi } from "../api/sites";
 import { useFilterStore } from "../store/filters";
 
@@ -18,6 +18,11 @@ export function SitesDashboard() {
   const { data: byTec, isFetching: loadingByTec } = useQuery({
     queryKey: ["sites-by-tecnologia", uf, municipio],
     queryFn: () => sitesApi.byTecnologia(filters),
+  });
+
+  const { data: vendors, isFetching: loadingVendors } = useQuery({
+    queryKey: ["sites-vendors", uf, municipio],
+    queryFn: () => sitesApi.vendors(filters),
   });
 
   const { data: tipo, isFetching: loadingTipo } = useQuery({
@@ -83,7 +88,27 @@ export function SitesDashboard() {
       </div>
 
       <div className="row g-3 mt-1">
-        <div className="col-lg-4">
+        <div className="col-lg-6">
+          <ChartPanel
+            title="Fornecedor Dominante por Site"
+            subtitle="Cascata por banda (maior primeiro) dentro de cada tecnologia — mesma fonte e regra do 'Fornecedor por Site' do Resumo"
+            sourceTable="BASE_TB_END_ID_NEW"
+            height={280}
+            option={vendorDonutSideOption(vendors ?? [])}
+            loading={loadingVendors}
+            imageFilename="sites-fornecedor-dominante.png"
+            exportSheet={{
+              name: "Sites por Fornecedor",
+              columns: [
+                { header: "Fornecedor", key: "label" },
+                { header: "Sites", key: "value" },
+              ],
+              rows: vendors ?? [],
+            }}
+          />
+        </div>
+
+        <div className="col-lg-6">
           <ChartPanel
             title="Tipo de Site"
             subtitle="Site móvel × perfil de transmissão configurado (TX Profile) — inclui site não-móvel, universo diferente das outras visões desta aba"
@@ -102,8 +127,10 @@ export function SitesDashboard() {
             }}
           />
         </div>
+      </div>
 
-        <div className="col-lg-8">
+      <div className="row g-3 mt-1">
+        <div className="col-12">
           <SitesPivotTable filters={filters} />
         </div>
       </div>

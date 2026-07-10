@@ -89,21 +89,25 @@ reabrir essa porta aqui sem uma coluna de dedup confiável).
   roaming, mas **não** filtra `MOBILE_SITE='SIM'` (é uma das dimensões
   mostradas). Por isso o total dessa visão não bate com o total das
   outras — é esperado, não é bug.
+- **Fornecedor Dominante por Site**: fonte real é
+  `NTW_MABE.BASE_TB_END_ID_NEW` (confirmado pelo usuário via query ODBC
+  do Power BI antigo — a leitura anterior de "VW03 || RF DESIGN PROFILE
+  (VENDOR_2)" e de "depende de `TB_FT_BASE_UNICA_SITES`" estavam
+  erradas). **Mesma cascata de colunas `VENDOR_*` já usada em
+  `R1_VENDORS`** (`summary/queries.py`) — 19 colunas confirmadas
+  1:1 com a query real do usuário (GSM_900/1800, UMTS_850/2100,
+  LTE_700/850/1800/2100/2300/2600/2600RS/2600P,
+  NR_700DSS/1800DSS/2100DSS/2600DSS/2300/3500/26000), maior banda
+  primeiro dentro de cada tec. Diferente de `R1_VENDORS`, aqui o join é
+  feito **dentro do universo de sites já filtrado** desta aba (`BASE`
+  da `SITES_BASE_CTE`), não como query independente — garante que o
+  total do donut de fornecedor bate com o total das outras visões da
+  mesma tela (confirmado: 45.230 nos dois, testado com stub). Sem
+  `FillDown` (a lógica frágil do Power Query original não foi
+  replicada) — site sem match vira "A DEFINIR".
 
 ### Pendências conhecidas desta aba (não implementadas ainda)
 
-- **Fornecedor por site**: confirmado que a coluna vem de dentro da
-  própria `TB_FT_BASE_UNICA_SITES` (não é uma view separada — a leitura
-  anterior de "VW03 || RF DESIGN PROFILE (VENDOR_2)" era só o nome
-  "bonito" do Power Query). **Ainda falta o nome exato da(s) coluna(s)**
-  — uma só (tipo `VENDOR`) ou uma por tecnologia (`VENDOR_2G`/`VENDOR_3G`/
-  `VENDOR_4G`/`VENDOR_5G`, no estilo de `BASE_TB_END_ID_NEW`)? Não
-  implementar sem essa confirmação — não dá pra adivinhar nome de
-  coluna. O `FillDown` do M-query original (preenche vendor nulo com o
-  valor da linha anterior, ordenado por TECH+END_ID) é lógica frágil de
-  Power Query — **não replicar em SQL**; o combinado com o usuário é
-  fazer join direto, sem fill down, mostrando "sem fornecedor" quando
-  não houver match.
 - **Mapas (Brasil + múndi)**: colunas de coordenada confirmadas —
   `LATITUDE`/`LONGITUDE`, ambas em `TB_FT_BASE_UNICA_SITES`. Backend já
   pronto: `SITES_GEO_POINTS` (`sites/queries.py`) +
@@ -118,9 +122,9 @@ reabrir essa porta aqui sem uma coluna de dedup confiável).
   engano: a TIM tem site na Antártida, fora do território nacional (por
   isso o mapa do Brasil sozinho não cobre 100% dos sites).
 
-"Sites" hoje tem as 4 visões visuais confirmadas (max-tech,
-por-tecnologia, pivot, tipo de site) + o endpoint de geo-points pronto
-sem consumidor visual ainda.
+"Sites" hoje tem 5 visões visuais confirmadas (max-tech, por-tecnologia,
+fornecedor dominante, tipo de site, pivot) + o endpoint de geo-points
+pronto sem consumidor visual ainda (falta o mapa em si).
 
 ## Convenções de backend
 

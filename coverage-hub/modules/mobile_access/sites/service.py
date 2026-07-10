@@ -15,9 +15,21 @@ from modules.mobile_access.sites.queries import (
     SITES_BY_MAX_TECH,
     SITES_BY_TECNOLOGIA,
     SITES_PIVOT,
+    SITES_VENDORS,
     SITES_GEO_POINTS,
     SITES_TIPO,
 )
+
+
+# Mesma paleta de VENDOR_COLORS de summary/service.py — cada aba mantém
+# sua própria cópia (ver nota acima sobre duplicação de helpers).
+VENDOR_COLORS = {
+    "NOKIA":     "#124191",
+    "ERICSSON":  "#0082F0",
+    "HUAWEI":    "#E60012",
+    "ZTE":       "#3A67C1",
+    "A DEFINIR": "#6c757d",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +114,26 @@ def get_sites_by_tecnologia(filters):
     sql = _apply_geo(SITES_BY_TECNOLOGIA, filters, params)
     row = (execute_query(sql, params) or [{}])[0]
     return _tech_bars_payload(row)
+
+
+def get_sites_vendors(filters):
+    """Fornecedor dominante por site (cascata NTW_MABE.BASE_TB_END_ID_NEW,
+    maior banda primeiro dentro de cada tec) — join feito dentro do
+    universo de sites já filtrado desta aba, pra bater com o total das
+    outras visões da mesma tela."""
+    params = {}
+    sql = _apply_geo(SITES_VENDORS, filters, params)
+    rows = execute_query(sql, params) or []
+    result = []
+    for r in rows:
+        name = r.get("vendor", "A DEFINIR") or "A DEFINIR"
+        value = r.get("qtd", 0) or 0
+        result.append({
+            "label": name,
+            "value": value,
+            "color": VENDOR_COLORS.get(name, "#888888"),
+        })
+    return result
 
 
 def get_sites_pivot(filters):
