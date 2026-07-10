@@ -140,6 +140,62 @@ body {
   color: var(--tim-text-muted) !important;
 }
 
+.tim-footer strong {
+  color: var(--tim-heading);
+}
+
+.tim-footer i.bi-broadcast {
+  color: var(--tim-navbar-bg-1);
+  font-size: 1.1rem;
+}
+
+[data-theme="dark"] .tim-footer i.bi-broadcast {
+  color: #7d9cff;
+}
+
+.tim-footer-heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tim-text-muted);
+  margin-bottom: 0.6rem;
+}
+
+.tim-footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tim-footer-links a {
+  color: var(--tim-text);
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+
+.tim-footer-links a:hover {
+  color: var(--tim-navbar-bg-1);
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .tim-footer-links a:hover {
+  color: #7d9cff;
+}
+
+.tim-footer-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--tim-text-muted);
+  background: var(--tim-hover-bg);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+}
+
 /* -----------------------------------------------------------------------------
  * Venn (SVG) — não vira preto no dark
  * ---------------------------------------------------------------------------*/
@@ -378,8 +434,67 @@ body {
  * PageHeader
  * ============================================================================= */
 
+.tim-page-header {
+  padding: 1.1rem 1.35rem;
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tim-navbar-bg-1) 7%, var(--tim-card-bg)) 0%,
+    var(--tim-card-bg) 100%
+  );
+  border: 1px solid var(--tim-card-border);
+}
+
 .tim-page-header h3 {
   letter-spacing: -0.01em;
+}
+
+.tim-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.tim-breadcrumb-link {
+  color: var(--tim-text-muted);
+  text-decoration: none;
+}
+
+.tim-breadcrumb-link:hover {
+  color: var(--tim-navbar-bg-1);
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .tim-breadcrumb-link:hover {
+  color: #7d9cff;
+}
+
+.tim-breadcrumb-current {
+  color: var(--tim-text-muted);
+  font-weight: 500;
+}
+
+.tim-breadcrumb-sep {
+  font-size: 0.6rem;
+  margin: 0 0.4rem;
+  color: var(--tim-text-muted);
+  opacity: 0.6;
+}
+
+/* =============================================================================
+ * Eyebrow — rótulo pequeno acima de um bloco (substitui texto solto sem
+ * função visual, ex.: "Resumo executivo" antes do card de filtros)
+ * ============================================================================= */
+
+.tim-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tim-text-muted);
 }
 
 .tim-page-header-icon {

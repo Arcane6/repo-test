@@ -25,7 +25,7 @@ export function ResumoDashboard() {
   return (
     <div>
       <div className="mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <p className="text-muted mb-0">Resumo executivo</p>
+        <span className="tim-eyebrow">Resumo executivo</span>
         {hasFocus && (
           <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFocus}>
             <i className="bi bi-x-lg" /> Limpar destaque
