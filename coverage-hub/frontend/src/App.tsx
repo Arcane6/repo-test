@@ -5,6 +5,7 @@ import { HomePage } from "./pages/HomePage";
 import { MobileAccessLayout } from "./pages/mobile-access/MobileAccessLayout";
 import { ResumoDashboard } from "./dashboards/ResumoDashboard";
 import { CidadesDashboard } from "./dashboards/CidadesDashboard";
+import { SitesDashboard } from "./dashboards/SitesDashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +27,7 @@ export function App() {
               <Route index element={<Navigate to="resumo" replace />} />
               <Route path="resumo" element={<ResumoDashboard />} />
               <Route path="cidades" element={<CidadesDashboard />} />
+              <Route path="sites" element={<SitesDashboard />} />
             </Route>
           </Route>
         </Routes>

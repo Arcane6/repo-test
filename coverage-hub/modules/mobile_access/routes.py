@@ -12,6 +12,7 @@ from modules.mobile_access.shared.filters import parse_filters
 from modules.mobile_access.shared.refs import get_refs
 from modules.mobile_access.actual import service as actual
 from modules.mobile_access.summary import service as summary
+from modules.mobile_access.sites import service as sites
 
 
 mobile_access_bp = Blueprint(
@@ -149,3 +150,36 @@ def api_summary_r3_vendors():
 @mobile_access_bp.route("/api/summary/r3/top-projects")
 def api_summary_r3_projects():
     return jsonify(summary.get_r3_top_projects(parse_filters()))
+
+
+# ---------------------------------------------------------------------------
+# API — Sites (inventário de sites físicos, TB_FT_BASE_UNICA_SITES)
+# ---------------------------------------------------------------------------
+
+def _sites_filters():
+    f = parse_filters()
+    return {
+        "ufs": f["ufs"],
+        "municipios": f["municipios"],
+        "regionais": f["regionais"],
+    }
+
+
+@mobile_access_bp.route("/api/sites/by-max-tech")
+def api_sites_by_max_tech():
+    return jsonify(sites.get_sites_by_max_tech(_sites_filters()))
+
+
+@mobile_access_bp.route("/api/sites/by-tecnologia")
+def api_sites_by_tecnologia():
+    return jsonify(sites.get_sites_by_tecnologia(_sites_filters()))
+
+
+@mobile_access_bp.route("/api/sites/pivot")
+def api_sites_pivot():
+    return jsonify(sites.get_sites_pivot(_sites_filters()))
+
+
+@mobile_access_bp.route("/api/sites/tipo")
+def api_sites_tipo():
+    return jsonify(sites.get_sites_tipo(_sites_filters()))
