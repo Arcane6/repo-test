@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FilterBar } from "../components/FilterBar";
 import { ChartPanel } from "../components/ChartPanel";
 import { SitesPivotTable } from "../components/SitesPivotTable";
+import { SitesMap } from "../components/SitesMap";
 import { barsByTechOption, donutOption, vendorDonutSideOption } from "../charts/optionBuilders";
 import { sitesApi } from "../api/sites";
 import { useFilterStore } from "../store/filters";
@@ -84,6 +85,12 @@ export function SitesDashboard() {
               rows: byTec?.bars ?? [],
             }}
           />
+        </div>
+      </div>
+
+      <div className="row g-3 mt-1">
+        <div className="col-12">
+          <SitesMap filters={filters} />
         </div>
       </div>
 

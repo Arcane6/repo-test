@@ -106,25 +106,50 @@ reabrir essa porta aqui sem uma coluna de dedup confiável).
   `FillDown` (a lógica frágil do Power Query original não foi
   replicada) — site sem match vira "A DEFINIR".
 
-### Pendências conhecidas desta aba (não implementadas ainda)
-
-- **Mapas (Brasil + múndi)**: colunas de coordenada confirmadas —
-  `LATITUDE`/`LONGITUDE`, ambas em `TB_FT_BASE_UNICA_SITES`. Backend já
-  pronto: `SITES_GEO_POINTS` (`sites/queries.py`) +
+- **Sites no Mapa**: `SITES_GEO_POINTS` (`sites/queries.py`) +
   `get_sites_geo_points` (`sites/service.py`) + rota
-  `/api/sites/geo-points` — devolve um ponto por site (END_ID, UF,
-  MUNICIPIO, lat, lon, tecnologia máxima, cor). Descarta site sem
-  lat/long. **O que falta é só o desenho**: nenhum componente de mapa no
-  frontend ainda consome esse endpoint. Vai precisar de
-  `GeoComponent`/`ScatterChart` do ECharts (não registrados em
-  `charts/Chart.tsx` hoje) e de um asset GeoJSON de contorno (Brasil +
-  mundo) — ainda não decidido de onde vem esse asset. Mapa múndi não é
-  engano: a TIM tem site na Antártida, fora do território nacional (por
-  isso o mapa do Brasil sozinho não cobre 100% dos sites).
+  `/api/sites/geo-points` devolvem um ponto por site (END_ID, UF,
+  MUNICIPIO, `LATITUDE`/`LONGITUDE`, tecnologia máxima, cor) — descarta
+  site sem coordenada. Frontend (`SitesMap.tsx`) alterna Brasil/Múndi
+  (a TIM tem site na Antártida, fora do território nacional — por isso
+  o mapa do Brasil sozinho não cobre 100% dos sites e o múndi existe de
+  verdade, não é engano). Cada tecnologia é uma **série** ECharts
+  separada (não `itemStyle` por ponto) — no modo `large` (obrigatório
+  aqui, pode ter dezenas de milhares de sites) o ECharts ignora estilo
+  por item e pinta tudo com uma cor só; agrupar por tech em séries
+  distintas contorna isso e ainda dá legenda de graça.
 
-"Sites" hoje tem 5 visões visuais confirmadas (max-tech, por-tecnologia,
-fornecedor dominante, tipo de site, pivot) + o endpoint de geo-points
-pronto sem consumidor visual ainda (falta o mapa em si).
+### GeoJSON dos mapas — origem e licença
+
+`frontend/public/geo/{brazil,world-110m}.geo.json` são estáticos,
+gerados uma vez a partir do pacote npm `world-atlas` (Natural Earth,
+licença ISC) convertido de TopoJSON pra GeoJSON via `topojson-client`
+(ISC também) — **não são baixados de CDN em runtime**, ficam versionados
+no repo e são servidos junto com o resto do build, igual aos ícones do
+Bootstrap. `ensureMapRegistered()`/`isMapRegistered()`
+(`charts/maps.ts`) fazem o fetch (`fetch('/geo/...')`, respeitando
+`import.meta.env.BASE_URL` pra funcionar em dev e produção) e o
+`echarts.registerMap()` sob demanda, com cache em memória por nome de
+mapa.
+
+Considerado e descartado: o pacote `world-geojson` (que tem um
+`countries/brazil.json`) é licenciado **GPL-3.0** — evitado de propósito
+pra não misturar licença copyleft em dado versionado no repo de uma
+ferramenta interna da empresa. `world-atlas`/`topojson-client` (ISC,
+permissiva, mesma família do d3) resolveu sem essa pegadinha.
+
+**Nota técnica que já mordeu uma vez**: o estado que controla se um
+mapa está pronto pra render (`mapReady`) **precisa ser calculado de
+forma síncrona** no corpo do componente (`isMapRegistered(view)`), não
+um `useState` setado dentro de um `.then()` — se for `useState`, o
+render que troca `view` (ex.: Brasil → Múndi) manda `geo.map` apontando
+pro mapa novo um ciclo antes do registro assíncrono terminar, e o
+ECharts quebra em runtime ("Map ... not exists"). Só um contador
+(`forceRerender`) bumped depois do `.then()` força o re-render quando o
+registro de verdade termina.
+
+"Sites" hoje tem as 6 visões completas: max-tech, por-tecnologia,
+fornecedor dominante, tipo de site, mapa (Brasil/Múndi) e pivot.
 
 ## Convenções de backend
 

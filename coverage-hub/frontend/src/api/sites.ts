@@ -63,6 +63,20 @@ export interface LabeledValue {
   color: string;
 }
 
+export interface SitesGeoPoint {
+  end_id: string;
+  uf: string | null;
+  municipio: string | null;
+  lat: number;
+  lon: number;
+  tech: string | null;
+  color: string;
+}
+
+export interface SitesGeoPointsResponse {
+  points: SitesGeoPoint[];
+}
+
 export const sitesApi = {
   byMaxTech: (f: SitesFilters) =>
     fetchJson<TechBarsResponse>(`${BASE}/by-max-tech?${query(f)}`),
@@ -74,4 +88,6 @@ export const sitesApi = {
     fetchJson<SitesPivotResponse>(`${BASE}/pivot?${query(f)}`),
   tipo: (f: SitesFilters) =>
     fetchJson<SitesTipoResponse>(`${BASE}/tipo?${query(f)}`),
+  geoPoints: (f: SitesFilters) =>
+    fetchJson<SitesGeoPointsResponse>(`${BASE}/geo-points?${query(f)}`),
 };
