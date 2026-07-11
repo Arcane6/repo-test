@@ -50,6 +50,8 @@ modules/
   mobile_access/   — único módulo funcional hoje
     actual/        — aba "Cidades" (rede hoje, MUNICIPIOS_FECHAMENTO)
     summary/       — aba "Resumo" (raias R1/R2/R3)
+    sites/         — aba "Sites" (inventário de sites físicos,
+                     TB_FT_BASE_UNICA_SITES — ver seção própria abaixo)
     shared/        — filtros, constantes, refs (fonte + data mais recente)
   budget/, executive/, transport/  — módulos placeholder, __init__.py
     vazio, listados em config/modules.py com enabled=False (aparecem
@@ -57,7 +59,97 @@ modules/
 ```
 
 Frontend espelha isso em `frontend/src/dashboards/` (`CidadesDashboard`,
-`ResumoDashboard` com `resumo/Raia1.tsx`, `Raia2.tsx`, `Raia3.tsx`).
+`ResumoDashboard` com `resumo/Raia1.tsx`, `Raia2.tsx`, `Raia3.tsx`,
+`SitesDashboard`).
+
+## Aba Sites (`modules/mobile_access/sites/`)
+
+Inventário de sites físicos — deliberadamente **só Fechamento 25**
+(`TB_FT_BASE_UNICA_SITES`, que tem `END_ID` único). Não mistura Casa
+Nova do Plano 26 (`TB_ROLLOUT_ACESSO` não tem coluna de site único — é
+exatamente por isso que "Sites Físicos EoY 26" foi removido antes; não
+reabrir essa porta aqui sem uma coluna de dedup confiável).
+
+- **Join com `MUNICIPIOS_FECHAMENTO` por `IBGE`**, não por `UF+MUNICIPIO`
+  em string — `TB_FT_BASE_UNICA_SITES` tem `IBGE` (confirmado pelo
+  usuário via M-query do Power BI antigo). Mais robusto que o
+  string-match usado em outras queries mais antigas do módulo.
+- **Sites por Tecnologia Máxima**: cascata 5G>4G>3G>2G, cada site conta
+  uma vez (mesma lógica do extinto `R1_SITES_BY_TECH`).
+- **Sites por Tecnologia**: contagem independente por tech — um site
+  2G+4G conta nas duas barras (não é dedup).
+- **Pivot (Regional/UF/Município)**: backend entrega uma linha por
+  Município já com as duas métricas acima; o frontend
+  (`SitesPivotTable.tsx`) é uma tabela plana com seletor de métrica, não
+  um pivot arrasta-solta de verdade — decisão consciente pra não
+  over-engenheirar um widget novo sem validar a necessidade primeiro.
+- **Tipo de Site**: cruza `MOBILE_SITE` × `FLAG_TX_PROFILE_ENG`
+  (renomeado `TX_PROFILE` na UI). Universo **diferente** das outras
+  visões desta aba — só exige `STATUS_END_ID='ATIVADO'` e exclui
+  roaming, mas **não** filtra `MOBILE_SITE='SIM'` (é uma das dimensões
+  mostradas). Por isso o total dessa visão não bate com o total das
+  outras — é esperado, não é bug.
+- **Fornecedor Dominante por Site**: fonte real é
+  `NTW_MABE.BASE_TB_END_ID_NEW` (confirmado pelo usuário via query ODBC
+  do Power BI antigo — a leitura anterior de "VW03 || RF DESIGN PROFILE
+  (VENDOR_2)" e de "depende de `TB_FT_BASE_UNICA_SITES`" estavam
+  erradas). **Mesma cascata de colunas `VENDOR_*` já usada em
+  `R1_VENDORS`** (`summary/queries.py`) — 19 colunas confirmadas
+  1:1 com a query real do usuário (GSM_900/1800, UMTS_850/2100,
+  LTE_700/850/1800/2100/2300/2600/2600RS/2600P,
+  NR_700DSS/1800DSS/2100DSS/2600DSS/2300/3500/26000), maior banda
+  primeiro dentro de cada tec. Diferente de `R1_VENDORS`, aqui o join é
+  feito **dentro do universo de sites já filtrado** desta aba (`BASE`
+  da `SITES_BASE_CTE`), não como query independente — garante que o
+  total do donut de fornecedor bate com o total das outras visões da
+  mesma tela (confirmado: 45.230 nos dois, testado com stub). Sem
+  `FillDown` (a lógica frágil do Power Query original não foi
+  replicada) — site sem match vira "A DEFINIR".
+
+- **Sites no Mapa**: `SITES_GEO_POINTS` (`sites/queries.py`) +
+  `get_sites_geo_points` (`sites/service.py`) + rota
+  `/api/sites/geo-points` devolvem um ponto por site (END_ID, UF,
+  MUNICIPIO, `LATITUDE`/`LONGITUDE`, tecnologia máxima, cor) — descarta
+  site sem coordenada. Frontend (`SitesMap.tsx`) alterna Brasil/Múndi
+  (a TIM tem site na Antártida, fora do território nacional — por isso
+  o mapa do Brasil sozinho não cobre 100% dos sites e o múndi existe de
+  verdade, não é engano). Cada tecnologia é uma **série** ECharts
+  separada (não `itemStyle` por ponto) — no modo `large` (obrigatório
+  aqui, pode ter dezenas de milhares de sites) o ECharts ignora estilo
+  por item e pinta tudo com uma cor só; agrupar por tech em séries
+  distintas contorna isso e ainda dá legenda de graça.
+
+### GeoJSON dos mapas — origem e licença
+
+`frontend/public/geo/{brazil,world-110m}.geo.json` são estáticos,
+gerados uma vez a partir do pacote npm `world-atlas` (Natural Earth,
+licença ISC) convertido de TopoJSON pra GeoJSON via `topojson-client`
+(ISC também) — **não são baixados de CDN em runtime**, ficam versionados
+no repo e são servidos junto com o resto do build, igual aos ícones do
+Bootstrap. `ensureMapRegistered()`/`isMapRegistered()`
+(`charts/maps.ts`) fazem o fetch (`fetch('/geo/...')`, respeitando
+`import.meta.env.BASE_URL` pra funcionar em dev e produção) e o
+`echarts.registerMap()` sob demanda, com cache em memória por nome de
+mapa.
+
+Considerado e descartado: o pacote `world-geojson` (que tem um
+`countries/brazil.json`) é licenciado **GPL-3.0** — evitado de propósito
+pra não misturar licença copyleft em dado versionado no repo de uma
+ferramenta interna da empresa. `world-atlas`/`topojson-client` (ISC,
+permissiva, mesma família do d3) resolveu sem essa pegadinha.
+
+**Nota técnica que já mordeu uma vez**: o estado que controla se um
+mapa está pronto pra render (`mapReady`) **precisa ser calculado de
+forma síncrona** no corpo do componente (`isMapRegistered(view)`), não
+um `useState` setado dentro de um `.then()` — se for `useState`, o
+render que troca `view` (ex.: Brasil → Múndi) manda `geo.map` apontando
+pro mapa novo um ciclo antes do registro assíncrono terminar, e o
+ECharts quebra em runtime ("Map ... not exists"). Só um contador
+(`forceRerender`) bumped depois do `.then()` força o re-render quando o
+registro de verdade termina.
+
+"Sites" hoje tem as 6 visões completas: max-tech, por-tecnologia,
+fornecedor dominante, tipo de site, mapa (Brasil/Múndi) e pivot.
 
 ## Convenções de backend
 
@@ -139,7 +231,7 @@ Frontend espelha isso em `frontend/src/dashboards/` (`CidadesDashboard`,
 | Tabela/View | Uso | Observações |
 |---|---|---|
 | `NTW_OP.MUNICIPIOS_FECHAMENTO` | Presença 2G/3G/4G/5G por município (aba Cidades), Cidades por Regional | Sempre filtrar `TRUNC(DT_CARGA) = MAX(DT_CARGA)` — carga histórica, não só o último dia |
-| `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1) | Filtrar `MES_REF = MAX(MES_REF)`. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença |
+| `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | Filtrar `MES_REF = MAX(MES_REF)`. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado), `LATITUDE`/`LONGITUDE` (coordenada do site, confirmadas — usadas em `SITES_GEO_POINTS`) e, segundo o usuário, coluna(s) de fornecedor por tecnologia (nome exato ainda não confirmado) |
 | `NTW_MABE.BASE_TB_END_ID_NEW` | Fornecedor (vendor) dominante por site | Cascata de colunas `VENDOR_NR_*`/`VENDOR_LTE_*`/`VENDOR_UMTS_*`/`VENDOR_GSM_*` via `COALESCE`, maior banda primeiro dentro de cada tec |
 | `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente |
 | `TB_NEXUS_FINANCEIRO` | CAPEX/OPEX/LEASE por tipo | Usada só no rateio "Orçamento por Tecnologia" — sem schema/join direto, rateada por nº de OCs |

@@ -1,11 +1,12 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import * as echarts from "echarts/core";
-import { BarChart, LineChart, PieChart, GaugeChart } from "echarts/charts";
+import { BarChart, LineChart, PieChart, GaugeChart, ScatterChart } from "echarts/charts";
 import {
   GridComponent,
   TooltipComponent,
   LegendComponent,
   TitleComponent,
+  GeoComponent,
 } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import type { EChartsCoreOption } from "echarts/core";
@@ -18,10 +19,12 @@ echarts.use([
   LineChart,
   PieChart,
   GaugeChart,
+  ScatterChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
   TitleComponent,
+  GeoComponent,
   CanvasRenderer,
 ]);
 
