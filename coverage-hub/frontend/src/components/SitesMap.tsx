@@ -1,116 +1,134 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type * as echarts from "echarts/core";
-import type { EChartsCoreOption } from "echarts/core";
-import { Chart } from "../charts/Chart";
-import { ensureMapRegistered, isMapRegistered, type MapName } from "../charts/maps";
+import L from "leaflet";
+import "leaflet.markercluster";
 import { ChartToolbar } from "./ChartToolbar";
 import { SourceBadge } from "./SourceBadge";
 import { Skeleton } from "./Skeleton";
-import { downloadChartImage } from "../charts/exportImage";
 import { downloadSheet } from "../utils/excelExport";
 import { sitesApi, type SitesFilters } from "../api/sites";
 import { useThemeStore } from "../theme/useThemeStore";
 import { TECH_COLORS, TECH_ORDER } from "../theme";
 
-const VIEW_LABEL: Record<MapName, string> = {
-  brazil: "Brasil",
-  world: "Múndi",
-};
+const BRAZIL_BOUNDS: L.LatLngBoundsExpression = [
+  [-33.8, -74.0],
+  [5.5, -34.0],
+];
 
-const GEO_PALETTE = {
-  light: { area: "#eef1f5", border: "#c9d0d9", emphasis: "#e2e7ed" },
-  dark: { area: "#1f2530", border: "#3d444d", emphasis: "#262c37" },
-};
+/** Camadas base gratuitas, sem chave de API — cada uma com atribuição
+ * correta (obrigatória nos termos de uso de todas as três). */
+function baseLayers() {
+  return {
+    Ruas: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 19,
+    }),
+    Satélite: L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Tiles &copy; Esri", maxZoom: 19 },
+    ),
+    Escuro: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+      subdomains: "abcd",
+      maxZoom: 19,
+    }),
+  };
+}
 
 /**
- * Sites individuais no mapa, coloridos pela tecnologia máxima — alterna
- * entre Brasil (visão principal) e Múndi (a TIM tem site na Antártida,
- * fora do território nacional, por isso o mapa do Brasil sozinho não
- * cobre 100% dos sites). GeoJSON estático em public/geo/ (Natural Earth
- * via world-atlas, não é CDN em runtime).
+ * Sites individuais no mapa, com tiles de verdade (ruas/satélite/escuro,
+ * todas gratuitas e sem chave de API) em vez do contorno estático do
+ * ECharts. Usa Leaflet puro (BSD-2-Clause) + leaflet.markercluster
+ * (MIT) via wrapper imperativo — mesmo padrão de `charts/Chart.tsx` pro
+ * ECharts. Evitado de propósito o `react-leaflet` (licença
+ * Hippocratic-2.1, não é OSS permissiva de verdade, teria efeito
+ * colateral legal numa ferramenta corporativa sem revisão jurídica).
+ * Um `L.markerClusterGroup` por tecnologia — cada um é uma camada que o
+ * usuário liga/desliga no controle de camadas.
  */
 export function SitesMap({ filters }: { filters: SitesFilters }) {
-  const [view, setView] = useState<MapName>("brazil");
-  // Checagem síncrona (não useState) — se dependesse de um estado
-  // setado dentro de .then(), o render que troca `view` passaria
-  // `geo.map` pro ECharts um ciclo antes do registro terminar e
-  // quebraria (mapa "not exists"). O tick só existe pra forçar
-  // re-render quando o registro assíncrono termina.
-  const mapReady = isMapRegistered(view);
-  const [, forceRerender] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const clusterGroupsRef = useRef<Record<string, L.MarkerClusterGroup>>({});
+  const layersControlRef = useRef<L.Control.Layers | null>(null);
   const theme = useThemeStore((s) => s.theme);
-  const instanceRef = useRef<echarts.ECharts | null>(null);
-
-  useEffect(() => {
-    if (mapReady) return;
-    let cancelled = false;
-    ensureMapRegistered(view).then(() => {
-      if (!cancelled) forceRerender((n) => n + 1);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [view, mapReady]);
+  const [mapInitialized, setMapInitialized] = useState(false);
 
   const { data, isFetching } = useQuery({
     queryKey: ["sites-geo-points", filters.uf, filters.municipio],
     queryFn: () => sitesApi.geoPoints(filters),
   });
-
   const points = data?.points ?? [];
-  const palette = GEO_PALETTE[theme];
-  const loading = isFetching || !mapReady;
 
-  // Uma série por tecnologia (cor fixa por série), não itemStyle por
-  // ponto — no modo `large` (obrigatório aqui, pode ter dezenas de
-  // milhares de sites) o ECharts ignora itemStyle individual e pinta
-  // tudo com uma cor só. Agrupar por tech também dá um bônus de graça:
-  // dá pra usar a legend nativa pra ligar/desligar tecnologia.
-  const pointsByTech = new Map<string, typeof points>();
-  for (const p of points) {
-    const key = p.tech ?? "—";
-    const bucket = pointsByTech.get(key);
-    if (bucket) bucket.push(p);
-    else pointsByTech.set(key, [p]);
+  // Cria o mapa uma única vez — mesmo ciclo de vida do <Chart/>
+  // (init no mount, dispose no unmount), independente de dado/tema.
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = L.map(containerRef.current, {
+      center: [-14.2, -51.9],
+      zoom: 4,
+      worldCopyJump: true,
+    });
+    mapRef.current = map;
+
+    const layers = baseLayers();
+    const defaultLayer = theme === "dark" ? layers.Escuro : layers.Ruas;
+    defaultLayer.addTo(map);
+
+    const clusterGroups: Record<string, L.MarkerClusterGroup> = {};
+    for (const tec of TECH_ORDER) {
+      clusterGroups[tec] = L.markerClusterGroup({ spiderfyOnMaxZoom: true, maxClusterRadius: 40 });
+      clusterGroups[tec].addTo(map);
+    }
+    clusterGroupsRef.current = clusterGroups;
+
+    const overlays: Record<string, L.Layer> = {};
+    for (const tec of TECH_ORDER) overlays[tec] = clusterGroups[tec];
+    layersControlRef.current = L.control.layers(layers, overlays, { collapsed: false }).addTo(map);
+
+    setMapInitialized(true);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      layersControlRef.current = null;
+      clusterGroupsRef.current = {};
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Repovoa os clusters quando o dado muda (filtro novo, etc.).
+  useEffect(() => {
+    if (!mapInitialized) return;
+    const groups = clusterGroupsRef.current;
+    for (const tec of TECH_ORDER) groups[tec]?.clearLayers();
+
+    for (const p of points) {
+      const tec = p.tech ?? "";
+      const group = groups[tec];
+      if (!group) continue;
+      const marker = L.circleMarker([p.lat, p.lon], {
+        radius: 6,
+        color: "#fff",
+        weight: 1,
+        fillColor: p.color,
+        fillOpacity: 0.9,
+      });
+      const local = p.municipio ? `${p.municipio}${p.uf ? ` (${p.uf})` : ""}` : "Fora do Brasil";
+      marker.bindPopup(`<b>${local}</b><br/>${tec} &middot; ${p.end_id}`);
+      group.addLayer(marker);
+    }
+  }, [points, mapInitialized]);
+
+  function flyToBrazil() {
+    mapRef.current?.fitBounds(BRAZIL_BOUNDS);
+  }
+  function flyToWorld() {
+    mapRef.current?.setView([10, 0], 2);
   }
 
-  const option: EChartsCoreOption = mapReady
-    ? {
-        tooltip: {
-          trigger: "item",
-          formatter: (p: unknown) => {
-            const d = p as { seriesName?: string; data?: { name?: string } };
-            return `<b>${d.data?.name ?? "Site"}</b><br/>${d.seriesName ?? "—"}`;
-          },
-        },
-        geo: {
-          map: view,
-          roam: true,
-          itemStyle: {
-            areaColor: palette.area,
-            borderColor: palette.border,
-          },
-          emphasis: {
-            itemStyle: { areaColor: palette.emphasis },
-            label: { show: false },
-          },
-        },
-        series: TECH_ORDER.filter((tec) => pointsByTech.has(tec)).map((tec) => ({
-          name: tec,
-          type: "scatter",
-          coordinateSystem: "geo",
-          symbolSize: view === "brazil" ? 5 : 3,
-          large: true,
-          largeThreshold: 500,
-          itemStyle: { color: TECH_COLORS[tec] },
-          data: (pointsByTech.get(tec) ?? []).map((p) => ({
-            name: `${p.municipio ?? "Fora do Brasil"}${p.uf ? ` (${p.uf})` : ""}`,
-            value: [p.lon, p.lat],
-          })),
-        })),
-      }
-    : {};
+  const loading = isFetching && points.length === 0;
 
   return (
     <div className="card shadow-sm h-100">
@@ -122,27 +140,22 @@ export function SitesMap({ filters }: { filters: SitesFilters }) {
               <SourceBadge table="TB_FT_BASE_UNICA_SITES" />
             </div>
             <small className="text-muted d-block mb-2">
-              Cada ponto é um site, colorido pela tecnologia máxima — arraste pra
-              mover, role pra dar zoom
+              Cada ponto é um site, colorido pela tecnologia máxima — arraste, role pra
+              dar zoom, use o controle no canto pra trocar de camada
             </small>
           </div>
           <div className="d-flex align-items-center gap-2">
             <div className="btn-group btn-group-sm" role="group">
-              {(Object.keys(VIEW_LABEL) as MapName[]).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`btn ${view === v ? "btn-primary" : "btn-outline-secondary"}`}
-                  onClick={() => setView(v)}
-                >
-                  {VIEW_LABEL[v]}
-                </button>
-              ))}
+              <button type="button" className="btn btn-outline-secondary" onClick={flyToBrazil}>
+                Brasil
+              </button>
+              <button type="button" className="btn btn-outline-secondary" onClick={flyToWorld}>
+                Múndi
+              </button>
             </div>
             <ChartToolbar
-              onDownloadImage={() => downloadChartImage(instanceRef.current, `sites-mapa-${view}.png`)}
               onExportData={() =>
-                downloadSheet(`sites-mapa-${view}.xlsx`, {
+                downloadSheet("sites-mapa.xlsx", {
                   name: "Sites",
                   columns: [
                     { header: "END_ID", key: "end_id" },
@@ -176,13 +189,12 @@ export function SitesMap({ filters }: { filters: SitesFilters }) {
           ))}
         </div>
 
-        {loading && Object.keys(option).length === 0 ? (
-          <div style={{ height: 420 }} className="d-flex flex-column justify-content-center gap-2 px-2 pb-2">
-            <Skeleton height="90%" radius={8} />
+        {loading && (
+          <div style={{ position: "absolute", inset: "70px 20px auto 20px", zIndex: 500 }}>
+            <Skeleton height={420} radius={8} />
           </div>
-        ) : (
-          <Chart option={option} loading={loading} height={420} instanceRef={instanceRef} />
         )}
+        <div ref={containerRef} style={{ width: "100%", height: 420, opacity: loading ? 0 : 1 }} />
       </div>
     </div>
   );
