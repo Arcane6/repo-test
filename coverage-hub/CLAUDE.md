@@ -35,6 +35,21 @@ multinacional de telecom. Isso significa:
   pelo Flask. Sem CDN, sem Docker — tudo local/instalado via npm.
 - **Banco**: Oracle via `oracledb` (thin mode), pool de conexões em
   `database/oracle.py`. Credenciais via `.env` (`config/settings.py`).
+- **BigQuery** (`database/bigquery.py`): conector pronto pra uso
+  futuro, **nenhuma feature usa ainda** — criado a pedido do usuário
+  pra ter à mão se precisar ler algo do GCP. Mesma forma de uso do
+  Oracle (`execute_query(sql, params)` devolve `list[dict]`), mas
+  client **lazy** (só conecta na primeira chamada) em vez de eager no
+  import do módulo — diferente do Oracle, que é dependência obrigatória
+  do app inteiro, o BigQuery não pode quebrar a inicialização do Flask
+  enquanto nada o usa de verdade. Autenticação via Application Default
+  Credentials do próprio Google Cloud (`GOOGLE_APPLICATION_CREDENTIALS`
+  no `.env` apontando pro JSON da service account, ou identidade nativa
+  se rodar dentro do GCP) — não inventamos esquema de auth próprio.
+  Placeholders na query usam a sintaxe do BigQuery (`@nome`), não `:nome`
+  do Oracle. Se um dia alguma feature realmente precisar de BigQuery,
+  o service correspondente importa `database.bigquery.execute_query`
+  do mesmo jeito que os outros importam `database.oracle.execute_query`.
 - Rodar frontend: `cd frontend && npm run build` (gera `static/dist/`).
   Não existe servidor Oracle real neste ambiente de sandbox — testes
   ponta a ponta usam um `execute_query` mockado (stub) + Playwright
