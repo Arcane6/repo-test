@@ -35,6 +35,21 @@ multinacional de telecom. Isso significa:
   pelo Flask. Sem CDN, sem Docker — tudo local/instalado via npm.
 - **Banco**: Oracle via `oracledb` (thin mode), pool de conexões em
   `database/oracle.py`. Credenciais via `.env` (`config/settings.py`).
+- **BigQuery** (`database/bigquery.py`): conector pronto pra uso
+  futuro, **nenhuma feature usa ainda** — criado a pedido do usuário
+  pra ter à mão se precisar ler algo do GCP. Mesma forma de uso do
+  Oracle (`execute_query(sql, params)` devolve `list[dict]`), mas
+  client **lazy** (só conecta na primeira chamada) em vez de eager no
+  import do módulo — diferente do Oracle, que é dependência obrigatória
+  do app inteiro, o BigQuery não pode quebrar a inicialização do Flask
+  enquanto nada o usa de verdade. Autenticação via Application Default
+  Credentials do próprio Google Cloud (`GOOGLE_APPLICATION_CREDENTIALS`
+  no `.env` apontando pro JSON da service account, ou identidade nativa
+  se rodar dentro do GCP) — não inventamos esquema de auth próprio.
+  Placeholders na query usam a sintaxe do BigQuery (`@nome`), não `:nome`
+  do Oracle. Se um dia alguma feature realmente precisar de BigQuery,
+  o service correspondente importa `database.bigquery.execute_query`
+  do mesmo jeito que os outros importam `database.oracle.execute_query`.
 - Rodar frontend: `cd frontend && npm run build` (gera `static/dist/`).
   Não existe servidor Oracle real neste ambiente de sandbox — testes
   ponta a ponta usam um `execute_query` mockado (stub) + Playwright
@@ -110,46 +125,59 @@ reabrir essa porta aqui sem uma coluna de dedup confiável).
   `get_sites_geo_points` (`sites/service.py`) + rota
   `/api/sites/geo-points` devolvem um ponto por site (END_ID, UF,
   MUNICIPIO, `LATITUDE`/`LONGITUDE`, tecnologia máxima, cor) — descarta
-  site sem coordenada. Frontend (`SitesMap.tsx`) alterna Brasil/Múndi
-  (a TIM tem site na Antártida, fora do território nacional — por isso
-  o mapa do Brasil sozinho não cobre 100% dos sites e o múndi existe de
-  verdade, não é engano). Cada tecnologia é uma **série** ECharts
-  separada (não `itemStyle` por ponto) — no modo `large` (obrigatório
-  aqui, pode ter dezenas de milhares de sites) o ECharts ignora estilo
-  por item e pinta tudo com uma cor só; agrupar por tech em séries
-  distintas contorna isso e ainda dá legenda de graça.
+  site sem coordenada. O backend não muda entre a v1 (ECharts) e a v2
+  (Leaflet, atual) — só o consumo no frontend mudou.
 
-### GeoJSON dos mapas — origem e licença
+### Mapa v2 — Leaflet com tiles de verdade (Ruas/Satélite/Escuro)
 
-`frontend/public/geo/{brazil,world-110m}.geo.json` são estáticos,
-gerados uma vez a partir do pacote npm `world-atlas` (Natural Earth,
-licença ISC) convertido de TopoJSON pra GeoJSON via `topojson-client`
-(ISC também) — **não são baixados de CDN em runtime**, ficam versionados
-no repo e são servidos junto com o resto do build, igual aos ícones do
-Bootstrap. `ensureMapRegistered()`/`isMapRegistered()`
-(`charts/maps.ts`) fazem o fetch (`fetch('/geo/...')`, respeitando
-`import.meta.env.BASE_URL` pra funcionar em dev e produção) e o
-`echarts.registerMap()` sob demanda, com cache em memória por nome de
-mapa.
+A v1 usava o `geo`/`scatter` do ECharts com um contorno GeoJSON estático
+(silhueta só, sem rua/cidade/relevo real). O usuário pediu "outras
+camadas" pra uma experiência de diretor — trocamos pra tiles de mapa de
+verdade via **Leaflet puro** (BSD-2-Clause) + **leaflet.markercluster**
+(MIT), wrapper imperativo em `components/SitesMap.tsx` (mesmo padrão de
+`charts/Chart.tsx` pro ECharts: `L.map()` no mount, `.remove()` no
+unmount, sem lib de binding React no meio).
 
-Considerado e descartado: o pacote `world-geojson` (que tem um
-`countries/brazil.json`) é licenciado **GPL-3.0** — evitado de propósito
-pra não misturar licença copyleft em dado versionado no repo de uma
-ferramenta interna da empresa. `world-atlas`/`topojson-client` (ISC,
-permissiva, mesma família do d3) resolveu sem essa pegadinha.
+**Evitado de propósito: `react-leaflet`.** Todas as versões (3/4/5) são
+licenciadas **Hippocratic-2.1** — uma licença "ethical source" com
+cláusulas de uso que não é OSS permissiva de verdade (tipo MIT/BSD/ISC).
+Não é apropriado importar isso numa ferramenta corporativa sem revisão
+jurídica, e não tinha necessidade real: Leaflet puro cobre tudo que
+precisávamos com uma API pequena, e já tínhamos o padrão de wrapper
+imperativo estabelecido pro ECharts.
 
-**Nota técnica que já mordeu uma vez**: o estado que controla se um
-mapa está pronto pra render (`mapReady`) **precisa ser calculado de
-forma síncrona** no corpo do componente (`isMapRegistered(view)`), não
-um `useState` setado dentro de um `.then()` — se for `useState`, o
-render que troca `view` (ex.: Brasil → Múndi) manda `geo.map` apontando
-pro mapa novo um ciclo antes do registro assíncrono terminar, e o
-ECharts quebra em runtime ("Map ... not exists"). Só um contador
-(`forceRerender`) bumped depois do `.then()` força o re-render quando o
-registro de verdade termina.
+**Camadas base** (`baseLayers()` em `SitesMap.tsx`), todas gratuitas, sem
+chave de API, cada uma com atribuição correta nos termos de uso:
+- **Ruas** — OpenStreetMap padrão.
+- **Satélite** — Esri World Imagery.
+- **Escuro** — CARTO Dark Matter (combina bem com o tema escuro do portal).
+
+Trocadas via `L.control.layers()` nativo do Leaflet (radio button,
+sem componente extra). **Sites por tecnologia** viram overlays
+independentes (`L.markerClusterGroup`, um por tech) na mesma control —
+o usuário liga/desliga tecnologia como checkbox, e o cluster já
+recalcula a contagem sozinho. Cada site é um `L.circleMarker` colorido
+por `TECH_COLORS`, com popup (município/UF/tech/END_ID).
+
+Botões "Brasil"/"Múndi" continuam existindo, mas agora são só atalhos de
+enquadramento (`fitBounds`/`setView`) — o mapa sempre permite pan/zoom
+livre, diferente da v1 onde trocar de visão trocava o mapa inteiro.
+
+**Assets/deps removidos da v1** (não usar mais, se aparecerem numa busca
+antiga): `frontend/public/geo/*.geo.json`, `charts/maps.ts`,
+`GeoComponent`/`ScatterChart` em `charts/Chart.tsx`.
+
+**Limitação conhecida deste sandbox de dev**: `tile.openstreetmap.org`,
+`server.arcgisonline.com` e `*.basemaps.cartocdn.com` são bloqueados
+pela política de rede deste ambiente (mesma classe de bloqueio que já
+pegou `echarts.apache.org` antes) — não dá pra ver o tile renderizado de
+verdade rodando aqui, só a estrutura (controles, clusters, popups,
+troca de camada) sem erro de JS. Isso não afeta o ambiente real de
+produção do usuário, que não tem essa mesma restrição de rede.
 
 "Sites" hoje tem as 6 visões completas: max-tech, por-tecnologia,
-fornecedor dominante, tipo de site, mapa (Brasil/Múndi) e pivot.
+fornecedor dominante, tipo de site, mapa (Brasil/Múndi, tiles Leaflet) e
+pivot.
 
 ## Convenções de backend
 

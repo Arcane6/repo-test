@@ -2,6 +2,9 @@
  * consistente com o restante do site mesmo fora do shell Jinja. */
 @import "bootstrap/dist/css/bootstrap.min.css";
 @import "bootstrap-icons/font/bootstrap-icons.min.css";
+@import "leaflet/dist/leaflet.css";
+@import "leaflet.markercluster/dist/MarkerCluster.css";
+@import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 /* =============================================================================
  * TIM Technical Planning — tema claro/escuro (portado de static/css/app.css)
@@ -542,5 +545,31 @@ body {
 }
 
 [data-theme="dark"] .tim-source-badge-ref {
+  color: #7d9cff;
+}
+
+/* =============================================================================
+ * Leaflet (Sites no Mapa) — controles/popups do Leaflet nascem sempre
+ * claros, mesmo no tema escuro do resto do portal.
+ * ============================================================================= */
+
+[data-theme="dark"] .leaflet-control-layers,
+[data-theme="dark"] .leaflet-bar a,
+[data-theme="dark"] .leaflet-popup-content-wrapper,
+[data-theme="dark"] .leaflet-popup-tip {
+  background: var(--tim-card-bg);
+  color: var(--tim-text);
+}
+
+[data-theme="dark"] .leaflet-bar a {
+  border-color: var(--tim-card-border);
+}
+
+[data-theme="dark"] .leaflet-control-attribution {
+  background: rgba(26, 31, 40, 0.8);
+  color: var(--tim-text-muted);
+}
+
+[data-theme="dark"] .leaflet-control-attribution a {
   color: #7d9cff;
 }
