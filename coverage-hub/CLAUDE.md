@@ -353,15 +353,20 @@ com denominador filtrado por engano), então mais vale perguntar de novo.
 
 ## Questões em aberto (não resolvidas ainda)
 
-- **Filtro de município não parece filtrar** "Total de Sites por
-  Tecnologia" e "Novas Cidades por Regional" segundo o usuário — auditoria
-  de código (ver histórico de conversa) confirmou que a cláusula SQL é
-  gerada corretamente nos dois casos; suspeita não confirmada é
-  descasamento de nome de município entre `TB_FT_BASE_UNICA_SITES` e
-  `MUNICIPIOS_FECHAMENTO` (tabelas diferentes, strings podem não bater
-  exatamente). Não há acesso a Oracle real neste ambiente pra confirmar
-  — precisa de teste do usuário em produção ou acesso a uma amostra dos
-  dados reais.
+- ~~Filtro de município não parece filtrar~~ **RESOLVIDO**: a causa raiz
+  era exatamente o descasamento de nome suspeitado antes — várias queries
+  filtravam `MUNICIPIO` (texto) direto contra a própria coluna de
+  `TB_FT_BASE_UNICA_SITES`/`NTW_MABE.BASE_TB_END_ID_NEW`, em vez de
+  resolver o nome via `MUNICIPIOS_FECHAMENTO` (que é de onde vem a busca
+  do autocomplete do filtro). Corrigido em toda a aba Sites e em
+  "Total de Sites por Tecnologia"/"Fornecedor por Site" (Resumo Raia 1)
+  resolvendo o(s) nome(s) de município pro `IBGE` via
+  `MUNICIPIOS_FECHAMENTO` antes de filtrar (`_build_municipio_ibge_clause`
+  em `sites/service.py` e `summary/service.py`); pra
+  `BASE_TB_END_ID_NEW`, que não tem `IBGE` próprio, a ponte é feita por
+  `END_ID` via `TB_FT_BASE_UNICA_SITES`
+  (`_build_municipio_end_id_clause`). UF não precisou do mesmo tratamento
+  (sigla de 2 letras não tem a mesma variação de acentuação/grafia).
 
 ## Git / PRs
 

@@ -65,7 +65,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
             option={stackedBarsOption(
               orcamento?.categories ?? [],
               orcamento?.series ?? [],
-              { valueFormatter: valorFmt, showValueLabels: true },
+              { valueFormatter: valorFmt, showValueLabels: true, showTotalLabel: true },
             )}
             loading={loadingOrcamento}
             imageFilename="r2-orcamento-por-tecnologia.png"
@@ -94,7 +94,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
             option={stackedBarsOption(
               endereco?.categories ?? [],
               endereco?.series ?? [],
-              { valueFormatter: valorFmt, showValueLabels: true },
+              { valueFormatter: valorFmt, showValueLabels: true, showTotalLabel: true },
             )}
             loading={loadingEndereco}
             imageFilename="r2-endereco-por-tecnologia.png"

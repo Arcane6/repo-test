@@ -80,7 +80,16 @@ export function applyChartTheme(
         ...(ax.axisLine as AnyRecord),
         lineStyle: { color: p.axisLine, ...((ax.axisLine as AnyRecord)?.lineStyle as AnyRecord) },
       },
-      axisLabel: { color: p.text, ...(ax.axisLabel as AnyRecord) },
+      // Padrão TIM: sem números no eixo de valor — só o valor mostrado na
+      // própria barra (label da série). Eixo de categoria (nome da tec,
+      // vendor, município etc.) não é afetado, pois não é "número do
+      // eixo". Mesmo princípio do splitLine abaixo — um builder que
+      // realmente precise do número do eixo pode reativar passando
+      // `axisLabel: { show: true }` explicitamente.
+      axisLabel:
+        ax.type === "value"
+          ? { show: false, color: p.text, ...(ax.axisLabel as AnyRecord) }
+          : { color: p.text, ...(ax.axisLabel as AnyRecord) },
       // Nenhum gráfico deve nascer com grade de linha — é aplicado aqui,
       // centralizado, em vez de cada option builder lembrar de desligar.
       // Um builder que realmente precise de grade pode reativar passando

@@ -62,6 +62,44 @@ def _build_in_clause(field, values, prefix, params):
     return f"AND {field} IN ({', '.join(placeholders)})"
 
 
+def _build_municipio_ibge_clause(field, values, prefix, params):
+    """Resolve nome(s) de município pro IBGE via MUNICIPIOS_FECHAMENTO antes
+    de filtrar {field} — necessário quando a tabela-alvo guarda o nome do
+    município como texto próprio, que pode não bater caractere-a-caractere
+    com o nome vindo do autocomplete do filtro (que busca em
+    MUNICIPIOS_FECHAMENTO). Comparar direto por texto nesses casos deixava
+    o filtro silenciosamente sem casar nada."""
+    if not values:
+        return ""
+    placeholders = []
+    for i, v in enumerate(values):
+        key = f"{prefix}_{i}"
+        params[key] = v
+        placeholders.append(f":{key}")
+    in_list = ", ".join(placeholders)
+    return f"""AND {field} IN (
+        SELECT IBGE FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+        WHERE TRUNC(DT_CARGA) = (SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO)
+        AND MUNICIPIO IN ({in_list})
+    )"""
+
+
+def _build_municipio_end_id_clause(values, prefix, params):
+    """Mesma ponte por IBGE acima, mas pra tabelas sem coluna IBGE própria
+    (ex.: NTW_MABE.BASE_TB_END_ID_NEW) — resolve via END_ID, identificador
+    já usado em outros joins entre BASE_TB_END_ID_NEW e
+    TB_FT_BASE_UNICA_SITES (ex.: SITES_VENDORS)."""
+    if not values:
+        return ""
+    ibge_clause = _build_municipio_ibge_clause("s.IBGE", values, prefix, params)
+    return f"""AND END_ID IN (
+        SELECT s.END_ID
+        FROM NTW_OP.TB_FT_BASE_UNICA_SITES s
+        WHERE s.MES_REF = (SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES)
+        {ibge_clause}
+    )"""
+
+
 def _prepare_params(filters):
     """
     Só devolve o ano_int normalizado.
@@ -178,11 +216,18 @@ def get_r1_sites_venn(filters):
     params, _ = _prepare_params(filters)
 
     venn_clause = _build_site_venn_clause(filters.get("site_venn_region"))
-    template = R1_SITES_VENN.replace("{site_venn_filter}", venn_clause)
+    mun_clause = _build_municipio_ibge_clause(
+        "IBGE", _normalize_list(filters.get("municipios")), "mun", params
+    )
+    template = (
+        R1_SITES_VENN
+        .replace("{site_venn_filter}", venn_clause)
+        .replace("{municipio_filter_site}", mun_clause)
+    )
 
     sql = _apply_geo_all(
         template, filters, params,
-        uf_key="uf_filter_site", mun_key="municipio_filter_site",
+        uf_key="uf_filter_site",
         regional_field="g.REGIONAL", regional_key="regional_filter_site",
     )
     row = (execute_query(sql, params) or [{}])[0]
@@ -212,7 +257,12 @@ def get_r1_vendors(filters):
     params, ano_int = _prepare_params(filters)
     params["baseline_date"] = _dt.date(ano_int - 1, 12, 31)
 
-    sql = _apply_geo_all(R1_VENDORS, filters, params, regional_field="g.REGIONAL")
+    mun_clause = _build_municipio_end_id_clause(
+        _normalize_list(filters.get("municipios")), "mun", params
+    )
+    template = R1_VENDORS.replace("{municipio_filter}", mun_clause)
+
+    sql = _apply_geo_all(template, filters, params, regional_field="g.REGIONAL")
     rows = execute_query(sql, params) or []
     return _vendor_payload(rows)
 

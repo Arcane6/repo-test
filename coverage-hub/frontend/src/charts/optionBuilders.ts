@@ -200,10 +200,15 @@ export interface StackedSeriesInput {
 export function stackedBarsOption(
   categories: string[],
   series: StackedSeriesInput[],
-  opts: { horizontal?: boolean; valueFormatter?: (v: number) => string; showValueLabels?: boolean } = {},
+  opts: {
+    horizontal?: boolean;
+    valueFormatter?: (v: number) => string;
+    showValueLabels?: boolean;
+    showTotalLabel?: boolean;
+  } = {},
 ): EChartsCoreOption {
   if (categories.length === 0 || series.length === 0) return {};
-  const { horizontal = false, valueFormatter = fmt, showValueLabels = false } = opts;
+  const { horizontal = false, valueFormatter = fmt, showValueLabels = false, showTotalLabel = false } = opts;
 
   const categoryAxis = {
     type: "category" as const,
@@ -216,8 +221,8 @@ export function stackedBarsOption(
 
   return {
     grid: horizontal
-      ? { left: 60, right: 30, top: 20, bottom: 40 }
-      : { left: 20, right: 20, top: 30, bottom: 60 },
+      ? { left: 60, right: showTotalLabel ? 60 : 30, top: 20, bottom: 40 }
+      : { left: 20, right: 20, top: showTotalLabel ? 48 : 30, bottom: 60 },
     tooltip: {
       trigger: "axis",
       axisPointer: { type: "shadow" },
@@ -242,24 +247,64 @@ export function stackedBarsOption(
     legend: { data: series.map((s) => s.name), bottom: 0, icon: "circle", textStyle: { fontWeight: "bold" } },
     xAxis: horizontal ? valueAxis : categoryAxis,
     yAxis: horizontal ? categoryAxis : valueAxis,
-    series: series.map((s) => ({
-      name: s.name,
+    series: buildStackedSeries(categories, series, valueFormatter, showValueLabels, showTotalLabel, horizontal),
+  };
+}
+
+/**
+ * Séries de barra empilhada + (opcional) uma série "fantasma" de altura
+ * zero, empilhada por cima das reais, só pra desenhar o total geral da
+ * categoria acima/à direita da barra (padrão pedido pra Orçamento
+ * Estratificado e Endereço por Tecnologia) — não conta como dado de
+ * verdade (fica de fora da legenda e some do tooltip por ter valor 0).
+ */
+function buildStackedSeries(
+  categories: string[],
+  series: StackedSeriesInput[],
+  valueFormatter: (v: number) => string,
+  showValueLabels: boolean,
+  showTotalLabel: boolean,
+  horizontal: boolean,
+): Record<string, unknown>[] {
+  const barSeries: Record<string, unknown>[] = series.map((s) => ({
+    name: s.name,
+    type: "bar",
+    stack: "total",
+    itemStyle: { color: s.color },
+    label: showValueLabels
+      ? {
+          show: true,
+          position: "inside" as const,
+          fontWeight: "bold" as const,
+          fontSize: 10,
+          color: "#fff",
+          formatter: (p: { value: number }) => (p.value ? valueFormatter(p.value) : ""),
+        }
+      : undefined,
+    data: s.data,
+  }));
+
+  if (showTotalLabel) {
+    const totals = categories.map((_, i) => series.reduce((sum, s) => sum + (s.data[i] || 0), 0));
+    barSeries.push({
+      name: "__total__",
       type: "bar",
       stack: "total",
-      itemStyle: { color: s.color },
-      label: showValueLabels
-        ? {
-            show: true,
-            position: "inside" as const,
-            fontWeight: "bold" as const,
-            fontSize: 10,
-            color: "#fff",
-            formatter: (p: { value: number }) => (p.value ? valueFormatter(p.value) : ""),
-          }
-        : undefined,
-      data: s.data,
-    })),
-  };
+      data: categories.map(() => 0),
+      itemStyle: { color: "transparent" },
+      silent: true,
+      tooltip: { show: false },
+      label: {
+        show: true,
+        position: horizontal ? "right" : "top",
+        fontWeight: "bold",
+        fontSize: 11,
+        formatter: (p: { dataIndex: number }) => valueFormatter(totals[p.dataIndex]),
+      },
+    });
+  }
+
+  return barSeries;
 }
 
 /** Donut com total no centro + legenda rica Base/Ganho (R3 cidades por regional). */
