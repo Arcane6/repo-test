@@ -57,6 +57,27 @@ def _build_in_clause(field, values, prefix, params):
     return f"AND {field} IN ({', '.join(placeholders)})"
 
 
+def _build_municipio_ibge_clause(values, prefix, params):
+    """Resolve nome(s) de município pro IBGE via MUNICIPIOS_FECHAMENTO antes
+    de filtrar — o nome de MUNICIPIO gravado em TB_FT_BASE_UNICA_SITES pode
+    não bater caractere-a-caractere com o nome que vem do autocomplete do
+    filtro (que busca em MUNICIPIOS_FECHAMENTO), então comparar direto por
+    texto aqui deixava o filtro silenciosamente sem casar nada."""
+    if not values:
+        return ""
+    placeholders = []
+    for i, v in enumerate(values):
+        key = f"{prefix}_{i}"
+        params[key] = v
+        placeholders.append(f":{key}")
+    in_list = ", ".join(placeholders)
+    return f"""AND IBGE IN (
+        SELECT IBGE FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+        WHERE TRUNC(DT_CARGA) = (SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO)
+        AND MUNICIPIO IN ({in_list})
+    )"""
+
+
 def _template_fields(sql_template):
     return {
         name
@@ -69,11 +90,12 @@ def _apply_geo(sql_template, filters, params):
     """Injeta uf_filter_site/municipio_filter_site/regional_filter_site só
     nos placeholders que o template realmente tem — mesma lógica de
     _apply_geo_all (summary/service.py), adaptada pros nomes de campo
-    desta aba (BASE.UF/BASE.MUNICIPIO, GEO.REGIONAL)."""
+    desta aba (BASE.UF/BASE.MUNICIPIO, GEO.REGIONAL). Município usa a
+    ponte por IBGE (_build_municipio_ibge_clause) em vez de comparar
+    MUNICIPIO por texto direto."""
     fields = _template_fields(sql_template)
     spec = {
         "uf_filter_site": ("UF", _normalize_list(filters.get("ufs")), "uf"),
-        "municipio_filter_site": ("MUNICIPIO", _normalize_list(filters.get("municipios")), "mun"),
         "regional_filter_site": ("g.REGIONAL", _normalize_list(filters.get("regionais")), "reg"),
     }
     to_fill = {
@@ -81,6 +103,10 @@ def _apply_geo(sql_template, filters, params):
         for key, (field, values, prefix) in spec.items()
         if key in fields
     }
+    if "municipio_filter_site" in fields:
+        to_fill["municipio_filter_site"] = _build_municipio_ibge_clause(
+            _normalize_list(filters.get("municipios")), "mun", params
+        )
     return sql_template.format(**to_fill)
 
 
