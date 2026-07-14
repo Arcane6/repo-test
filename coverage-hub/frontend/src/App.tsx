@@ -6,6 +6,7 @@ import { MobileAccessLayout } from "./pages/mobile-access/MobileAccessLayout";
 import { ResumoDashboard } from "./dashboards/ResumoDashboard";
 import { CidadesDashboard } from "./dashboards/CidadesDashboard";
 import { SitesDashboard } from "./dashboards/SitesDashboard";
+import { CoreDashboard } from "./dashboards/CoreDashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,7 @@ export function App() {
               <Route path="cidades" element={<CidadesDashboard />} />
               <Route path="sites" element={<SitesDashboard />} />
             </Route>
+            <Route path="core" element={<CoreDashboard />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -11,11 +11,11 @@ MODULES = [
     {
         "key": "core",
         "name": "Core",
-        "description": "Núcleo da rede e elementos centrais",
+        "description": "Volumetria de tráfego da RAN por município, UF e regional",
         "url": "/core/",
         "icon": "bi-hdd-network",
         "color": "#7DC242",
-        "enabled": False,
+        "enabled": True,
     },
     {
         "key": "transport",

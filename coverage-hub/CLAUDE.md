@@ -61,8 +61,14 @@ multinacional de telecom. Isso significa:
 
 ```
 modules/
-  core/            — endpoint /api/modules (lista de módulos p/ Home)
-  mobile_access/   — único módulo funcional hoje
+  core/            — endpoint /api/modules (lista de módulos p/ Home) —
+                     NOME CONFUSO DE PROPÓSITO: é infra do portal (nada
+                     a ver com o módulo de negócio "Core" da Home/RAN).
+  network_core/    — módulo de negócio "Core" (RAN, ver seção própria
+                     abaixo) — nome diferente de `modules/core/` só pra
+                     não colidir (Flask não registra dois blueprints
+                     com o mesmo nome).
+  mobile_access/   — módulo "Acesso Móvel"
     actual/        — aba "Cidades" (rede hoje, MUNICIPIOS_FECHAMENTO)
     summary/       — aba "Resumo" (raias R1/R2/R3)
     sites/         — aba "Sites" (inventário de sites físicos,
@@ -75,7 +81,7 @@ modules/
 
 Frontend espelha isso em `frontend/src/dashboards/` (`CidadesDashboard`,
 `ResumoDashboard` com `resumo/Raia1.tsx`, `Raia2.tsx`, `Raia3.tsx`,
-`SitesDashboard`).
+`SitesDashboard`, `CoreDashboard`).
 
 ## Aba Sites (`modules/mobile_access/sites/`)
 
@@ -178,6 +184,50 @@ produção do usuário, que não tem essa mesma restrição de rede.
 "Sites" hoje tem as 6 visões completas: max-tech, por-tecnologia,
 fornecedor dominante, tipo de site, mapa (Brasil/Múndi, tiles Leaflet) e
 pivot.
+
+## Módulo Core (`modules/network_core/`) — volumetria de tráfego da RAN
+
+Primeiro módulo além de Acesso Móvel, habilitado a partir das duas
+queries de volumetria que o usuário validou com o time de Core. Domínio
+de dado bem diferente do resto do portal:
+
+- **Fonte**: `NTW_MABE.ALTAIA_PM_MES_4G`/`ALTAIA_PM_MES_5G` (contador
+  mensal por `RAN_NODE`, sem segmentação por app — é medição de rede,
+  não DPI). `RAN_NODE` → município via `NTW_MABE.MOBILESITE` (nome) →
+  UF/Regional via `NTW_OP.TB_AUX_INFO_MUNICIPIOS` (join por **IBGE**,
+  numérico — por isso filtrar UF/Regional direto em `MUN.UF`/`MUN.REGIONAL`
+  não tem o mesmo risco de descasamento de string que já corrigimos em
+  outras abas; só o filtro de **nome** de município precisa da mesma
+  ponte via `MUNICIPIOS_FECHAMENTO` → IBGE usada em `sites/`/`summary/`,
+  porque o autocomplete do filtro busca lá, não em
+  `TB_AUX_INFO_MUNICIPIOS`).
+- **Sem "ano"/"tecnologia"** como filtro — não existem nesse dado. Só
+  geografia (UF/Município/Regional) e tempo (`MES`, formato `YYYYMM`).
+  Regional não tem dropdown próprio (mesmo padrão do resto do portal:
+  filtra via clique no gráfico "Volumetria por Regional").
+- **Duas queries-base** (`queries.py`): `VOLUMETRIA_SNAPSHOT` (só o
+  último mês, alimenta ranking/mapa) e `VOLUMETRIA_HISTORICO_13M`
+  (últimos 13 meses — 13 e não 12 de propósito: o 13º mês só serve de
+  base pro cálculo de variação MoM do primeiro ponto exibido).
+- **KPIs com MoM/YoY** e **Destaques de Variação** (maior
+  crescimento/queda por município e por UF) são calculados em Python a
+  partir do histórico, não em SQL — mais simples de auditar/testar com
+  stub sem Oracle real. Cada painel de destaque só lista o lado que
+  promete (crescimento não lista quem caiu, mesmo que sobre vaga no
+  top N por falta de mais entidades no recorte filtrado).
+- **Mapa**: bolhas graduadas (raio + cor proporcionais à volumetria) em
+  `components/CoreMap.tsx`, reaproveitando o Leaflet puro já usado em
+  Sites — **não** é heatmap de kernel-density (`leaflet.heat` seria a
+  lib pra isso, MIT, ainda não adicionada — evolução rápida se o
+  usuário quiser o gradiente contínuo de verdade em vez de bolhas).
+- **Estado próprio** (`store/coreFilters.ts`, `components/CoreFilterBar.tsx`):
+  não reaproveita o `useFilterStore` do Acesso Móvel — são domínios de
+  dado diferentes, um filtro escolhido aqui não deve vazar pro outro
+  módulo ao trocar de aba.
+- Reaproveita os endpoints de UF/busca de município do Acesso Móvel
+  (`/mobile-access/api/actual/ufs`, `/municipios/search`) em vez de
+  duplicar — é lookup geográfico genérico, não algo específico daquele
+  módulo.
 
 ## Convenções de backend
 

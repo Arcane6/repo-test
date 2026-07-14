@@ -694,4 +694,67 @@ export function gaugeOption(card: {
   };
 }
 
+interface TrendPoint {
+  label: string;
+  volumetria_pb: number;
+  variacao_pct: number | null;
+}
+
+/**
+ * Linha de tendência com valor + variação % sempre visíveis acima de
+ * cada ponto (não só no tooltip) — estilo "Histórico de Tráfego" de
+ * referência. Diferente de `timeSeriesOption` (múltiplas séries, delta
+ * só no hover): aqui é sempre uma série única com rótulo permanente.
+ */
+export function trafficTrendOption(points: TrendPoint[]): EChartsCoreOption {
+  if (points.length === 0) return {};
+
+  return {
+    grid: { left: 55, right: 30, top: 55, bottom: 30 },
+    tooltip: {
+      trigger: "axis",
+      formatter: (raw: unknown) => {
+        const p = (raw as { dataIndex: number }[])[0];
+        const point = points[p.dataIndex];
+        const deltaHtml =
+          point.variacao_pct === null
+            ? ""
+            : ` <span style="color:${point.variacao_pct >= 0 ? "#2e7d32" : "#c62828"}">(${point.variacao_pct >= 0 ? "+" : ""}${point.variacao_pct}%)</span>`;
+        return `<b>${point.label}</b><br/>${fmt(point.volumetria_pb)} PB${deltaHtml}`;
+      },
+    },
+    xAxis: { type: "category", data: points.map((p) => p.label), boundaryGap: false },
+    yAxis: { type: "value" },
+    series: [
+      {
+        type: "line",
+        showSymbol: true,
+        symbolSize: 6,
+        lineStyle: { width: 2, color: "#003399" },
+        itemStyle: { color: "#003399" },
+        areaStyle: { color: "#003399", opacity: 0.12 },
+        label: {
+          show: true,
+          position: "top",
+          formatter: (p: { dataIndex: number }) => {
+            const point = points[p.dataIndex];
+            const deltaText =
+              point.variacao_pct === null
+                ? ""
+                : `${point.variacao_pct >= 0 ? "+" : ""}${point.variacao_pct}%`;
+            const deltaStyle = point.variacao_pct !== null && point.variacao_pct < 0 ? "down" : "up";
+            return `{value|${fmt(point.volumetria_pb)} PB}\n{${deltaStyle}|${deltaText}}`;
+          },
+          rich: {
+            value: { fontWeight: "bold" as const, fontSize: 11, lineHeight: 16 },
+            up: { color: "#2e7d32", fontSize: 10, lineHeight: 14 },
+            down: { color: "#c62828", fontSize: 10, lineHeight: 14 },
+          },
+        },
+        data: points.map((p) => p.volumetria_pb),
+      },
+    ],
+  };
+}
+
 export type { TechSeries };
