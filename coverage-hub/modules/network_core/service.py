@@ -177,7 +177,17 @@ def get_ranking_regionais(filters):
 def _historico_rows(filters):
     params = {}
     sql = _apply_geo(VOLUMETRIA_HISTORICO_13M, filters, params)
-    return execute_query(sql, params) or []
+    rows = execute_query(sql, params) or []
+    # MES pode voltar do Oracle como NUMBER/Decimal em vez de string (o
+    # formato "YYYYMM" descrito pelo usuário é só a representação visual,
+    # não garante o tipo da coluna) — normaliza aqui, uma vez só, pra todo
+    # o resto do módulo (_mes_label, _mes_minus_years, chaves de dict em
+    # _monthly_totals/_top_variacao) poder tratar MES como string sem
+    # quebrar com TypeError se vier número.
+    for r in rows:
+        if r.get("mes") is not None:
+            r["mes"] = str(r["mes"]).strip()
+    return rows
 
 
 def _monthly_totals(rows):
