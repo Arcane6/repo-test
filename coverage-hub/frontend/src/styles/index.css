@@ -573,3 +573,105 @@ body {
 [data-theme="dark"] .leaflet-control-attribution a {
   color: #7d9cff;
 }
+
+/* =============================================================================
+ * Core — KPI cards com badges de variação (MoM/YoY) e destaques de
+ * crescimento/queda
+ * ============================================================================= */
+
+.kpi-card {
+  border: 1px solid var(--tim-card-border);
+  border-radius: 12px;
+  background: var(--tim-card-bg);
+  padding: 20px;
+  height: 100%;
+}
+
+.kpi-card-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--tim-text-muted);
+  text-transform: uppercase;
+}
+
+.kpi-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.kpi-card-value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.kpi-card-value-unit {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tim-text-muted);
+  margin-left: 4px;
+}
+
+.kpi-card-secondary {
+  font-size: 0.9rem;
+  color: var(--tim-text-muted);
+  margin-top: 2px;
+}
+
+.kpi-card-divider {
+  border-top: 1px solid var(--tim-card-border);
+  margin: 14px 0 10px;
+}
+
+.kpi-delta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.kpi-delta-badge.up {
+  background: rgba(46, 125, 50, 0.12);
+  color: #2e7d32;
+}
+
+.kpi-delta-badge.down {
+  background: rgba(198, 40, 40, 0.12);
+  color: #c62828;
+}
+
+[data-theme="dark"] .kpi-delta-badge.up {
+  background: rgba(76, 175, 80, 0.18);
+  color: #66bb6a;
+}
+
+[data-theme="dark"] .kpi-delta-badge.down {
+  background: rgba(239, 83, 80, 0.18);
+  color: #ef5350;
+}
+
+.core-variation-panel {
+  border-top: 3px solid var(--variation-color, var(--tim-card-border));
+  border-radius: 10px;
+}
+
+.core-variation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tim-card-border);
+}
+
+.core-variation-item:last-child {
+  border-bottom: none;
+}
