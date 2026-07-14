@@ -40,24 +40,40 @@ export function FrequencyChart() {
       };
     }
 
-    const bandas = Array.from(new Set(bars.map((b) => b.banda))).sort((a, b) => {
-      const [an, as_] = bandaSortKey(a);
-      const [bn, bs] = bandaSortKey(b);
+    // Categoria = banda + tecnologia, não só a banda: a mesma frequência
+    // (ex.: 2100 MHz) usada por tecnologias diferentes é uma coisa
+    // distinta em cada uma (uso/licenciamento próprio), então não pode
+    // virar uma única barra empilhada como se fossem equivalentes.
+    const sortedBars = [...bars].sort((a, b) => {
+      const ta = TECH_ORDER.indexOf(a.tec);
+      const tb = TECH_ORDER.indexOf(b.tec);
+      if (ta !== tb) return ta - tb;
+      const [an, as_] = bandaSortKey(a.banda);
+      const [bn, bs] = bandaSortKey(b.banda);
       return an !== bn ? an - bn : as_.localeCompare(bs);
     });
+    const categories = sortedBars.map((b) => `${b.banda} MHz (${b.tec})`);
 
     const tecsPresent = TECH_ORDER.filter((t) => bars.some((b) => b.tec === t));
 
-    const series = tecsPresent.map((tec) => {
-      const barsByBanda = new Map(bars.filter((b) => b.tec === tec).map((b) => [b.banda, b]));
-      return {
-        name: tec,
-        color: bars.find((b) => b.tec === tec)?.color ?? "#888",
-        data: bandas.map((banda) => barsByBanda.get(banda)?.value ?? 0),
-      };
-    });
+    const series = tecsPresent.map((tec) => ({
+      name: tec,
+      color: bars.find((b) => b.tec === tec)?.color ?? "#888",
+      data: sortedBars.map((b) => (b.tec === tec ? b.value : 0)),
+    }));
 
-    return stackedBarsOption(bandas, series);
+    const built = stackedBarsOption(categories, series);
+    // Com banda+tecnologia na mesma categoria, o eixo fica mais lotado —
+    // rótulo rotacionado pra não sobrepor.
+    const xAxis = built.xAxis as Record<string, unknown>;
+    return {
+      ...built,
+      grid: { ...(built.grid as Record<string, unknown>), bottom: 80 },
+      xAxis: {
+        ...xAxis,
+        axisLabel: { ...(xAxis.axisLabel as Record<string, unknown>), rotate: 40, fontSize: 10 },
+      },
+    };
   }, [bars, isFetching]);
 
   return (
