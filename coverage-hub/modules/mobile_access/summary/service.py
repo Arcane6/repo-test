@@ -8,6 +8,7 @@ Service layer do módulo Summary.
 """
 
 import datetime as _dt
+import math as _math
 
 from database.oracle import execute_query
 
@@ -406,17 +407,29 @@ def get_r2_endereco_por_tecnologia(filters):
     classificacoes = ["CN", "CE"]
     by_key = {(r["tech"], r["classificacao"]): r.get("valor", 0) or 0 for r in rows}
 
+    # Arredonda pra cima (não pra 2 casas): o rateio proporcional dá valor
+    # fracionário (ex.: 0.47 endereço), mas quando filtramos um recorte
+    # pequeno (um município) isso não faz sentido de exibir — "0,47
+    # endereço" não é uma métrica que bate. O total soma os mesmos valores
+    # já arredondados exibidos nas barras, não o bruto, senão total e
+    # barras não batem entre si.
+    data_by_cell = {
+        (t, c): _math.ceil(by_key.get((t, c), 0))
+        for t in techs
+        for c in classificacoes
+    }
+
     return {
         "categories": classificacoes,
         "series": [
             {
                 "name": t,
                 "color": TECH_COLORS[t],
-                "data": [round(by_key.get((t, c), 0), 2) for c in classificacoes],
+                "data": [data_by_cell[(t, c)] for c in classificacoes],
             }
             for t in techs
         ],
-        "total": round(sum(by_key.values()), 2),
+        "total": sum(data_by_cell.values()),
     }
 
 
