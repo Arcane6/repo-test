@@ -127,9 +127,7 @@ def _snapshot_rows(filters):
     return execute_query(sql, params) or []
 
 
-def get_geo_points(filters):
-    """Um ponto por município (lat/lon + volumetria) — alimenta o mapa."""
-    rows = _snapshot_rows(filters)
+def _geo_points_from_rows(rows):
     return {
         "points": [
             {
@@ -145,6 +143,11 @@ def get_geo_points(filters):
             if r.get("latitude") is not None and r.get("longitude") is not None
         ],
     }
+
+
+def get_geo_points(filters):
+    """Um ponto por município (lat/lon + volumetria) — alimenta o mapa."""
+    return _geo_points_from_rows(_snapshot_rows(filters))
 
 
 def _rank(rows, key_field, limit=None):
@@ -199,12 +202,11 @@ def _monthly_totals(rows):
     return totals
 
 
-def get_historico_mensal(filters):
+def _historico_points_from_rows(historico_rows):
     """Série nacional dos últimos 12 meses, com variação MoM em cada ponto
     (o 13º mês buscado só serve de base pro delta do primeiro ponto
     exibido, mesmo princípio do gráfico de referência)."""
-    rows = _historico_rows(filters)
-    totals = _monthly_totals(rows)
+    totals = _monthly_totals(historico_rows)
     meses_ordenados = sorted(totals.keys())
     if not meses_ordenados:
         return {"points": []}
@@ -228,10 +230,18 @@ def get_historico_mensal(filters):
     return {"points": points}
 
 
-def get_kpis(filters):
-    """Volume total + top município + top UF, cada um com MoM/YoY."""
-    snapshot_rows = _snapshot_rows(filters)
-    historico_rows = _historico_rows(filters)
+def get_historico_mensal(filters):
+    return _historico_points_from_rows(_historico_rows(filters))
+
+
+def _kpis_from_rows(snapshot_rows, historico_rows):
+    """Volume total + top município + top UF, cada um com MoM/YoY. Recebe
+    as linhas já buscadas (snapshot + histórico) em vez de consultar o
+    banco — assim get_overview roda cada query pesada uma vez só e
+    reaproveita aqui, sem refazer o full-scan."""
+    # snapshot_rows é aceito por simetria/futuro; hoje os KPIs (inclusive o
+    # top do mês corrente) saem todos do histórico, que já tem o último mês.
+    _ = snapshot_rows
     totals = _monthly_totals(historico_rows)
     meses_ordenados = sorted(totals.keys())
 
@@ -292,6 +302,10 @@ def get_kpis(filters):
     }
 
 
+def get_kpis(filters):
+    return _kpis_from_rows(_snapshot_rows(filters), _historico_rows(filters))
+
+
 def _top_variacao(rows, field, mes_atual, mes_anterior, n=5):
     """Maiores altas/quedas (MoM) por `field` (município ou UF)."""
     atual = {}
@@ -331,11 +345,10 @@ def _top_variacao(rows, field, mes_atual, mes_anterior, n=5):
     return crescimento[:n], queda[:n]
 
 
-def get_destaques_variacao(filters, n=5):
+def _destaques_from_rows(historico_rows, n=5):
     """Maiores altas/quedas MoM por município e por UF — equivalente ao
     painel 'Destaques de Variação' (mês vs mês anterior)."""
-    rows = _historico_rows(filters)
-    totals = _monthly_totals(rows)
+    totals = _monthly_totals(historico_rows)
     meses_ordenados = sorted(totals.keys())
     if len(meses_ordenados) < 2:
         return {
@@ -346,8 +359,8 @@ def get_destaques_variacao(filters, n=5):
         }
 
     mes_atual, mes_anterior = meses_ordenados[-1], meses_ordenados[-2]
-    mun_alta, mun_queda = _top_variacao(rows, "municipio", mes_atual, mes_anterior, n)
-    uf_alta, uf_queda = _top_variacao(rows, "uf", mes_atual, mes_anterior, n)
+    mun_alta, mun_queda = _top_variacao(historico_rows, "municipio", mes_atual, mes_anterior, n)
+    uf_alta, uf_queda = _top_variacao(historico_rows, "uf", mes_atual, mes_anterior, n)
 
     return {
         "mes_atual": _mes_label(mes_atual),
@@ -356,4 +369,37 @@ def get_destaques_variacao(filters, n=5):
         "municipios_queda": mun_queda,
         "ufs_alta": uf_alta,
         "ufs_queda": uf_queda,
+    }
+
+
+def get_destaques_variacao(filters, n=5):
+    return _destaques_from_rows(_historico_rows(filters), n)
+
+
+# ---------------------------------------------------------------------------
+# Overview — TUDO do dashboard numa chamada só
+# ---------------------------------------------------------------------------
+
+def get_overview(filters):
+    """Roda as duas queries pesadas (snapshot + histórico) UMA vez cada e
+    deriva todos os blocos do dashboard a partir delas.
+
+    Por que existe: o dashboard tem 7 visões que, se cada uma chamasse
+    seu próprio endpoint, disparariam 8 execuções das queries pesadas em
+    paralelo (histórico 3x, snapshot 5x) contra um pool de só 5 conexões
+    (POOL_MAX). A query de histórico faz full-scan de ALTAIA_PM_MES_4G/5G
+    com parsing de string linha a linha — cara mesmo rodando uma vez;
+    rodada 3x concorrendo por conexão, a página "nunca" carrega. Aqui é 1
+    request → 2 queries, sem contenção. Os endpoints granulares continuam
+    existindo (úteis pra debug direto/REST), mas o front usa só este."""
+    snapshot_rows = _snapshot_rows(filters)
+    historico_rows = _historico_rows(filters)
+    return {
+        "kpis": _kpis_from_rows(snapshot_rows, historico_rows),
+        "historico": _historico_points_from_rows(historico_rows),
+        "destaques": _destaques_from_rows(historico_rows),
+        "ranking_municipios": {"items": _rank(snapshot_rows, "municipio", 15)},
+        "ranking_ufs": {"items": _rank(snapshot_rows, "uf")},
+        "ranking_regionais": {"items": _rank(snapshot_rows, "regional")},
+        "geo": _geo_points_from_rows(snapshot_rows),
     }

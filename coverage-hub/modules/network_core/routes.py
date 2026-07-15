@@ -25,6 +25,14 @@ def _geo_filters():
     }
 
 
+@network_core_bp.route("/api/overview")
+def api_overview():
+    """TUDO do dashboard numa chamada só — evita disparar 8 execuções das
+    queries pesadas em paralelo (ver get_overview). É o único endpoint que
+    o frontend usa; os granulares abaixo ficam pra debug/REST direto."""
+    return jsonify(service.get_overview(_geo_filters()))
+
+
 @network_core_bp.route("/api/kpis")
 def api_kpis():
     return jsonify(service.get_kpis(_geo_filters()))

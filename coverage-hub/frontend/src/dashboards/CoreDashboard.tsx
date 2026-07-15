@@ -15,35 +15,28 @@ export function CoreDashboard() {
   const { uf, municipio, regional, toggleRegional } = useCoreFilterStore();
   const filters = { uf, municipio, regional };
 
-  const { data: kpis, isFetching: loadingKpis } = useQuery({
-    queryKey: ["core-kpis", uf, municipio, regional],
-    queryFn: () => coreApi.kpis(filters),
+  // Uma chamada só pro dashboard inteiro (ver get_overview no backend) —
+  // evita disparar as queries pesadas (histórico full-scan) várias vezes
+  // em paralelo contra um pool de 5 conexões, que fazia a página "nunca"
+  // carregar.
+  const { data, isFetching: loading } = useQuery({
+    queryKey: ["core-overview", uf, municipio, regional],
+    queryFn: () => coreApi.overview(filters),
   });
 
-  const { data: historico, isFetching: loadingHistorico } = useQuery({
-    queryKey: ["core-historico", uf, municipio, regional],
-    queryFn: () => coreApi.historicoMensal(filters),
-  });
+  const kpis = data?.kpis;
+  const historico = data?.historico;
+  const destaques = data?.destaques;
+  const rankMun = data?.ranking_municipios;
+  const rankUf = data?.ranking_ufs;
+  const rankRegional = data?.ranking_regionais;
 
-  const { data: destaques, isFetching: loadingDestaques } = useQuery({
-    queryKey: ["core-destaques", uf, municipio, regional],
-    queryFn: () => coreApi.destaquesVariacao(filters),
-  });
-
-  const { data: rankMun, isFetching: loadingRankMun } = useQuery({
-    queryKey: ["core-rank-municipios", uf, municipio, regional],
-    queryFn: () => coreApi.rankingMunicipios(filters),
-  });
-
-  const { data: rankUf, isFetching: loadingRankUf } = useQuery({
-    queryKey: ["core-rank-ufs", uf, municipio, regional],
-    queryFn: () => coreApi.rankingUfs(filters),
-  });
-
-  const { data: rankRegional, isFetching: loadingRankRegional } = useQuery({
-    queryKey: ["core-rank-regionais", uf, municipio, regional],
-    queryFn: () => coreApi.rankingRegionais(filters),
-  });
+  const loadingKpis = loading;
+  const loadingHistorico = loading;
+  const loadingDestaques = loading;
+  const loadingRankMun = loading;
+  const loadingRankUf = loading;
+  const loadingRankRegional = loading;
 
   return (
     <div className="container-fluid mt-4">
@@ -175,7 +168,7 @@ export function CoreDashboard() {
       {/* Mapa */}
       <div className="row g-3 mt-1">
         <div className="col-12">
-          <CoreMap filters={filters} />
+          <CoreMap points={data?.geo.points ?? []} loading={loading} />
         </div>
       </div>
 

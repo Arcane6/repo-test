@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import L from "leaflet";
 import { ChartToolbar } from "./ChartToolbar";
 import { SourceBadge } from "./SourceBadge";
 import { Skeleton } from "./Skeleton";
 import { downloadSheet } from "../utils/excelExport";
-import { coreApi, type CoreFilters } from "../api/core";
+import type { CoreGeoPoint } from "../api/core";
 import { useThemeStore } from "../theme/useThemeStore";
 
 const BRAZIL_BOUNDS: L.LatLngBoundsExpression = [
@@ -46,18 +45,12 @@ function intensityColor(t: number): string {
  * lib externa (`leaflet.heat` é uma opção rápida de evoluir depois, se
  * quiser o gradiente contínuo).
  */
-export function CoreMap({ filters }: { filters: CoreFilters }) {
+export function CoreMap({ points, loading = false }: { points: CoreGeoPoint[]; loading?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const theme = useThemeStore((s) => s.theme);
   const [mapInitialized, setMapInitialized] = useState(false);
-
-  const { data, isFetching } = useQuery({
-    queryKey: ["core-geo-points", filters.uf, filters.municipio],
-    queryFn: () => coreApi.geoPoints(filters),
-  });
-  const points = data?.points ?? [];
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -121,7 +114,7 @@ export function CoreMap({ filters }: { filters: CoreFilters }) {
     mapRef.current?.fitBounds(BRAZIL_BOUNDS);
   }
 
-  const loading = isFetching && points.length === 0;
+  const showSkeleton = loading && points.length === 0;
 
   return (
     <div className="card shadow-sm h-100">
@@ -157,12 +150,12 @@ export function CoreMap({ filters }: { filters: CoreFilters }) {
           </div>
         </div>
 
-        {loading && (
+        {showSkeleton && (
           <div style={{ position: "absolute", inset: "70px 20px auto 20px", zIndex: 500 }}>
             <Skeleton height={420} radius={8} />
           </div>
         )}
-        <div ref={containerRef} style={{ width: "100%", height: 420, opacity: loading ? 0 : 1 }} />
+        <div ref={containerRef} style={{ width: "100%", height: 420, opacity: showSkeleton ? 0 : 1 }} />
       </div>
     </div>
   );
