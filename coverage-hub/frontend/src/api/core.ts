@@ -85,18 +85,24 @@ export interface CoreGeoPointsResponse {
   points: CoreGeoPoint[];
 }
 
+/** Resposta consolidada do dashboard — tudo numa chamada só, pra não
+ * disparar 8 execuções das queries pesadas em paralelo (ver
+ * get_overview no backend). */
+export interface CoreOverviewResponse {
+  kpis: CoreKpisResponse;
+  historico: CoreHistoricoResponse;
+  destaques: CoreDestaquesResponse;
+  ranking_municipios: CoreRankingResponse;
+  ranking_ufs: CoreRankingResponse;
+  ranking_regionais: CoreRankingResponse;
+  geo: CoreGeoPointsResponse;
+}
+
 export const coreApi = {
-  kpis: (f: CoreFilters) => fetchJson<CoreKpisResponse>(`${BASE}/kpis?${query(f)}`),
-  historicoMensal: (f: CoreFilters) =>
-    fetchJson<CoreHistoricoResponse>(`${BASE}/historico-mensal?${query(f)}`),
-  destaquesVariacao: (f: CoreFilters) =>
-    fetchJson<CoreDestaquesResponse>(`${BASE}/destaques-variacao?${query(f)}`),
-  rankingMunicipios: (f: CoreFilters) =>
-    fetchJson<CoreRankingResponse>(`${BASE}/ranking/municipios?${query(f)}`),
-  rankingUfs: (f: CoreFilters) =>
-    fetchJson<CoreRankingResponse>(`${BASE}/ranking/ufs?${query(f)}`),
-  rankingRegionais: (f: CoreFilters) =>
-    fetchJson<CoreRankingResponse>(`${BASE}/ranking/regionais?${query(f)}`),
-  geoPoints: (f: CoreFilters) =>
-    fetchJson<CoreGeoPointsResponse>(`${BASE}/geo-points?${query(f)}`),
+  // Uma chamada só pro dashboard inteiro — os endpoints granulares
+  // (/kpis, /historico-mensal, /ranking/*, /geo-points) existem no
+  // backend pra debug/REST direto, mas o front não os usa: dispará-los
+  // separado rodaria as queries pesadas várias vezes em paralelo (ver
+  // get_overview no backend).
+  overview: (f: CoreFilters) => fetchJson<CoreOverviewResponse>(`${BASE}/overview?${query(f)}`),
 };

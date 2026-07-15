@@ -208,7 +208,25 @@ de dado bem diferente do resto do portal:
 - **Duas queries-base** (`queries.py`): `VOLUMETRIA_SNAPSHOT` (só o
   último mês, alimenta ranking/mapa) e `VOLUMETRIA_HISTORICO_13M`
   (últimos 13 meses — 13 e não 12 de propósito: o 13º mês só serve de
-  base pro cálculo de variação MoM do primeiro ponto exibido).
+  base pro cálculo de variação MoM do primeiro ponto exibido). As duas
+  fazem full-scan de `ALTAIA_PM_MES_4G/5G` com parsing de string linha a
+  linha (`TRANSLATE`/`REPLACE`/`TO_NUMBER`) — são **caras**, e o
+  histórico especialmente.
+- **UM endpoint só pro dashboard: `/core/api/overview`** (`get_overview`).
+  Motivo: o dashboard tem 7 visões; se cada uma chamasse seu próprio
+  endpoint, seriam 8 execuções das queries pesadas em paralelo (histórico
+  3x, snapshot 5x) contra um pool de só 5 conexões (`POOL_MAX`) — a
+  página "nunca" carregava (sintoma real reportado: request ficava
+  eternamente pendente, mas hitar a URL sozinho no navegador retornava
+  depois de muito tempo). `get_overview` roda snapshot + histórico UMA
+  vez cada e deriva tudo. Os endpoints granulares (`/kpis`,
+  `/historico-mensal`, `/ranking/*`, `/geo-points`) continuam no backend
+  **só pra debug/REST direto** — o front usa exclusivamente `/overview`
+  (por isso `CoreMap` recebe `points` por prop, não busca sozinho).
+- **`MES` pode vir como NUMBER do Oracle** (o "YYYYMM" é só a
+  representação visual) — `_historico_rows` normaliza pra string assim
+  que os dados chegam, senão `_mes_label`/`_mes_minus_years` quebram com
+  `TypeError` ao fatiar um int.
 - **KPIs com MoM/YoY** e **Destaques de Variação** (maior
   crescimento/queda por município e por UF) são calculados em Python a
   partir do histórico, não em SQL — mais simples de auditar/testar com
