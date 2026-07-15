@@ -19,10 +19,25 @@ export function CoreDashboard() {
   // evita disparar as queries pesadas (histórico full-scan) várias vezes
   // em paralelo contra um pool de 5 conexões, que fazia a página "nunca"
   // carregar.
-  const { data, isFetching: loading } = useQuery({
+  const { data, isFetching: loading, error, isLoading } = useQuery({
     queryKey: ["core-overview", uf, municipio, regional],
     queryFn: () => coreApi.overview(filters),
+    // Sem retry: se a query pesada falhar (ex.: timeout de gateway), o
+    // default do react-query tentaria 3x com backoff — multiplicando a
+    // espera e escondendo o erro. Melhor falhar rápido e visível.
+    retry: false,
   });
+
+  // Se o dado veio mas está totalmente vazio (query rodou mas não
+  // retornou linha — ex.: join sem match, janela de mês fora do range),
+  // avisa explicitamente em vez de mostrar cards em branco (que o
+  // usuário lê como "quebrado").
+  const semDados =
+    !isLoading &&
+    !error &&
+    data != null &&
+    (data.historico?.points?.length ?? 0) === 0 &&
+    (data.ranking_municipios?.items?.length ?? 0) === 0;
 
   const kpis = data?.kpis;
   const historico = data?.historico;
@@ -48,6 +63,36 @@ export function CoreDashboard() {
       />
 
       <CoreFilterBar />
+
+      {error && (
+        <div className="alert alert-danger d-flex align-items-start gap-2" role="alert">
+          <i className="bi bi-exclamation-triangle-fill mt-1" />
+          <div>
+            <strong>Falha ao carregar os dados do Core.</strong>
+            <div className="small mt-1">
+              {(error as Error).message}
+            </div>
+            <div className="small text-muted mt-1">
+              Verifique <code>/core/api/overview</code> direto no navegador — se
+              demorar demais e a query for lenta, pode ser timeout de gateway.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {semDados && (
+        <div className="alert alert-warning d-flex align-items-start gap-2" role="alert">
+          <i className="bi bi-info-circle-fill mt-1" />
+          <div>
+            <strong>A consulta rodou, mas não retornou nenhuma linha.</strong>
+            <div className="small mt-1">
+              Provável descasamento nos joins (RAN_NODE ↔ MOBILESITE.NAME, ou
+              MOBILESITE.IBGE_ID ↔ TB_AUX_INFO_MUNICIPIOS.IBGE) ou a janela de
+              meses do histórico não bateu com os dados. Não é erro de código.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="row g-3 mb-1">
