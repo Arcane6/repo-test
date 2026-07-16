@@ -80,20 +80,32 @@ def _build_uf_clause(values, params):
 
 
 def _build_municipio_clause(values, params):
-    """Filtra por nome de município direto na coluna MUNICIPIO_NOME
-    (UPPER/TRIM dos dois lados). O autocomplete do filtro busca em
-    MUNICIPIOS_FECHAMENTO; se aparecer descasamento de acentuação/grafia
-    contra as tabelas de tráfego, a ponte via IBGE (MUNICIPIO_ID de 6
-    dígitos) entra numa próxima iteração — por ora o match por nome cobre
-    o caso comum e degrada de forma visível (sem match = vazio)."""
+    """Ponte por IBGE (mesma lógica de sites/summary). Resolve o(s) nome(s)
+    de município pro código IBGE via NTW_OP.MUNICIPIOS_FECHAMENTO — que é de
+    onde o autocomplete do filtro busca — e filtra por MUNICIPIO_ID (o IBGE
+    de 6 dígitos das tabelas de tráfego).
+
+    Por que não filtrar MUNICIPIO_NOME direto: a grafia não bate. O
+    realizado (REL_DS013) guarda o nome em CAIXA ALTA e SEM acento
+    ('SAO PAULO'), enquanto o autocomplete devolve com acento ('São Paulo')
+    — então `UPPER(MUNICIPIO_NOME) IN (...)` casava no planejado (Raia 2,
+    nome acentuado) mas NÃO no realizado (Raias 1 e 3). O MUNICIPIO_ID é
+    idêntico nos dois (ex.: 314260), então a ponte resolve tudo. MUNICIPIO_ID
+    = 6 primeiros dígitos do IBGE de 7 de MUNICIPIOS_FECHAMENTO."""
     if not values:
         return ""
     ph = []
     for i, v in enumerate(values):
         key = f"mun_{i}"
-        params[key] = v.upper()
-        ph.append(f"UPPER(:{key})")
-    return f"AND UPPER(TRIM(MUNICIPIO_NOME)) IN ({', '.join(ph)})"
+        params[key] = v
+        ph.append(f":{key}")
+    in_list = ", ".join(ph)
+    return f"""AND TO_CHAR(MUNICIPIO_ID) IN (
+        SELECT SUBSTR(TO_CHAR(IBGE), 1, 6)
+        FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+        WHERE TRUNC(DT_CARGA) = (SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO)
+        AND MUNICIPIO IN ({in_list})
+    )"""
 
 
 

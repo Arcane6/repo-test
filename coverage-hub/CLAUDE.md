@@ -270,21 +270,25 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
   `/api/resumo-executivo` (as 3 raias numa chamada) e `/api/ytd`. Todo
   cálculo é feito em Python a partir das linhas (testável com stub sem
   Oracle — ver os testes que rodam contra os CSVs de amostra).
-- **Filtro só geográfico** (UF via `ESTADO`, Município via
-  `MUNICIPIO_NOME`). O tempo é fixo por raia, não é filtro de usuário.
-  Store **próprio** (`store/trafficFilters.ts`,
-  `components/TrafficFilterBar.tsx`) — não vaza pro Acesso Móvel.
-  Reaproveita os endpoints de UF/busca de município do Acesso Móvel
-  (lookup geográfico genérico).
+- **Filtro só geográfico** (UF via `ESTADO`; Município via **ponte por
+  IBGE**). O tempo é fixo por raia, não é filtro de usuário. Store
+  **próprio** (`store/trafficFilters.ts`, `components/TrafficFilterBar.tsx`)
+  — não vaza pro Acesso Móvel. Reaproveita os endpoints de UF/busca de
+  município do Acesso Móvel (lookup geográfico genérico).
+  - **Município NÃO é filtrado por `MUNICIPIO_NOME`** direto:
+    `_build_municipio_clause` resolve o nome pro IBGE via
+    `MUNICIPIOS_FECHAMENTO` (de onde o autocomplete busca) e filtra
+    `MUNICIPIO_ID` (IBGE de 6 díg = `SUBSTR(TO_CHAR(IBGE),1,6)`). Motivo: o
+    **realizado** guarda o nome em CAIXA ALTA e **sem acento** ('SAO PAULO'),
+    e o autocomplete devolve com acento ('São Paulo') — o match por nome
+    funcionava no planejado (Raia 2) mas quebrava no realizado (Raias 1 e
+    3). O `MUNICIPIO_ID` é idêntico nas duas tabelas, então a ponte
+    resolve. Mesma família de solução de sites/summary.
 - **Pendências conhecidas** (primeiro corte, iterar depois):
   - **Regional**: as tabelas de tráfego têm `ESTADO`/`ANF`, mas não
     `REGIONAL`. Pra abrir por regional falta confirmar a chave de join
     (`MUNICIPIO_ID` de 6 dígitos ↔ `TB_AUX_INFO_MUNICIPIOS.IBGE` de 7 —
     provável `/10`). Por ora só UF/Município.
-  - **Filtro de município por nome** direto em `MUNICIPIO_NOME`
-    (UPPER/TRIM). Se aparecer descasamento de acentuação vs o
-    autocomplete (que busca em `MUNICIPIOS_FECHAMENTO`), migrar pra ponte
-    via IBGE, como já feito em sites/summary.
   - Nos CSVs de amostra o realizado só traz **2026-03** (então YTD/
     aderência ficam distorcidos localmente — Jan/Fev realizados vazios) e
     não há **2025**; em produção o Oracle tem o histórico completo.
