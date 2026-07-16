@@ -213,8 +213,14 @@ def get_r1_sites_venn(filters):
     conta uma única vez, na combinação exata de tecnologias que ele tem
     (não por cascata), fonte TB_FT_BASE_UNICA_SITES (mesma regra do
     Power BI anterior: exclui roaming, só site móvel, tec informada).
-    Clicar numa fatia filtra o próprio gráfico por aquela combinação exata."""
-    params, _ = _prepare_params(filters)
+    Clicar numa fatia filtra o próprio gráfico por aquela combinação exata.
+
+    Recorte de mês = FECHAMENTO de dezembro do ano anterior ao plano
+    (baseline_date), não o MES_REF mais recente — esta é a raia Fechamento
+    25. (Pegar o MES_REF mais recente é o correto só na aba Sites, que
+    mostra o inventário atual.)"""
+    params, ano_int = _prepare_params(filters)
+    params["baseline_date"] = _dt.date(ano_int - 1, 12, 31)
 
     venn_clause = _build_site_venn_clause(filters.get("site_venn_region"))
     mun_clause = _build_municipio_ibge_clause(
