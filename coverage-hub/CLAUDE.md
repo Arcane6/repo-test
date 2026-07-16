@@ -218,8 +218,14 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
   - **`REL_TRAFEGO_CIDADES_WIDE`** (planejado): 1 linha por
     (município, `TIPO_TRAF`), com os 12 meses em **colunas**
     (`JANEIRO`..`DEZEMBRO`), `ANO`. Existe a `REL_TRAFEGO_CIDADES_LONG`
-    (mesmo dado com mês em linha) — usamos a WIDE e desempilhamos no
-    Python. `MUNICIPIO_ID` é o IBGE de 6 dígitos (sem verificador).
+    (mesmo dado com mês em linha). `MUNICIPIO_ID` é o IBGE de 6 dígitos.
+    Também é **agregado no Oracle** (não puxa as ~28k linhas cruas):
+    `PLANEJADO_POR_CAMADA` (`GROUP BY TIPO_TRAF`, 5 linhas com os 12 meses
+    somados → série/total/YTD nacional pela linha Consolidado + split por
+    camada), `PLANEJADO_POR_UF` (`GROUP BY ESTADO`, só Consolidado → YTD por
+    UF) e `PLANEJADO_TOP_MUNICIPIOS` (`ORDER BY ... WHERE ROWNUM <= 15` → só
+    o top 15). Assume que as colunas de mês são `NUMBER` (fazemos `SUM`
+    direto); se vierem `VARCHAR`, envolver em `TO_NUMBER`.
   - **`REL_DS013_TRAFEGO_REALIZADO`** (realizado): 1 linha por
     (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz
     **TIM e OI**. Base de usuários rica (não usada ainda). A tabela crua é
