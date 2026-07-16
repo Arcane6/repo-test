@@ -30,6 +30,26 @@ multinacional de telecom. Isso significa:
 - **Backend**: Flask (Python), API JSON pura — nenhuma renderização
   server-side. `app.py` registra os blueprints e serve o build do Vite
   como SPA (rota catch-all `/`).
+  - **Roteamento de API — duas regras que já custaram caro (bug do
+    "Unexpected token '<', <!doctype ... is not valid JSON")**: esse erro
+    NÃO é backend fora do ar nem falta de restart. Ele acontece quando o
+    `fetchJson` do front recebe um **HTML com status 200** e tenta
+    `response.json()`. Duas fontes possíveis, ambas já corrigidas — não
+    reintroduzir:
+    1. **Catch-all da SPA (`spa()` em `app.py`)**: um path `/.../api/...`
+       que não casa com nenhum blueprint (endpoint removido/renomeado,
+       build do front velho) tem que devolver **404 JSON**, nunca o
+       `index.html`. Servir HTML-200 numa rota de API mascara o erro real
+       e ainda passa pelo `if (!response.ok)` do front (é 200). A regra
+       `if "/api/" in f"/{path}": return jsonify(...), 404` garante isso.
+    2. **Proxy do Vite (`vite.config.ts`)**: em `npm run dev` o front roda
+       no Vite (:5173) e as chamadas de API são proxiadas pro Flask
+       (:5000). **Cada módulo com prefixo próprio precisa estar no
+       `proxy`** — hoje `/mobile-access/api`, `/core/api` e `/api`. Sem a
+       linha do módulo, a chamada cai no `index.html` do próprio Vite
+       (HTML-200) e dá o mesmo erro. Ao criar um módulo novo com prefixo
+       próprio, **adicione o prefixo `/<modulo>/api` no proxy** (nunca o
+       prefixo sozinho tipo `/core` — esse é a página da SPA).
 - **Frontend**: React + TypeScript + Vite, em `frontend/` (dentro do
   projeto Flask, não um repo irmão). Build gera `static/dist/`, servido
   pelo Flask. Sem CDN, sem Docker — tudo local/instalado via npm.
@@ -245,10 +265,14 @@ de dado bem diferente do resto do portal:
   com busca + paginação e uma fração do peso. Por isso a `VOLUMETRIA_SNAPSHOT`
   **não seleciona mais `LATITUDE`/`LONGITUDE`** (ninguém consome), e o
   `/overview` devolve `tabela` (município/UF/regional/volumetria) no lugar
-  de `geo`. Componente é presentational (recebe as linhas por prop do
-  `/overview`, não busca sozinho). Se um dia quiser o mapa de volta,
-  reabrir lat/lon na snapshot + um `CoreMap` que receba só os top N
-  municípios (não os 5500) pra não repetir o problema de peso.
+  de `geo`. A tabela é **capada no top `TABELA_MUNICIPIOS_LIMIT` (=100)**
+  municípios por volumetria (`_tabela_municipios_from_rows`) — mandar os
+  ~5570 no JSON era o que deixava o `/overview` "puxando uma infinidade de
+  coisas" (payload gigante); a cauda longa carrega pouquíssimo tráfego.
+  Componente é presentational (recebe as linhas por prop do `/overview`,
+  não busca sozinho). Se um dia quiser o mapa de volta, reabrir lat/lon na
+  snapshot + um `CoreMap` que receba só os top N municípios (não os 5500)
+  pra não repetir o problema de peso.
 - **Estado próprio** (`store/coreFilters.ts`, `components/CoreFilterBar.tsx`):
   não reaproveita o `useFilterStore` do Acesso Móvel — são domínios de
   dado diferentes, um filtro escolhido aqui não deve vazar pro outro

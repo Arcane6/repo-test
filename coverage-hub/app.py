@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 from modules.core.routes import core_bp
 from modules.mobile_access.routes import mobile_access_bp
@@ -43,7 +43,19 @@ def spa(path):
     Toda a UI é React (SPA). Qualquer rota que não seja API ou estático
     devolve o index.html buildado pelo Vite — o roteamento de verdade
     acontece no cliente (react-router).
+
+    EXCEÇÃO CRÍTICA: um path de API que não casou com nenhum blueprint
+    (endpoint removido/renomeado, build do front desatualizado, etc.) NÃO
+    pode cair aqui e receber o index.html. Devolver HTML com status 200
+    faz o `fetchJson` do front chamar `response.json()` num documento HTML
+    e estourar "Unexpected token '<', <!doctype ... is not valid JSON" —
+    um erro que esconde a causa real e ainda passa despercebido pelo
+    `if (!response.ok)` (afinal é 200). Uma rota de API sempre responde
+    JSON: aqui devolvemos um 404 JSON explícito, que o front trata como
+    erro de verdade ("HTTP 404") apontando o path que faltou.
     """
+    if "/api/" in f"/{path}":
+        return jsonify({"error": "endpoint não encontrado", "path": f"/{path}"}), 404
     return send_from_directory(DIST_DIR, "index.html")
 
 

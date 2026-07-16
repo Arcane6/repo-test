@@ -210,7 +210,7 @@ export function CoreDashboard() {
       {/* Tabela de volumetria por município (substituiu o mapa) */}
       <div className="row g-3 mt-1">
         <div className="col-12">
-          <CoreVolumetriaTable items={data?.tabela.items ?? []} loading={loading} />
+          <CoreVolumetriaTable items={data?.tabela.items ?? []} limit={data?.tabela.limit} loading={loading} />
         </div>
       </div>
 

@@ -120,13 +120,22 @@ def _snapshot_rows(filters):
     return execute_query(sql, params) or []
 
 
-def _tabela_municipios_from_rows(rows):
-    """Uma linha por município (UF/Regional/Volumetria) — alimenta a
-    tabela de volumetria. Substituiu o mapa de bolhas: sem lat/lon e sem
-    5500 marcadores pra renderizar, é a mesma leitura de 'onde está o
-    tráfego' com uma fração do peso. As linhas já vêm ordenadas por
-    volumetria desc da query (snapshot)."""
+# Quantos municípios a tabela devolve. O Brasil tem ~5570 municípios; mandar
+# todos no JSON do /overview era o que deixava a resposta "puxando uma
+# infinidade de coisas" (payload gigante). A cauda longa carrega pouquíssimo
+# tráfego — o top 100 já cobre a esmagadora maioria da volumetria nacional e
+# mantém a resposta leve. As linhas já vêm ordenadas por volumetria desc da
+# query (snapshot), então é só cortar as N primeiras.
+TABELA_MUNICIPIOS_LIMIT = 100
+
+
+def _tabela_municipios_from_rows(rows, limit=TABELA_MUNICIPIOS_LIMIT):
+    """Top N municípios por volumetria (UF/Regional/Volumetria) — alimenta a
+    tabela. Substituiu o mapa de bolhas: sem lat/lon, sem 5500 marcadores e
+    sem despejar 5500 linhas no payload, é a mesma leitura de 'onde está o
+    tráfego' com uma fração do peso."""
     return {
+        "limit": limit,
         "items": [
             {
                 "municipio": r.get("municipio") or "N/D",
@@ -134,13 +143,13 @@ def _tabela_municipios_from_rows(rows):
                 "regional": r.get("regional"),
                 "volumetria_pb": round(r.get("volumetria_pb", 0) or 0, 2),
             }
-            for r in rows
+            for r in rows[:limit]
         ],
     }
 
 
 def get_tabela_municipios(filters):
-    """Tabela de volumetria por município (substituiu o mapa)."""
+    """Tabela (top N) de volumetria por município (substituiu o mapa)."""
     return _tabela_municipios_from_rows(_snapshot_rows(filters))
 
 

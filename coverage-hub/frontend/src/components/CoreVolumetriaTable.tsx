@@ -19,9 +19,11 @@ const fmtPb = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 
  */
 export function CoreVolumetriaTable({
   items,
+  limit,
   loading = false,
 }: {
   items: CoreTabelaItem[];
+  limit?: number;
   loading?: boolean;
 }) {
   const [search, setSearch] = useState("");
@@ -49,7 +51,9 @@ export function CoreVolumetriaTable({
         <div className="d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
-              <h6 className="fw-bold mb-0">Volumetria de Tráfego por Município</h6>
+              <h6 className="fw-bold mb-0">
+                {limit ? `Top ${limit} Municípios por Volumetria` : "Volumetria de Tráfego por Município"}
+              </h6>
               <SourceBadge table="TB_AUX_INFO_MUNICIPIOS" />
             </div>
             <small className="text-muted d-block">Último mês disponível, ordenado por volumetria</small>

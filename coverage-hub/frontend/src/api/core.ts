@@ -77,6 +77,8 @@ export interface CoreTabelaItem {
 }
 
 export interface CoreTabelaResponse {
+  /** Quantos municípios no máximo o backend devolve (top N por volumetria). */
+  limit: number;
   items: CoreTabelaItem[];
 }
 
