@@ -53,26 +53,45 @@ WHERE ANO = :ano
 """
 
 
-# ---------- Realizado — por município × operadora, snapshot mensal ----------
-# S_MEGABYTE_TOTAL é o tráfego de dados total; as colunas por tecnologia
-# somam ao total. DT_REFERENCIA é o mês de referência.
-REALIZADO = """
+# ---------- Realizado — AGREGADO no Oracle ----------
+# A tabela crua é grande: município × operadora × mês ≈ 140k linhas no ano
+# cheio. Em vez de puxar tudo e agregar no Python, deixamos o Oracle
+# agregar (GROUP BY) e devolver só o que o dashboard precisa:
+#
+#  - REALIZADO_POR_MUNICIPIO: uma linha por município (soma dos meses do
+#    período e de TODAS as operadoras — OI é da TIM, ver service), com o
+#    total e o split por tecnologia. ~5,5k linhas em vez de 140k. Alimenta
+#    total, mix por tecnologia, ranking de município e quebra por UF.
+#  - REALIZADO_POR_MES: uma linha por mês (12), só o total. Alimenta a
+#    curva de acompanhamento e descobre o mês corrente (YTD).
+#
+# Valores agregados voltam em MB (converter pra PB dividindo por 1e9 no
+# service). O split por tecnologia é aditivo (2G+3G+4G+5G = total).
+REALIZADO_POR_MUNICIPIO = """
 SELECT
     ESTADO,
     MUNICIPIO_NOME,
     MUNICIPIO_ID,
-    OPERADORA,
-    EXTRACT(YEAR FROM DT_REFERENCIA) AS ANO,
-    EXTRACT(MONTH FROM DT_REFERENCIA) AS MES,
-    S_MEGABYTE_TOTAL,
-    S_MEGABYTE_2G,
-    S_MEGABYTE_3G,
-    S_MEGABYTE_4G,
-    S_MEGABYTE_5G_NSA,
-    S_MEGABYTE_5G_SA
+    SUM(S_MEGABYTE_TOTAL) AS MB_TOTAL,
+    SUM(S_MEGABYTE_2G) AS MB_2G,
+    SUM(S_MEGABYTE_3G) AS MB_3G,
+    SUM(S_MEGABYTE_4G) AS MB_4G,
+    SUM(S_MEGABYTE_5G_NSA) + SUM(S_MEGABYTE_5G_SA) AS MB_5G
 FROM REL_DS013_TRAFEGO_REALIZADO
 WHERE 1 = 1
 {periodo_filter}
 {uf_filter}
 {municipio_filter}
+GROUP BY ESTADO, MUNICIPIO_NOME, MUNICIPIO_ID
+"""
+
+REALIZADO_POR_MES = """
+SELECT
+    EXTRACT(MONTH FROM DT_REFERENCIA) AS MES,
+    SUM(S_MEGABYTE_TOTAL) AS MB_TOTAL
+FROM REL_DS013_TRAFEGO_REALIZADO
+WHERE EXTRACT(YEAR FROM DT_REFERENCIA) = :ano
+{uf_filter}
+{municipio_filter}
+GROUP BY EXTRACT(MONTH FROM DT_REFERENCIA)
 """
