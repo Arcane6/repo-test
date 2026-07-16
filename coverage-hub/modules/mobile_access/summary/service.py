@@ -89,14 +89,20 @@ def _build_municipio_end_id_clause(values, prefix, params):
     """Mesma ponte por IBGE acima, mas pra tabelas sem coluna IBGE própria
     (ex.: NTW_MABE.BASE_TB_END_ID_NEW) — resolve via END_ID, identificador
     já usado em outros joins entre BASE_TB_END_ID_NEW e
-    TB_FT_BASE_UNICA_SITES (ex.: SITES_VENDORS)."""
+    TB_FT_BASE_UNICA_SITES (ex.: SITES_VENDORS).
+
+    Usado só na raia Fechamento 25 (get_r1_vendors), então resolve os
+    END_IDs no MESMO recorte de mês da raia — o fechamento de dezembro
+    (`:baseline_date`, já presente em params quando chamado daqui) — e NÃO
+    no MES_REF mais recente. Assim o escopo do filtro de município bate com
+    o resto da raia (o Venn de sites por tecnologia também usa dez/25)."""
     if not values:
         return ""
     ibge_clause = _build_municipio_ibge_clause("s.IBGE", values, prefix, params)
     return f"""AND END_ID IN (
         SELECT s.END_ID
         FROM NTW_OP.TB_FT_BASE_UNICA_SITES s
-        WHERE s.MES_REF = (SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES)
+        WHERE TRUNC(s.MES_REF, 'MM') = TRUNC(:baseline_date, 'MM')
         {ibge_clause}
     )"""
 
