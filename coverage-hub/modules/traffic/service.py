@@ -346,6 +346,7 @@ def get_resumo_executivo(filters):
         "atingimento_plano_pct": _aderencia(projecao_ano, plano_ano),
         "por_tecnologia": tec26,
         "mix_5g_pct": _mix_5g_pct(tec26),
+        "ranking_municipios": _rz_ranking_municipios(rz26_mun),
     }
 
     return {
