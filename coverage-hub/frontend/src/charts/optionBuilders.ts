@@ -757,4 +757,61 @@ export function trafficTrendOption(points: TrendPoint[]): EChartsCoreOption {
   };
 }
 
+/**
+ * Curva mensal Planejado × Realizado (Plano 26). Duas linhas sobre os 12
+ * meses: planejado (tracejado, ano cheio) e realizado (sólido, só até o
+ * mês corrente — os meses futuros vêm `null` e a linha PARA, sem
+ * `connectNulls`, pra ler como acompanhamento e não como previsão). Rótulo
+ * de valor só no último ponto realizado (o YTD), pra não poluir.
+ */
+export function trafficPlanVsRealOption(
+  months: string[],
+  planejado: (number | null)[],
+  realizado: (number | null)[],
+): EChartsCoreOption {
+  if (months.length === 0) return {};
+  const lastRealIdx = realizado.reduce((acc, v, i) => (v !== null && v !== undefined ? i : acc), -1);
+
+  return {
+    grid: { left: 45, right: 24, top: 40, bottom: 40 },
+    tooltip: {
+      trigger: "axis",
+      valueFormatter: (v: unknown) => (v === null || v === undefined ? "—" : `${fmt(v as number)} PB`),
+    },
+    legend: { data: ["Planejado", "Realizado"], bottom: 0, icon: "roundRect", textStyle: { fontWeight: "bold" } },
+    xAxis: { type: "category", data: months, boundaryGap: false },
+    yAxis: { type: "value" },
+    series: [
+      {
+        name: "Planejado",
+        type: "line",
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { width: 2, type: "dashed", color: "#94A3B8" },
+        itemStyle: { color: "#94A3B8" },
+        data: planejado,
+      },
+      {
+        name: "Realizado",
+        type: "line",
+        smooth: true,
+        connectNulls: false,
+        showSymbol: true,
+        symbolSize: 7,
+        lineStyle: { width: 3, color: "#003399" },
+        itemStyle: { color: "#003399" },
+        areaStyle: { color: "#003399", opacity: 0.12 },
+        label: {
+          show: true,
+          position: "top",
+          fontWeight: "bold",
+          formatter: (p: { dataIndex: number; value: number | null }) =>
+            p.dataIndex === lastRealIdx && p.value != null ? `${fmt(p.value)} PB` : "",
+        },
+        data: realizado,
+      },
+    ],
+  };
+}
+
 export type { TechSeries };

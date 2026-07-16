@@ -222,7 +222,7 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     Python. `MUNICIPIO_ID` é o IBGE de 6 dígitos (sem verificador).
   - **`REL_DS013_TRAFEGO_REALIZADO`** (realizado): 1 linha por
     (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz
-    **TIM e OI** → market share. Base de usuários rica (não usada ainda).
+    **TIM e OI**. Base de usuários rica (não usada ainda).
 - **Regras de negócio confirmadas nos dados** (não reintroduzir erro):
   - **`TIPO_TRAF='Consolidado'` é o TOTAL oficial** do planejado — NÃO é
     a soma das outras camadas. A hierarquia é `Consolidado = "2G/3G" +
@@ -233,12 +233,26 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     converter pra PB dividindo por `1e9` (`MB_POR_PB`, decimal: 1 PB =
     1e9 MB). As colunas por tecnologia do realizado **são aditivas**
     (`S_MEGABYTE_2G+3G+4G+5G_NSA+5G_SA = TOTAL`, confirmado).
-  - **Market share TIM = TIM / (TIM + OI)** (a fonte só traz essas duas
-    operadoras — OI tem footprint pequeno, então o share fica perto de
-    100%; é o que o dado suporta, não é bug).
+  - **A OI pertence à TIM — NÃO existe market share.** O usuário foi
+    explícito: OI não é concorrente, é da TIM. Então "tráfego realizado" =
+    **soma de TODAS as operadoras** da fonte (TIM + OI = grupo TIM); todas
+    as funções `_rz_*` agregam sobre as linhas inteiras, sem filtrar
+    operadora. Não reintroduzir cálculo/visual de market share TIM×OI.
   - **YTD = acumulado Jan..mês corrente**, onde o mês corrente é o maior
     `MES` do realizado do ano (`_mes_corrente`). **Aderência = realizado
-    ÷ planejado** no mesmo intervalo.
+    ÷ planejado** no mesmo intervalo. **Crescimento YoY** = realizado YTD
+    deste ano vs mesmo período (Jan..mês corrente) do ano anterior
+    (`_pct_growth`). **Projeção fim de ano** = run-rate linear
+    (`realizado_ytd / mês_corrente × 12`), comparada ao plano cheio
+    (`atingimento_plano_pct`). **Mix 5G** = % do tráfego que já é 5G
+    (`_mix_5g_pct`) — leitura de modernização.
+- **Visual (Resumo Executivo)**: 3 raias com o MESMO destaque de cor do
+  Resumo do Acesso Móvel — **R1 Fechamento 2025 = `#003399` (azul)**,
+  **R2 Plano 26 = `#F5C518` (amarelo)**, **R3 Fechamento 26 = `#7DC242`
+  (verde)** — via as classes `.summary-raia`/`.raia-badge`. A curva mensal
+  do Plano 26 traz **duas linhas** (planejado tracejado + realizado sólido
+  acompanhando **até o mês corrente**, depois `null` pra a linha parar —
+  `trafficPlanVsRealOption`, `connectNulls:false`).
 - **Dois endpoints** (`routes.py`, prefixo `/trafego`):
   `/api/resumo-executivo` (as 3 raias numa chamada) e `/api/ytd`. Todo
   cálculo é feito em Python a partir das linhas (testável com stub sem

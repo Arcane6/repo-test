@@ -20,25 +20,26 @@ export interface LabeledValue {
   value: number;
 }
 
-export interface MarketShare {
-  tim_pb: number;
-  total_mercado_pb: number;
-  share_tim_pct: number | null;
-  por_operadora: Record<string, number>;
-}
-
 export interface RaiaFechamento2025 {
   ano: number;
-  trafego_tim_pb: number;
-  market_share: MarketShare;
+  trafego_pb: number;
   por_tecnologia: LabeledValue[];
+  mix_5g_pct: number | null;
   ranking_municipios: LabeledValue[];
+}
+
+export interface SerieMensalPonto {
+  mes: string;
+  planejado_pb: number;
+  /** Realizado só até o mês corrente; meses futuros vêm null (a linha para). */
+  realizado_pb: number | null;
 }
 
 export interface RaiaPlano26 {
   ano: number;
   trafego_planejado_pb: number;
-  serie_mensal: { mes: string; value: number }[];
+  mes_ate: string | null;
+  serie_mensal: SerieMensalPonto[];
   por_camada: LabeledValue[];
   ranking_municipios: LabeledValue[];
 }
@@ -46,11 +47,14 @@ export interface RaiaPlano26 {
 export interface RaiaFechamento26 {
   ano: number;
   mes_ate: string | null;
-  trafego_tim_ytd_pb: number;
+  trafego_ytd_pb: number;
   planejado_ytd_pb: number;
   aderencia_pct: number | null;
-  market_share: MarketShare;
+  crescimento_yoy_pct: number | null;
+  projecao_ano_pb: number;
+  atingimento_plano_pct: number | null;
   por_tecnologia: LabeledValue[];
+  mix_5g_pct: number | null;
 }
 
 export interface ResumoExecutivoResponse {

@@ -35,7 +35,6 @@ ANO_FECHAMENTO_ATUAL = 2026
 ANO_FECHAMENTO_ANTERIOR = 2025
 
 MB_POR_PB = 1e9  # decimal: 1 PB = 1e6 GB = 1e9 MB
-OPERADORA_TIM = "TIM"
 
 MESES_LABEL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
@@ -209,35 +208,19 @@ def _rz_pb(mb):
     return _num(mb) / MB_POR_PB
 
 
-def _rz_por_operadora(rows):
-    agg = {}
-    for r in rows:
-        op = str(r.get("operadora") or "N/D").strip().upper()
-        agg[op] = agg.get(op, 0.0) + _rz_pb(r.get("s_megabyte_total"))
-    return {k: round(v, 4) for k, v in agg.items()}
+# A OI pertence à TIM — não é concorrente. Então NÃO existe "market share":
+# o tráfego realizado soma TODAS as operadoras da fonte (TIM + OI = grupo
+# TIM). Todas as funções abaixo agregam sobre `rows` inteiro, sem filtrar
+# por operadora.
+
+def _rz_total(rows):
+    return round(sum(_rz_pb(r.get("s_megabyte_total")) for r in rows), 4)
 
 
-def _market_share_tim(rows):
-    por_op = _rz_por_operadora(rows)
-    tim = por_op.get(OPERADORA_TIM, 0.0)
-    total = sum(por_op.values())
-    share = round(tim / total * 100, 1) if total else None
-    return {"tim_pb": round(tim, 4), "total_mercado_pb": round(total, 4), "share_tim_pct": share, "por_operadora": por_op}
-
-
-def _rz_tim_rows(rows):
-    return [r for r in rows if str(r.get("operadora") or "").strip().upper() == OPERADORA_TIM]
-
-
-def _rz_total_tim(rows):
-    return round(sum(_rz_pb(r.get("s_megabyte_total")) for r in _rz_tim_rows(rows)), 4)
-
-
-def _rz_por_tecnologia_tim(rows):
-    """Split aditivo do tráfego TIM por tecnologia (2G/3G/4G/5G) em PB."""
-    tim = _rz_tim_rows(rows)
+def _rz_por_tecnologia(rows):
+    """Split aditivo do tráfego (grupo TIM) por tecnologia (2G/3G/4G/5G) em PB."""
     buckets = {"2G": 0.0, "3G": 0.0, "4G": 0.0, "5G": 0.0}
-    for r in tim:
+    for r in rows:
         buckets["2G"] += _rz_pb(r.get("s_megabyte_2g"))
         buckets["3G"] += _rz_pb(r.get("s_megabyte_3g"))
         buckets["4G"] += _rz_pb(r.get("s_megabyte_4g"))
@@ -245,22 +228,29 @@ def _rz_por_tecnologia_tim(rows):
     return [{"label": k, "value": round(v, 4)} for k, v in buckets.items()]
 
 
-def _rz_por_mes_tim(rows):
-    """Série mensal do realizado TIM (PB), indexada por número do mês."""
+def _rz_por_mes(rows):
+    """Série mensal do realizado (PB), indexada por número do mês."""
     agg = {}
-    for r in _rz_tim_rows(rows):
+    for r in rows:
         mes = int(_num(r.get("mes")))
         agg[mes] = agg.get(mes, 0.0) + _rz_pb(r.get("s_megabyte_total"))
     return {m: round(v, 4) for m, v in agg.items()}
 
 
-def _rz_ranking_municipios_tim(rows, limit=15):
+def _rz_ranking_municipios(rows, limit=15):
     agg = {}
-    for r in _rz_tim_rows(rows):
+    for r in rows:
         nome = r.get("municipio_nome") or "N/D"
         agg[nome] = agg.get(nome, 0.0) + _rz_pb(r.get("s_megabyte_total"))
     ranked = sorted(agg.items(), key=lambda kv: kv[1], reverse=True)[:limit]
     return [{"label": k, "value": round(v, 4)} for k, v in ranked]
+
+
+def _mix_5g_pct(por_tecnologia):
+    """% do tráfego que já é 5G — leitura executiva de modernização da rede."""
+    total = sum(t["value"] for t in por_tecnologia)
+    g5 = next((t["value"] for t in por_tecnologia if t["label"] == "5G"), 0.0)
+    return round(g5 / total * 100, 1) if total else None
 
 
 def _mes_corrente(realizado_rows):
@@ -275,50 +265,78 @@ def _aderencia(realizado_pb, planejado_pb):
     return round(realizado_pb / planejado_pb * 100, 1)
 
 
+def _pct_growth(atual, anterior):
+    """Crescimento % de `atual` sobre `anterior` (YoY)."""
+    if not anterior:
+        return None
+    return round((atual - anterior) / anterior * 100, 1)
+
+
 # ---------------------------------------------------------------------------
 # Endpoints de alto nível
 # ---------------------------------------------------------------------------
 
 def get_resumo_executivo(filters):
     """3 raias: Fechamento 2025 · Plano 26 · Fechamento 26."""
+    pl26 = _planejado_rows(filters, ano=ANO_PLANO)
+    rz26_full = _realizado_rows(filters, ano=ANO_FECHAMENTO_ATUAL)
+    mes_max = _mes_corrente(rz26_full)
+
     # --- Raia 1: Fechamento 2025 (realizado ano cheio) ---
     rz25 = _realizado_rows(filters, ano=ANO_FECHAMENTO_ANTERIOR)
-    ms25 = _market_share_tim(rz25)
+    tec25 = _rz_por_tecnologia(rz25)
     fechamento_2025 = {
         "ano": ANO_FECHAMENTO_ANTERIOR,
-        "trafego_tim_pb": _rz_total_tim(rz25),
-        "market_share": ms25,
-        "por_tecnologia": _rz_por_tecnologia_tim(rz25),
-        "ranking_municipios": _rz_ranking_municipios_tim(rz25),
+        "trafego_pb": _rz_total(rz25),
+        "por_tecnologia": tec25,
+        "mix_5g_pct": _mix_5g_pct(tec25),
+        "ranking_municipios": _rz_ranking_municipios(rz25),
     }
 
-    # --- Raia 2: Plano 26 (planejado ano cheio) ---
-    pl26 = _planejado_rows(filters, ano=ANO_PLANO)
+    # --- Raia 2: Plano 26 — curva mensal planejada + REALIZADO até o YTD ---
+    plan_mensal = _plan_por_mes(pl26)          # 12 valores
+    rz_mensal = _rz_por_mes(rz26_full)         # {mes: pb}, só até o mês corrente
+    serie_mensal = [
+        {
+            "mes": MESES_LABEL[i],
+            "planejado_pb": plan_mensal[i],
+            # realizado só existe até o mês corrente; depois fica None pra a
+            # linha "parar" no acompanhamento (não desenha futuro).
+            "realizado_pb": round(rz_mensal.get(i + 1, 0.0), 4) if (mes_max and i + 1 <= mes_max) else None,
+        }
+        for i in range(12)
+    ]
     plano_26 = {
         "ano": ANO_PLANO,
         "trafego_planejado_pb": _plan_total_ano(pl26),
-        "serie_mensal": [
-            {"mes": MESES_LABEL[i], "value": v} for i, v in enumerate(_plan_por_mes(pl26))
-        ],
+        "mes_ate": MESES_LABEL[mes_max - 1] if mes_max else None,
+        "serie_mensal": serie_mensal,
         "por_camada": _plan_por_camada(pl26),
         "ranking_municipios": _plan_ranking_municipios(pl26),
     }
 
-    # --- Raia 3: Fechamento 26 (realizado YTD) + aderência ao plano ---
-    rz26_full = _realizado_rows(filters, ano=ANO_FECHAMENTO_ATUAL)
-    mes_max = _mes_corrente(rz26_full)
+    # --- Raia 3: Fechamento 26 (realizado YTD) + aderência, YoY e projeção ---
     rz26 = _realizado_rows(filters, ano=ANO_FECHAMENTO_ATUAL, mes_max=mes_max) if mes_max else rz26_full
-    ms26 = _market_share_tim(rz26)
-    realizado_ytd = _rz_total_tim(rz26)
+    realizado_ytd = _rz_total(rz26)
     planejado_ytd = _plan_ytd(pl26, mes_max) if mes_max else 0.0
+    # YoY: mesmo período (Jan..mes_max) do ano anterior.
+    rz25_ytd = _realizado_rows(filters, ano=ANO_FECHAMENTO_ANTERIOR, mes_max=mes_max) if mes_max else []
+    realizado_ytd_ano_ant = _rz_total(rz25_ytd)
+    # Projeção linear de fechamento do ano (run-rate) vs plano cheio.
+    plano_ano = _plan_total_ano(pl26)
+    projecao_ano = round(realizado_ytd / mes_max * 12, 4) if mes_max else 0.0
+    tec26 = _rz_por_tecnologia(rz26)
     fechamento_26 = {
         "ano": ANO_FECHAMENTO_ATUAL,
         "mes_ate": MESES_LABEL[mes_max - 1] if mes_max else None,
-        "trafego_tim_ytd_pb": realizado_ytd,
+        "trafego_ytd_pb": realizado_ytd,
         "planejado_ytd_pb": planejado_ytd,
         "aderencia_pct": _aderencia(realizado_ytd, planejado_ytd),
-        "market_share": ms26,
-        "por_tecnologia": _rz_por_tecnologia_tim(rz26),
+        "crescimento_yoy_pct": _pct_growth(realizado_ytd, realizado_ytd_ano_ant),
+        "projecao_ano_pb": projecao_ano,
+        "atingimento_plano_pct": _aderencia(projecao_ano, plano_ano),
+        "por_tecnologia": tec26,
+        "mix_5g_pct": _mix_5g_pct(tec26),
     }
 
     return {
@@ -336,7 +354,7 @@ def get_ytd(filters):
     mes_max = _mes_corrente(rz)
 
     plan_mensal = _plan_por_mes(pl)          # 12 valores
-    rz_mensal = _rz_por_mes_tim(rz)          # {mes: pb}
+    rz_mensal = _rz_por_mes(rz)              # {mes: pb} (grupo TIM = todas operadoras)
 
     # Série acumulada mês a mês até o mês corrente.
     serie = []
@@ -361,7 +379,7 @@ def get_ytd(filters):
         uf = str(r.get("estado") or "N/D").strip().upper()
         plan_uf[uf] = plan_uf.get(uf, 0.0) + sum(_num(r.get(MESES_WIDE[i].lower())) for i in range(mes_max or 12))
     real_uf = {}
-    for r in _rz_tim_rows(rz):
+    for r in rz:
         if mes_max and int(_num(r.get("mes"))) > mes_max:
             continue
         uf = str(r.get("estado") or "N/D").strip().upper()
