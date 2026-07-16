@@ -22,14 +22,12 @@ export interface CoreEntityKpi {
   label: string;
   volumetria_pb: number;
   mom_pct: number | null;
-  yoy_pct: number | null;
 }
 
 export interface CoreKpisResponse {
   total: {
     volumetria_pb: number;
     mom_pct: number | null;
-    yoy_pct: number | null;
   };
   top_municipio: CoreEntityKpi | null;
   top_uf: CoreEntityKpi | null;

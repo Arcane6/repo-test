@@ -206,12 +206,16 @@ de dado bem diferente do resto do portal:
   Regional não tem dropdown próprio (mesmo padrão do resto do portal:
   filtra via clique no gráfico "Volumetria por Regional").
 - **Duas queries-base** (`queries.py`): `VOLUMETRIA_SNAPSHOT` (só o
-  último mês, alimenta ranking/mapa) e `VOLUMETRIA_HISTORICO_13M`
-  (últimos 13 meses — 13 e não 12 de propósito: o 13º mês só serve de
-  base pro cálculo de variação MoM do primeiro ponto exibido). As duas
-  fazem full-scan de `ALTAIA_PM_MES_4G/5G` com parsing de string linha a
-  linha (`TRANSLATE`/`REPLACE`/`TO_NUMBER`) — são **caras**, e o
-  histórico especialmente.
+  último mês, alimenta ranking/mapa) e `VOLUMETRIA_HISTORICO_12M`
+  (últimos 12 meses — janela enxuta a pedido do usuário, pra reduzir o
+  full-scan da série e o peso do payload; era 13 antes, mas o usuário
+  optou por 12 mesmo abrindo mão do YoY). As duas fazem full-scan de
+  `ALTAIA_PM_MES_4G/5G` com parsing de string linha a linha
+  (`TRANSLATE`/`REPLACE`/`TO_NUMBER`) — são **caras**, e o histórico
+  especialmente. Como a janela agora é de 12 meses exatos (sem 13º de
+  base), o **primeiro ponto da série sai sem variação MoM** e os **KPIs
+  não têm mais comparação YoY** (precisaria do mês de 1 ano atrás) —
+  só "vs Mês Ant." (MoM).
 - **UM endpoint só pro dashboard: `/core/api/overview`** (`get_overview`).
   Motivo: o dashboard tem 7 visões; se cada uma chamasse seu próprio
   endpoint, seriam 8 execuções das queries pesadas em paralelo (histórico
@@ -225,9 +229,9 @@ de dado bem diferente do resto do portal:
   (por isso `CoreMap` recebe `points` por prop, não busca sozinho).
 - **`MES` pode vir como NUMBER do Oracle** (o "YYYYMM" é só a
   representação visual) — `_historico_rows` normaliza pra string assim
-  que os dados chegam, senão `_mes_label`/`_mes_minus_years` quebram com
-  `TypeError` ao fatiar um int.
-- **KPIs com MoM/YoY** e **Destaques de Variação** (maior
+  que os dados chegam, senão `_mes_label` quebra com `TypeError` ao
+  fatiar um int.
+- **KPIs com MoM** e **Destaques de Variação** (maior
   crescimento/queda por município e por UF) são calculados em Python a
   partir do histórico, não em SQL — mais simples de auditar/testar com
   stub sem Oracle real. Cada painel de destaque só lista o lado que

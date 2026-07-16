@@ -90,14 +90,15 @@ ORDER BY VOLUMETRIA_PB DESC
 """
 
 
-# ---------- Volumetria por município — últimos 13 meses ----------
-# 13 (não 12) de propósito: precisamos do mês anterior ao primeiro mês
-# exibido só pra calcular a variação MoM dele também (mesmo raciocínio
-# do "Histórico de Tráfego" de referência, que mostra variação em todo
-# ponto da série, inclusive o primeiro). Cada branch (4G/5G) usa seu
-# próprio MAX(MES) como referência — evita cortar dado se um dos dois
-# atrasar a carga do mês corrente.
-VOLUMETRIA_HISTORICO_13M = f"""
+# ---------- Volumetria por município — últimos 12 meses ----------
+# Janela enxuta de 12 meses (a pedido: reduz o full-scan da série e o peso
+# do payload). ADD_MONTHS(..., -11) sobre o MAX(MES) dá 12 pontos
+# inclusive o mês corrente. Cada branch (4G/5G) usa seu próprio MAX(MES)
+# como referência — evita cortar dado se um dos dois atrasar a carga do
+# mês corrente. Sem 13º mês de base: o primeiro ponto da série simplesmente
+# não exibe variação MoM (não há mês anterior a ele na janela), e os KPIs
+# não têm mais comparação YoY (precisaria do mês de 1 ano atrás).
+VOLUMETRIA_HISTORICO_12M = f"""
 WITH VOLUMETRIA_RAN AS (
     SELECT
         MES,
@@ -105,7 +106,7 @@ WITH VOLUMETRIA_RAN AS (
         SUM({_volume_parse_case('VOLUME_DADOS_DLUL_ALLOP_4G')}) AS VOLUMETRIA_KB
     FROM NTW_MABE.ALTAIA_PM_MES_4G
     WHERE MES >= TO_CHAR(
-        ADD_MONTHS(TO_DATE((SELECT MAX(MES) FROM NTW_MABE.ALTAIA_PM_MES_4G), 'YYYYMM'), -12),
+        ADD_MONTHS(TO_DATE((SELECT MAX(MES) FROM NTW_MABE.ALTAIA_PM_MES_4G), 'YYYYMM'), -11),
         'YYYYMM'
     )
     GROUP BY MES, RAN_NODE
@@ -118,7 +119,7 @@ WITH VOLUMETRIA_RAN AS (
         SUM({_volume_parse_case('VOLUME_TOTAL_DL_TIM_5G')}) AS VOLUMETRIA_KB
     FROM NTW_MABE.ALTAIA_PM_MES_5G
     WHERE MES >= TO_CHAR(
-        ADD_MONTHS(TO_DATE((SELECT MAX(MES) FROM NTW_MABE.ALTAIA_PM_MES_5G), 'YYYYMM'), -12),
+        ADD_MONTHS(TO_DATE((SELECT MAX(MES) FROM NTW_MABE.ALTAIA_PM_MES_5G), 'YYYYMM'), -11),
         'YYYYMM'
     )
     GROUP BY MES, RAN_NODE

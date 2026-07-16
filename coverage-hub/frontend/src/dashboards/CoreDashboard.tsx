@@ -105,7 +105,6 @@ export function CoreDashboard() {
             unit="PB"
             deltas={[
               { label: "vs Mês Ant.", pct: kpis?.total.mom_pct ?? null },
-              { label: "vs Ano Ant.", pct: kpis?.total.yoy_pct ?? null },
             ]}
           />
         </div>
@@ -118,7 +117,6 @@ export function CoreDashboard() {
             secondaryValue={kpis?.top_municipio ? `${fmtPb(kpis.top_municipio.volumetria_pb)} PB` : undefined}
             deltas={[
               { label: "vs Mês Ant.", pct: kpis?.top_municipio?.mom_pct ?? null },
-              { label: "vs Ano Ant.", pct: kpis?.top_municipio?.yoy_pct ?? null },
             ]}
           />
         </div>
@@ -131,7 +129,6 @@ export function CoreDashboard() {
             secondaryValue={kpis?.top_uf ? `${fmtPb(kpis.top_uf.volumetria_pb)} PB` : undefined}
             deltas={[
               { label: "vs Mês Ant.", pct: kpis?.top_uf?.mom_pct ?? null },
-              { label: "vs Ano Ant.", pct: kpis?.top_uf?.yoy_pct ?? null },
             ]}
           />
         </div>

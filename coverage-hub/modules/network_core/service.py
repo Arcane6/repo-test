@@ -4,7 +4,8 @@ Service layer do módulo Core (volumetria de tráfego da RAN).
 Sem conceito de "ano"/"tecnologia" (não existe no dado) — só geografia
 (UF/Município/Regional) e tempo (MES, formato YYYYMM). Todo endpoint
 deriva de uma das duas queries de queries.py: snapshot (último mês) ou
-histórico (últimos 13 meses).
+histórico (últimos 12 meses). A janela de 12 meses (sem 13º de base)
+significa que não há comparação YoY — só MoM (mês a mês).
 """
 
 import string as _string
@@ -13,7 +14,7 @@ from database.oracle import execute_query
 
 from modules.network_core.queries import (
     VOLUMETRIA_SNAPSHOT,
-    VOLUMETRIA_HISTORICO_13M,
+    VOLUMETRIA_HISTORICO_12M,
 )
 
 
@@ -109,14 +110,6 @@ def _pct_change(current, previous):
     return round((current - previous) / previous * 100, 1)
 
 
-def _mes_minus_years(mes, years):
-    """'202206' menos N anos -> '202006' (mesmo mês, ano anterior)."""
-    if not mes or len(mes) != 6:
-        return None
-    ano, mm = int(mes[:4]), mes[4:]
-    return f"{ano - years}{mm}"
-
-
 # ---------------------------------------------------------------------------
 # Snapshot (último mês) — ranking por município/UF/Regional, mapa
 # ---------------------------------------------------------------------------
@@ -174,17 +167,17 @@ def get_ranking_regionais(filters):
 
 
 # ---------------------------------------------------------------------------
-# Histórico (13 meses) — KPIs com MoM/YoY, tendência nacional, destaques
+# Histórico (12 meses) — KPIs com MoM, tendência nacional, destaques
 # ---------------------------------------------------------------------------
 
 def _historico_rows(filters):
     params = {}
-    sql = _apply_geo(VOLUMETRIA_HISTORICO_13M, filters, params)
+    sql = _apply_geo(VOLUMETRIA_HISTORICO_12M, filters, params)
     rows = execute_query(sql, params) or []
     # MES pode voltar do Oracle como NUMBER/Decimal em vez de string (o
     # formato "YYYYMM" descrito pelo usuário é só a representação visual,
     # não garante o tipo da coluna) — normaliza aqui, uma vez só, pra todo
-    # o resto do módulo (_mes_label, _mes_minus_years, chaves de dict em
+    # o resto do módulo (_mes_label, chaves de dict em
     # _monthly_totals/_top_variacao) poder tratar MES como string sem
     # quebrar com TypeError se vier número.
     for r in rows:
@@ -203,9 +196,10 @@ def _monthly_totals(rows):
 
 
 def _historico_points_from_rows(historico_rows):
-    """Série nacional dos últimos 12 meses, com variação MoM em cada ponto
-    (o 13º mês buscado só serve de base pro delta do primeiro ponto
-    exibido, mesmo princípio do gráfico de referência)."""
+    """Série nacional dos 12 meses da janela, com variação MoM em cada
+    ponto. O primeiro ponto não tem mês anterior dentro da janela, então
+    sai sem variação MoM (variacao_pct = None) — consequência de puxar
+    exatamente 12 meses, sem o 13º de base."""
     totals = _monthly_totals(historico_rows)
     meses_ordenados = sorted(totals.keys())
     if not meses_ordenados:
@@ -235,10 +229,11 @@ def get_historico_mensal(filters):
 
 
 def _kpis_from_rows(snapshot_rows, historico_rows):
-    """Volume total + top município + top UF, cada um com MoM/YoY. Recebe
-    as linhas já buscadas (snapshot + histórico) em vez de consultar o
-    banco — assim get_overview roda cada query pesada uma vez só e
-    reaproveita aqui, sem refazer o full-scan."""
+    """Volume total + top município + top UF, cada um com variação MoM.
+    Recebe as linhas já buscadas (snapshot + histórico) em vez de consultar
+    o banco — assim get_overview roda cada query pesada uma vez só e
+    reaproveita aqui, sem refazer o full-scan. Sem YoY: a janela é de 12
+    meses, não alcança o mesmo mês de 1 ano atrás."""
     # snapshot_rows é aceito por simetria/futuro; hoje os KPIs (inclusive o
     # top do mês corrente) saem todos do histórico, que já tem o último mês.
     _ = snapshot_rows
@@ -247,21 +242,18 @@ def _kpis_from_rows(snapshot_rows, historico_rows):
 
     if not meses_ordenados:
         return {
-            "total": {"volumetria_pb": 0, "mom_pct": None, "yoy_pct": None},
+            "total": {"volumetria_pb": 0, "mom_pct": None},
             "top_municipio": None,
             "top_uf": None,
         }
 
     mes_atual = meses_ordenados[-1]
     mes_mom = meses_ordenados[-2] if len(meses_ordenados) >= 2 else None
-    mes_yoy_alvo = _mes_minus_years(mes_atual, 1)
-    mes_yoy = mes_yoy_alvo if mes_yoy_alvo in totals else None
 
     total_atual = totals[mes_atual]
     total_row = {
         "volumetria_pb": round(total_atual, 2),
         "mom_pct": _pct_change(total_atual, totals.get(mes_mom)) if mes_mom else None,
-        "yoy_pct": _pct_change(total_atual, totals.get(mes_yoy)) if mes_yoy else None,
     }
 
     def _top_entity(field):
@@ -287,12 +279,10 @@ def _kpis_from_rows(snapshot_rows, historico_rows):
 
         atual = latest_by_entity[top_key]
         mom_val = _total_for(mes_mom)
-        yoy_val = _total_for(mes_yoy)
         return {
             "label": top_key,
             "volumetria_pb": round(atual, 2),
             "mom_pct": _pct_change(atual, mom_val) if mom_val else None,
-            "yoy_pct": _pct_change(atual, yoy_val) if yoy_val else None,
         }
 
     return {
