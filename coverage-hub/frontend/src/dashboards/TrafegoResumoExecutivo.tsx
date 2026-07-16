@@ -197,6 +197,12 @@ export function TrafegoResumoExecutivo() {
               height={300} option={donutOption(toDonut(f26?.por_tecnologia ?? []))} loading={loading}
               imageFilename="trafego-fech26-por-tecnologia.png" />
           </div>
+          <div className="col-lg-7">
+            <ChartPanel title="Top 15 Municípios — Realizado YTD" subtitle={f26?.mes_ate ? `Jan–${f26.mes_ate}/${f26.ano} (PB)` : "Realizado YTD (PB)"}
+              sourceTable="REL_DS013_TRAFEGO_REALIZADO" height={300}
+              option={horizontalBarsOption((f26?.ranking_municipios ?? []).map((i) => ({ name: i.label, value: i.value, color: RAIA.r3 })), 15)}
+              loading={loading} imageFilename="trafego-fech26-top-municipios.png" />
+          </div>
         </div>
       </Raia>
     </div>

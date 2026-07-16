@@ -55,6 +55,7 @@ export interface RaiaFechamento26 {
   atingimento_plano_pct: number | null;
   por_tecnologia: LabeledValue[];
   mix_5g_pct: number | null;
+  ranking_municipios: LabeledValue[];
 }
 
 export interface ResumoExecutivoResponse {
