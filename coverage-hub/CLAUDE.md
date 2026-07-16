@@ -84,10 +84,10 @@ modules/
   core/            — endpoint /api/modules (lista de módulos p/ Home) —
                      NOME CONFUSO DE PROPÓSITO: é infra do portal (nada
                      a ver com o módulo de negócio "Core" da Home/RAN).
-  network_core/    — módulo de negócio "Core" (RAN, ver seção própria
-                     abaixo) — nome diferente de `modules/core/` só pra
-                     não colidir (Flask não registra dois blueprints
-                     com o mesmo nome).
+  traffic/         — módulo de negócio "Tráfego" (planejado × realizado,
+                     ver seção própria abaixo) — substituiu o antigo
+                     `network_core` (volumetria ALTAIA), descontinuado
+                     quando a fonte de tráfego mudou. Prefixo /trafego.
   mobile_access/   — módulo "Acesso Móvel"
     actual/        — aba "Cidades" (rede hoje, MUNICIPIOS_FECHAMENTO)
     summary/       — aba "Resumo" (raias R1/R2/R3)
@@ -101,7 +101,7 @@ modules/
 
 Frontend espelha isso em `frontend/src/dashboards/` (`CidadesDashboard`,
 `ResumoDashboard` com `resumo/Raia1.tsx`, `Raia2.tsx`, `Raia3.tsx`,
-`SitesDashboard`, `CoreDashboard`).
+`SitesDashboard`, `TrafegoResumoExecutivo`, `TrafegoYtd`).
 
 ## Aba Sites (`modules/mobile_access/sites/`)
 
@@ -205,82 +205,62 @@ produção do usuário, que não tem essa mesma restrição de rede.
 fornecedor dominante, tipo de site, mapa (Brasil/Múndi, tiles Leaflet) e
 pivot.
 
-## Módulo Core (`modules/network_core/`) — volumetria de tráfego da RAN
+## Módulo Tráfego (`modules/traffic/`) — planejado × realizado + market share
 
-Primeiro módulo além de Acesso Móvel, habilitado a partir das duas
-queries de volumetria que o usuário validou com o time de Core. Domínio
-de dado bem diferente do resto do portal:
+Substituiu o antigo módulo Core (volumetria ALTAIA, `network_core`,
+**removido**) — a fonte de tráfego mudou. Prefixo `/trafego`, duas abas:
+**Resumo Executivo** (3 raias: Fechamento 2025 · Plano 26 · Fechamento 26)
+e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
 
-- **Fonte**: `NTW_MABE.ALTAIA_PM_MES_4G`/`ALTAIA_PM_MES_5G` (contador
-  mensal por `RAN_NODE`, sem segmentação por app — é medição de rede,
-  não DPI). `RAN_NODE` → município via `NTW_MABE.MOBILESITE` (nome) →
-  UF/Regional via `NTW_OP.TB_AUX_INFO_MUNICIPIOS` (join por **IBGE**,
-  numérico — por isso filtrar UF/Regional direto em `MUN.UF`/`MUN.REGIONAL`
-  não tem o mesmo risco de descasamento de string que já corrigimos em
-  outras abas; só o filtro de **nome** de município precisa da mesma
-  ponte via `MUNICIPIOS_FECHAMENTO` → IBGE usada em `sites/`/`summary/`,
-  porque o autocomplete do filtro busca lá, não em
-  `TB_AUX_INFO_MUNICIPIOS`).
-- **Sem "ano"/"tecnologia"** como filtro — não existem nesse dado. Só
-  geografia (UF/Município/Regional) e tempo (`MES`, formato `YYYYMM`).
-  Regional não tem dropdown próprio (mesmo padrão do resto do portal:
-  filtra via clique no gráfico "Volumetria por Regional").
-- **Duas queries-base** (`queries.py`): `VOLUMETRIA_SNAPSHOT` (só o
-  último mês, alimenta ranking/mapa) e `VOLUMETRIA_HISTORICO_12M`
-  (últimos 12 meses — janela enxuta a pedido do usuário, pra reduzir o
-  full-scan da série e o peso do payload; era 13 antes, mas o usuário
-  optou por 12 mesmo abrindo mão do YoY). As duas fazem full-scan de
-  `ALTAIA_PM_MES_4G/5G` com parsing de string linha a linha
-  (`TRANSLATE`/`REPLACE`/`TO_NUMBER`) — são **caras**, e o histórico
-  especialmente. Como a janela agora é de 12 meses exatos (sem 13º de
-  base), o **primeiro ponto da série sai sem variação MoM** e os **KPIs
-  não têm mais comparação YoY** (precisaria do mês de 1 ano atrás) —
-  só "vs Mês Ant." (MoM).
-- **UM endpoint só pro dashboard: `/core/api/overview`** (`get_overview`).
-  Motivo: o dashboard tem 7 visões; se cada uma chamasse seu próprio
-  endpoint, seriam 8 execuções das queries pesadas em paralelo (histórico
-  3x, snapshot 5x) contra um pool de só 5 conexões (`POOL_MAX`) — a
-  página "nunca" carregava (sintoma real reportado: request ficava
-  eternamente pendente, mas hitar a URL sozinho no navegador retornava
-  depois de muito tempo). `get_overview` roda snapshot + histórico UMA
-  vez cada e deriva tudo. Os endpoints granulares (`/kpis`,
-  `/historico-mensal`, `/ranking/*`, `/tabela-municipios`) continuam no
-  backend **só pra debug/REST direto** — o front usa exclusivamente
-  `/overview` (por isso `CoreVolumetriaTable` recebe as linhas por prop,
-  não busca sozinho).
-- **`MES` pode vir como NUMBER do Oracle** (o "YYYYMM" é só a
-  representação visual) — `_historico_rows` normaliza pra string assim
-  que os dados chegam, senão `_mes_label` quebra com `TypeError` ao
-  fatiar um int.
-- **KPIs com MoM** e **Destaques de Variação** (maior
-  crescimento/queda por município e por UF) são calculados em Python a
-  partir do histórico, não em SQL — mais simples de auditar/testar com
-  stub sem Oracle real. Cada painel de destaque só lista o lado que
-  promete (crescimento não lista quem caiu, mesmo que sobre vaga no
-  top N por falta de mais entidades no recorte filtrado).
-- **Tabela de volumetria por município** (`components/CoreVolumetriaTable.tsx`):
-  substituiu o mapa de bolhas Leaflet (`CoreMap.tsx`, removido). O mapa
-  carregava ~5500 marcadores + payload pesado com lat/lon por município e
-  travava a página; a tabela dá a mesma leitura de "onde está o tráfego"
-  com busca + paginação e uma fração do peso. Por isso a `VOLUMETRIA_SNAPSHOT`
-  **não seleciona mais `LATITUDE`/`LONGITUDE`** (ninguém consome), e o
-  `/overview` devolve `tabela` (município/UF/regional/volumetria) no lugar
-  de `geo`. A tabela é **capada no top `TABELA_MUNICIPIOS_LIMIT` (=100)**
-  municípios por volumetria (`_tabela_municipios_from_rows`) — mandar os
-  ~5570 no JSON era o que deixava o `/overview` "puxando uma infinidade de
-  coisas" (payload gigante); a cauda longa carrega pouquíssimo tráfego.
-  Componente é presentational (recebe as linhas por prop do `/overview`,
-  não busca sozinho). Se um dia quiser o mapa de volta, reabrir lat/lon na
-  snapshot + um `CoreMap` que receba só os top N municípios (não os 5500)
-  pra não repetir o problema de peso.
-- **Estado próprio** (`store/coreFilters.ts`, `components/CoreFilterBar.tsx`):
-  não reaproveita o `useFilterStore` do Acesso Móvel — são domínios de
-  dado diferentes, um filtro escolhido aqui não deve vazar pro outro
-  módulo ao trocar de aba.
-- Reaproveita os endpoints de UF/busca de município do Acesso Móvel
-  (`/mobile-access/api/actual/ufs`, `/municipios/search`) em vez de
-  duplicar — é lookup geográfico genérico, não algo específico daquele
-  módulo.
+- **Fontes** (Oracle; os `TRAFEGO_PLANEJADO.csv`/`TRAFEGO_REALIZADO.csv`
+  na raiz do projeto são **amostra de schema** pra dev/teste sem Oracle,
+  não a fonte de produção):
+  - **`REL_TRAFEGO_CIDADES_WIDE`** (planejado): 1 linha por
+    (município, `TIPO_TRAF`), com os 12 meses em **colunas**
+    (`JANEIRO`..`DEZEMBRO`), `ANO`. Existe a `REL_TRAFEGO_CIDADES_LONG`
+    (mesmo dado com mês em linha) — usamos a WIDE e desempilhamos no
+    Python. `MUNICIPIO_ID` é o IBGE de 6 dígitos (sem verificador).
+  - **`REL_DS013_TRAFEGO_REALIZADO`** (realizado): 1 linha por
+    (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz
+    **TIM e OI** → market share. Base de usuários rica (não usada ainda).
+- **Regras de negócio confirmadas nos dados** (não reintroduzir erro):
+  - **`TIPO_TRAF='Consolidado'` é o TOTAL oficial** do planejado — NÃO é
+    a soma das outras camadas. A hierarquia é `Consolidado = "2G/3G" +
+    "4G/5G"` e `"4G/5G" = "4G" + "5G"`. O split **aditivo** que fecha
+    100% é `{2G/3G, 4G, 5G}` (`CAMADAS_ADITIVAS`); "4G/5G" e "Consolidado"
+    ficam de fora de qualquer pizza pra não dobrar.
+  - **Planejado já vem em PB.** **Realizado vem em MB** →
+    converter pra PB dividindo por `1e9` (`MB_POR_PB`, decimal: 1 PB =
+    1e9 MB). As colunas por tecnologia do realizado **são aditivas**
+    (`S_MEGABYTE_2G+3G+4G+5G_NSA+5G_SA = TOTAL`, confirmado).
+  - **Market share TIM = TIM / (TIM + OI)** (a fonte só traz essas duas
+    operadoras — OI tem footprint pequeno, então o share fica perto de
+    100%; é o que o dado suporta, não é bug).
+  - **YTD = acumulado Jan..mês corrente**, onde o mês corrente é o maior
+    `MES` do realizado do ano (`_mes_corrente`). **Aderência = realizado
+    ÷ planejado** no mesmo intervalo.
+- **Dois endpoints** (`routes.py`, prefixo `/trafego`):
+  `/api/resumo-executivo` (as 3 raias numa chamada) e `/api/ytd`. Todo
+  cálculo é feito em Python a partir das linhas (testável com stub sem
+  Oracle — ver os testes que rodam contra os CSVs de amostra).
+- **Filtro só geográfico** (UF via `ESTADO`, Município via
+  `MUNICIPIO_NOME`). O tempo é fixo por raia, não é filtro de usuário.
+  Store **próprio** (`store/trafficFilters.ts`,
+  `components/TrafficFilterBar.tsx`) — não vaza pro Acesso Móvel.
+  Reaproveita os endpoints de UF/busca de município do Acesso Móvel
+  (lookup geográfico genérico).
+- **Pendências conhecidas** (primeiro corte, iterar depois):
+  - **Regional**: as tabelas de tráfego têm `ESTADO`/`ANF`, mas não
+    `REGIONAL`. Pra abrir por regional falta confirmar a chave de join
+    (`MUNICIPIO_ID` de 6 dígitos ↔ `TB_AUX_INFO_MUNICIPIOS.IBGE` de 7 —
+    provável `/10`). Por ora só UF/Município.
+  - **Filtro de município por nome** direto em `MUNICIPIO_NOME`
+    (UPPER/TRIM). Se aparecer descasamento de acentuação vs o
+    autocomplete (que busca em `MUNICIPIOS_FECHAMENTO`), migrar pra ponte
+    via IBGE, como já feito em sites/summary.
+  - Nos CSVs de amostra o realizado só traz **2026-03** (então YTD/
+    aderência ficam distorcidos localmente — Jan/Fev realizados vazios) e
+    não há **2025**; em produção o Oracle tem o histórico completo.
 
 ## Convenções de backend
 
@@ -362,12 +342,15 @@ de dado bem diferente do resto do portal:
 | Tabela/View | Uso | Observações |
 |---|---|---|
 | `NTW_OP.MUNICIPIOS_FECHAMENTO` | Presença 2G/3G/4G/5G por município (aba Cidades), Cidades por Regional | Sempre filtrar `TRUNC(DT_CARGA) = MAX(DT_CARGA)` — carga histórica, não só o último dia |
-| `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | Filtrar `MES_REF = MAX(MES_REF)`. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado), `LATITUDE`/`LONGITUDE` (coordenada do site, confirmadas — usadas em `SITES_GEO_POINTS`) e, segundo o usuário, coluna(s) de fornecedor por tecnologia (nome exato ainda não confirmado) |
+| `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | **Recorte de `MES_REF` depende da tela**: a **aba Sites** usa `MES_REF = MAX(MES_REF)` (inventário atual, sempre o mais recente); a **raia Fechamento 25 do Resumo** usa o **fechamento de dezembro do ano anterior ao plano** (`TRUNC(MES_REF,'MM') = TRUNC(:baseline_date,'MM')`, com `baseline_date = 31/dez/ano-1`) — é um fechamento histórico, não o load mais novo. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado), `LATITUDE`/`LONGITUDE` (coordenada do site, confirmadas — usadas em `SITES_GEO_POINTS`) e, segundo o usuário, coluna(s) de fornecedor por tecnologia (nome exato ainda não confirmado) |
 | `NTW_MABE.BASE_TB_END_ID_NEW` | Fornecedor (vendor) dominante por site | Cascata de colunas `VENDOR_NR_*`/`VENDOR_LTE_*`/`VENDOR_UMTS_*`/`VENDOR_GSM_*` via `COALESCE`, maior banda primeiro dentro de cada tec |
 | `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente |
 | `TB_NEXUS_FINANCEIRO` | CAPEX/OPEX/LEASE por tipo | Usada só no rateio "Orçamento por Tecnologia" — sem schema/join direto, rateada por nº de OCs |
 | `TB_NEXUS_CN_CE` | CAC (custo de aquisição) por tech/tipo de casa | Rateio "Endereço por Tecnologia" (CN x CE) |
 | `VW_CAPEX_MASTER_FULL@NEXUS_LINK` | **Mapeada, ainda não integrada** — ver abaixo | Acesso via DB link `NEXUS_LINK` |
+| `REL_TRAFEGO_CIDADES_WIDE` | Tráfego **planejado** (módulo Tráfego) | 1 linha por (município, `TIPO_TRAF`), 12 meses em COLUNAS (`JANEIRO`..`DEZEMBRO`), `ANO`. `TIPO_TRAF='Consolidado'` é o total (NÃO somar as camadas). Valores em **PB**. `MUNICIPIO_ID`=IBGE 6 díg. Versão `REL_TRAFEGO_CIDADES_LONG` tem os meses em linha |
+| `REL_DS013_TRAFEGO_REALIZADO` | Tráfego **realizado** + base de usuários (módulo Tráfego) | 1 linha por (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz TIM e OI → market share. `S_MEGABYTE_TOTAL` em MB (÷1e9 = PB); colunas por tec aditivas |
+| ~~`NTW_MABE.ALTAIA_PM_MES_4G/5G`~~ | ~~Volumetria RAN (módulo Core)~~ | **Descontinuada** — o módulo Core foi removido e substituído pelo módulo Tráfego quando a fonte mudou |
 
 ### `VW_CAPEX_MASTER_FULL@NEXUS_LINK` (mapeada, uso futuro)
 

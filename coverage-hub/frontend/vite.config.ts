@@ -25,7 +25,7 @@ export default defineConfig(({ command }) => ({
     // Vite no cliente.
     proxy: {
       '/mobile-access/api': 'http://127.0.0.1:5000',
-      '/core/api': 'http://127.0.0.1:5000',
+      '/trafego/api': 'http://127.0.0.1:5000',
       '/api': 'http://127.0.0.1:5000',
     },
   },

@@ -19,9 +19,15 @@ Filtros globais compartilhados (aplicados via placeholders):
 
 # ---------- Sites por tecnologia — diagrama de Venn de 4 conjuntos ----------
 # Mesma fonte/filtro do M-query do Power BI que alimentava essa visão antes
-# da migração: TB_FT_BASE_UNICA_SITES, no MES_REF mais recente, excluindo
-# roaming (TIPO_SITE <> 'ROAMING VIVO'), só site móvel (MOBILE_SITE = 'SIM')
-# e com tecnologia informada (TECNOLOGIA <> '-'). Cada site cai em exatamente
+# da migração: TB_FT_BASE_UNICA_SITES, excluindo roaming (TIPO_SITE <>
+# 'ROAMING VIVO'), só site móvel (MOBILE_SITE = 'SIM') e com tecnologia
+# informada (TECNOLOGIA <> '-'). Esta é a raia FECHAMENTO 25, então o
+# recorte de mês é o FECHAMENTO de dezembro do ano anterior ao plano
+# (MES_REF = dez/2025 quando o plano é 2026), NÃO o MES_REF mais recente —
+# esse (MAX) é o comportamento correto só da aba Sites, que mostra o
+# inventário atual. Aqui usamos TRUNC(MES_REF,'MM') = TRUNC(:baseline_date)
+# pra pegar exatamente o snapshot de dezembro do fechamento. Cada site cai
+# em exatamente
 # UMA das 15 combinações não vazias de {2G,3G,4G,5G} — como as regiões do
 # Venn são disjuntas por construção, a soma das 15 é o total de sites, sem
 # contar o mesmo site mais de uma vez (diferente de somar por tecnologia
@@ -35,9 +41,7 @@ WITH BASE AS (
         CASE WHEN TECNOLOGIA LIKE '%4G%' THEN 1 ELSE 0 END AS HAS_4G,
         CASE WHEN TECNOLOGIA LIKE '%5G%' THEN 1 ELSE 0 END AS HAS_5G
     FROM NTW_OP.TB_FT_BASE_UNICA_SITES
-    WHERE MES_REF = (
-        SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES
-    )
+    WHERE TRUNC(MES_REF, 'MM') = TRUNC(:baseline_date, 'MM')
     AND TIPO_SITE <> 'ROAMING VIVO'
     AND MOBILE_SITE = 'SIM'
     AND TECNOLOGIA <> '-'

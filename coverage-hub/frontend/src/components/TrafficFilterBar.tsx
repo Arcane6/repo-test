@@ -2,18 +2,17 @@ import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import { useQuery } from "@tanstack/react-query";
 import { mobileAccessApi } from "../api/mobileAccess";
-import { useCoreFilterStore } from "../store/coreFilters";
+import { useTrafficFilterStore } from "../store/trafficFilters";
 import { themedSelectStyles } from "./selectStyles";
 
 /**
- * Filtro geográfico do módulo Core — mesma UX de `FilterBar` (Acesso
- * Móvel), mas com store próprio (`useCoreFilterStore`): é outro domínio
- * de dado, não deve compartilhar estado com os outros módulos. UF e
- * busca de município reaproveitam os endpoints do Acesso Móvel (são
- * lookup geográfico genérico, não algo específico daquele módulo).
+ * Filtro do módulo Tráfego (UF + Município). Reaproveita os endpoints de
+ * UF/busca de município do Acesso Móvel (lookup geográfico genérico), mas
+ * escreve no store PRÓPRIO do Tráfego (useTrafficFilterStore) — não vaza
+ * pro outro módulo.
  */
-export function CoreFilterBar() {
-  const { uf, municipio, regional, setValues, clear } = useCoreFilterStore();
+export function TrafficFilterBar() {
+  const { uf, municipio, setValues, clear } = useTrafficFilterStore();
   const multiStyles = themedSelectStyles<{ value: string; label: string }, true>();
 
   const { data: ufOptions = [] } = useQuery({
@@ -30,7 +29,7 @@ export function CoreFilterBar() {
     <div className="card shadow-sm mb-4">
       <div className="card-body">
         <div className="row g-3 align-items-end">
-          <div className="col-md" style={{ flexBasis: 0, flexGrow: 1 }}>
+          <div className="col-md">
             <label className="form-label fw-bold small">UF</label>
             <Select
               isMulti
@@ -42,7 +41,7 @@ export function CoreFilterBar() {
             />
           </div>
 
-          <div className="col-md" style={{ flexBasis: 0, flexGrow: 1 }}>
+          <div className="col-md">
             <label className="form-label fw-bold small">Município</label>
             <AsyncSelect
               isMulti
@@ -60,13 +59,6 @@ export function CoreFilterBar() {
             </button>
           </div>
         </div>
-
-        {regional.length > 0 && (
-          <div className="small text-muted mt-2">
-            <i className="bi bi-info-circle me-1" />
-            Regional filtrada via clique no ranking abaixo: <b>{regional.join(", ")}</b>
-          </div>
-        )}
       </div>
     </div>
   );
