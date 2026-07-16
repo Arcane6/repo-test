@@ -63,6 +63,6 @@ def api_ranking_regionais():
     return jsonify(service.get_ranking_regionais(_geo_filters()))
 
 
-@network_core_bp.route("/api/geo-points")
-def api_geo_points():
-    return jsonify(service.get_geo_points(_geo_filters()))
+@network_core_bp.route("/api/tabela-municipios")
+def api_tabela_municipios():
+    return jsonify(service.get_tabela_municipios(_geo_filters()))

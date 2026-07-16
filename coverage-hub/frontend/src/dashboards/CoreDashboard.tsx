@@ -4,7 +4,7 @@ import { CoreFilterBar } from "../components/CoreFilterBar";
 import { KpiDeltaCard } from "../components/KpiDeltaCard";
 import { VariationList } from "../components/VariationList";
 import { ChartPanel } from "../components/ChartPanel";
-import { CoreMap } from "../components/CoreMap";
+import { CoreVolumetriaTable } from "../components/CoreVolumetriaTable";
 import { horizontalBarsOption, trafficTrendOption } from "../charts/optionBuilders";
 import { coreApi } from "../api/core";
 import { useCoreFilterStore } from "../store/coreFilters";
@@ -105,7 +105,6 @@ export function CoreDashboard() {
             unit="PB"
             deltas={[
               { label: "vs Mês Ant.", pct: kpis?.total.mom_pct ?? null },
-              { label: "vs Ano Ant.", pct: kpis?.total.yoy_pct ?? null },
             ]}
           />
         </div>
@@ -118,7 +117,6 @@ export function CoreDashboard() {
             secondaryValue={kpis?.top_municipio ? `${fmtPb(kpis.top_municipio.volumetria_pb)} PB` : undefined}
             deltas={[
               { label: "vs Mês Ant.", pct: kpis?.top_municipio?.mom_pct ?? null },
-              { label: "vs Ano Ant.", pct: kpis?.top_municipio?.yoy_pct ?? null },
             ]}
           />
         </div>
@@ -131,7 +129,6 @@ export function CoreDashboard() {
             secondaryValue={kpis?.top_uf ? `${fmtPb(kpis.top_uf.volumetria_pb)} PB` : undefined}
             deltas={[
               { label: "vs Mês Ant.", pct: kpis?.top_uf?.mom_pct ?? null },
-              { label: "vs Ano Ant.", pct: kpis?.top_uf?.yoy_pct ?? null },
             ]}
           />
         </div>
@@ -210,10 +207,10 @@ export function CoreDashboard() {
         </div>
       </div>
 
-      {/* Mapa */}
+      {/* Tabela de volumetria por município (substituiu o mapa) */}
       <div className="row g-3 mt-1">
         <div className="col-12">
-          <CoreMap points={data?.geo.points ?? []} loading={loading} />
+          <CoreVolumetriaTable items={data?.tabela.items ?? []} loading={loading} />
         </div>
       </div>
 

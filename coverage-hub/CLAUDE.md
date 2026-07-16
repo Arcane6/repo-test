@@ -206,12 +206,16 @@ de dado bem diferente do resto do portal:
   Regional não tem dropdown próprio (mesmo padrão do resto do portal:
   filtra via clique no gráfico "Volumetria por Regional").
 - **Duas queries-base** (`queries.py`): `VOLUMETRIA_SNAPSHOT` (só o
-  último mês, alimenta ranking/mapa) e `VOLUMETRIA_HISTORICO_13M`
-  (últimos 13 meses — 13 e não 12 de propósito: o 13º mês só serve de
-  base pro cálculo de variação MoM do primeiro ponto exibido). As duas
-  fazem full-scan de `ALTAIA_PM_MES_4G/5G` com parsing de string linha a
-  linha (`TRANSLATE`/`REPLACE`/`TO_NUMBER`) — são **caras**, e o
-  histórico especialmente.
+  último mês, alimenta ranking/mapa) e `VOLUMETRIA_HISTORICO_12M`
+  (últimos 12 meses — janela enxuta a pedido do usuário, pra reduzir o
+  full-scan da série e o peso do payload; era 13 antes, mas o usuário
+  optou por 12 mesmo abrindo mão do YoY). As duas fazem full-scan de
+  `ALTAIA_PM_MES_4G/5G` com parsing de string linha a linha
+  (`TRANSLATE`/`REPLACE`/`TO_NUMBER`) — são **caras**, e o histórico
+  especialmente. Como a janela agora é de 12 meses exatos (sem 13º de
+  base), o **primeiro ponto da série sai sem variação MoM** e os **KPIs
+  não têm mais comparação YoY** (precisaria do mês de 1 ano atrás) —
+  só "vs Mês Ant." (MoM).
 - **UM endpoint só pro dashboard: `/core/api/overview`** (`get_overview`).
   Motivo: o dashboard tem 7 visões; se cada uma chamasse seu próprio
   endpoint, seriam 8 execuções das queries pesadas em paralelo (histórico
@@ -220,24 +224,31 @@ de dado bem diferente do resto do portal:
   eternamente pendente, mas hitar a URL sozinho no navegador retornava
   depois de muito tempo). `get_overview` roda snapshot + histórico UMA
   vez cada e deriva tudo. Os endpoints granulares (`/kpis`,
-  `/historico-mensal`, `/ranking/*`, `/geo-points`) continuam no backend
-  **só pra debug/REST direto** — o front usa exclusivamente `/overview`
-  (por isso `CoreMap` recebe `points` por prop, não busca sozinho).
+  `/historico-mensal`, `/ranking/*`, `/tabela-municipios`) continuam no
+  backend **só pra debug/REST direto** — o front usa exclusivamente
+  `/overview` (por isso `CoreVolumetriaTable` recebe as linhas por prop,
+  não busca sozinho).
 - **`MES` pode vir como NUMBER do Oracle** (o "YYYYMM" é só a
   representação visual) — `_historico_rows` normaliza pra string assim
-  que os dados chegam, senão `_mes_label`/`_mes_minus_years` quebram com
-  `TypeError` ao fatiar um int.
-- **KPIs com MoM/YoY** e **Destaques de Variação** (maior
+  que os dados chegam, senão `_mes_label` quebra com `TypeError` ao
+  fatiar um int.
+- **KPIs com MoM** e **Destaques de Variação** (maior
   crescimento/queda por município e por UF) são calculados em Python a
   partir do histórico, não em SQL — mais simples de auditar/testar com
   stub sem Oracle real. Cada painel de destaque só lista o lado que
   promete (crescimento não lista quem caiu, mesmo que sobre vaga no
   top N por falta de mais entidades no recorte filtrado).
-- **Mapa**: bolhas graduadas (raio + cor proporcionais à volumetria) em
-  `components/CoreMap.tsx`, reaproveitando o Leaflet puro já usado em
-  Sites — **não** é heatmap de kernel-density (`leaflet.heat` seria a
-  lib pra isso, MIT, ainda não adicionada — evolução rápida se o
-  usuário quiser o gradiente contínuo de verdade em vez de bolhas).
+- **Tabela de volumetria por município** (`components/CoreVolumetriaTable.tsx`):
+  substituiu o mapa de bolhas Leaflet (`CoreMap.tsx`, removido). O mapa
+  carregava ~5500 marcadores + payload pesado com lat/lon por município e
+  travava a página; a tabela dá a mesma leitura de "onde está o tráfego"
+  com busca + paginação e uma fração do peso. Por isso a `VOLUMETRIA_SNAPSHOT`
+  **não seleciona mais `LATITUDE`/`LONGITUDE`** (ninguém consome), e o
+  `/overview` devolve `tabela` (município/UF/regional/volumetria) no lugar
+  de `geo`. Componente é presentational (recebe as linhas por prop do
+  `/overview`, não busca sozinho). Se um dia quiser o mapa de volta,
+  reabrir lat/lon na snapshot + um `CoreMap` que receba só os top N
+  municípios (não os 5500) pra não repetir o problema de peso.
 - **Estado próprio** (`store/coreFilters.ts`, `components/CoreFilterBar.tsx`):
   não reaproveita o `useFilterStore` do Acesso Móvel — são domínios de
   dado diferentes, um filtro escolhido aqui não deve vazar pro outro
