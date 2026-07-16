@@ -4,7 +4,7 @@ import { CoreFilterBar } from "../components/CoreFilterBar";
 import { KpiDeltaCard } from "../components/KpiDeltaCard";
 import { VariationList } from "../components/VariationList";
 import { ChartPanel } from "../components/ChartPanel";
-import { CoreMap } from "../components/CoreMap";
+import { CoreVolumetriaTable } from "../components/CoreVolumetriaTable";
 import { horizontalBarsOption, trafficTrendOption } from "../charts/optionBuilders";
 import { coreApi } from "../api/core";
 import { useCoreFilterStore } from "../store/coreFilters";
@@ -207,10 +207,10 @@ export function CoreDashboard() {
         </div>
       </div>
 
-      {/* Mapa */}
+      {/* Tabela de volumetria por município (substituiu o mapa) */}
       <div className="row g-3 mt-1">
         <div className="col-12">
-          <CoreMap points={data?.geo.points ?? []} loading={loading} />
+          <CoreVolumetriaTable items={data?.tabela.items ?? []} loading={loading} />
         </div>
       </div>
 

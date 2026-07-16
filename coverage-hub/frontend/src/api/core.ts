@@ -69,18 +69,15 @@ export interface CoreRankingResponse {
   items: CoreRankingItem[];
 }
 
-export interface CoreGeoPoint {
-  ibge: string;
+export interface CoreTabelaItem {
   municipio: string;
   uf: string;
   regional: string | null;
-  lat: number;
-  lon: number;
   volumetria_pb: number;
 }
 
-export interface CoreGeoPointsResponse {
-  points: CoreGeoPoint[];
+export interface CoreTabelaResponse {
+  items: CoreTabelaItem[];
 }
 
 /** Resposta consolidada do dashboard — tudo numa chamada só, pra não
@@ -93,12 +90,12 @@ export interface CoreOverviewResponse {
   ranking_municipios: CoreRankingResponse;
   ranking_ufs: CoreRankingResponse;
   ranking_regionais: CoreRankingResponse;
-  geo: CoreGeoPointsResponse;
+  tabela: CoreTabelaResponse;
 }
 
 export const coreApi = {
   // Uma chamada só pro dashboard inteiro — os endpoints granulares
-  // (/kpis, /historico-mensal, /ranking/*, /geo-points) existem no
+  // (/kpis, /historico-mensal, /ranking/*, /tabela-municipios) existem no
   // backend pra debug/REST direto, mas o front não os usa: dispará-los
   // separado rodaria as queries pesadas várias vezes em paralelo (ver
   // get_overview no backend).

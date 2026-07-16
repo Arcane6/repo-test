@@ -120,27 +120,28 @@ def _snapshot_rows(filters):
     return execute_query(sql, params) or []
 
 
-def _geo_points_from_rows(rows):
+def _tabela_municipios_from_rows(rows):
+    """Uma linha por município (UF/Regional/Volumetria) — alimenta a
+    tabela de volumetria. Substituiu o mapa de bolhas: sem lat/lon e sem
+    5500 marcadores pra renderizar, é a mesma leitura de 'onde está o
+    tráfego' com uma fração do peso. As linhas já vêm ordenadas por
+    volumetria desc da query (snapshot)."""
     return {
-        "points": [
+        "items": [
             {
-                "ibge": r.get("ibge"),
-                "municipio": r.get("municipio"),
-                "uf": r.get("uf"),
+                "municipio": r.get("municipio") or "N/D",
+                "uf": r.get("uf") or "N/D",
                 "regional": r.get("regional"),
-                "lat": r.get("latitude"),
-                "lon": r.get("longitude"),
-                "volumetria_pb": r.get("volumetria_pb", 0) or 0,
+                "volumetria_pb": round(r.get("volumetria_pb", 0) or 0, 2),
             }
             for r in rows
-            if r.get("latitude") is not None and r.get("longitude") is not None
         ],
     }
 
 
-def get_geo_points(filters):
-    """Um ponto por município (lat/lon + volumetria) — alimenta o mapa."""
-    return _geo_points_from_rows(_snapshot_rows(filters))
+def get_tabela_municipios(filters):
+    """Tabela de volumetria por município (substituiu o mapa)."""
+    return _tabela_municipios_from_rows(_snapshot_rows(filters))
 
 
 def _rank(rows, key_field, limit=None):
@@ -391,5 +392,5 @@ def get_overview(filters):
         "ranking_municipios": {"items": _rank(snapshot_rows, "municipio", 15)},
         "ranking_ufs": {"items": _rank(snapshot_rows, "uf")},
         "ranking_regionais": {"items": _rank(snapshot_rows, "regional")},
-        "geo": _geo_points_from_rows(snapshot_rows),
+        "tabela": _tabela_municipios_from_rows(snapshot_rows),
     }

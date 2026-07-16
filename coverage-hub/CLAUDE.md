@@ -224,9 +224,10 @@ de dado bem diferente do resto do portal:
   eternamente pendente, mas hitar a URL sozinho no navegador retornava
   depois de muito tempo). `get_overview` roda snapshot + histórico UMA
   vez cada e deriva tudo. Os endpoints granulares (`/kpis`,
-  `/historico-mensal`, `/ranking/*`, `/geo-points`) continuam no backend
-  **só pra debug/REST direto** — o front usa exclusivamente `/overview`
-  (por isso `CoreMap` recebe `points` por prop, não busca sozinho).
+  `/historico-mensal`, `/ranking/*`, `/tabela-municipios`) continuam no
+  backend **só pra debug/REST direto** — o front usa exclusivamente
+  `/overview` (por isso `CoreVolumetriaTable` recebe as linhas por prop,
+  não busca sozinho).
 - **`MES` pode vir como NUMBER do Oracle** (o "YYYYMM" é só a
   representação visual) — `_historico_rows` normaliza pra string assim
   que os dados chegam, senão `_mes_label` quebra com `TypeError` ao
@@ -237,11 +238,17 @@ de dado bem diferente do resto do portal:
   stub sem Oracle real. Cada painel de destaque só lista o lado que
   promete (crescimento não lista quem caiu, mesmo que sobre vaga no
   top N por falta de mais entidades no recorte filtrado).
-- **Mapa**: bolhas graduadas (raio + cor proporcionais à volumetria) em
-  `components/CoreMap.tsx`, reaproveitando o Leaflet puro já usado em
-  Sites — **não** é heatmap de kernel-density (`leaflet.heat` seria a
-  lib pra isso, MIT, ainda não adicionada — evolução rápida se o
-  usuário quiser o gradiente contínuo de verdade em vez de bolhas).
+- **Tabela de volumetria por município** (`components/CoreVolumetriaTable.tsx`):
+  substituiu o mapa de bolhas Leaflet (`CoreMap.tsx`, removido). O mapa
+  carregava ~5500 marcadores + payload pesado com lat/lon por município e
+  travava a página; a tabela dá a mesma leitura de "onde está o tráfego"
+  com busca + paginação e uma fração do peso. Por isso a `VOLUMETRIA_SNAPSHOT`
+  **não seleciona mais `LATITUDE`/`LONGITUDE`** (ninguém consome), e o
+  `/overview` devolve `tabela` (município/UF/regional/volumetria) no lugar
+  de `geo`. Componente é presentational (recebe as linhas por prop do
+  `/overview`, não busca sozinho). Se um dia quiser o mapa de volta,
+  reabrir lat/lon na snapshot + um `CoreMap` que receba só os top N
+  municípios (não os 5500) pra não repetir o problema de peso.
 - **Estado próprio** (`store/coreFilters.ts`, `components/CoreFilterBar.tsx`):
   não reaproveita o `useFilterStore` do Acesso Móvel — são domínios de
   dado diferentes, um filtro escolhido aqui não deve vazar pro outro
