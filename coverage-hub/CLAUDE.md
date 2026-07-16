@@ -222,7 +222,14 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     Python. `MUNICIPIO_ID` é o IBGE de 6 dígitos (sem verificador).
   - **`REL_DS013_TRAFEGO_REALIZADO`** (realizado): 1 linha por
     (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz
-    **TIM e OI**. Base de usuários rica (não usada ainda).
+    **TIM e OI**. Base de usuários rica (não usada ainda). A tabela crua é
+    grande (**~140k linhas** no ano cheio: município × operadora × mês), então
+    o realizado é **agregado no Oracle** (`GROUP BY`), não puxado cru:
+    `REALIZADO_POR_MUNICIPIO` (uma linha por município, soma de meses e
+    operadoras → ~5,5k linhas; alimenta total, mix por tecnologia, ranking e
+    quebra por UF) e `REALIZADO_POR_MES` (uma linha por mês → 12; alimenta a
+    curva e descobre o mês corrente). Nunca voltar a puxar a tabela crua e
+    agregar no Python.
 - **Regras de negócio confirmadas nos dados** (não reintroduzir erro):
   - **`TIPO_TRAF='Consolidado'` é o TOTAL oficial** do planejado — NÃO é
     a soma das outras camadas. A hierarquia é `Consolidado = "2G/3G" +
