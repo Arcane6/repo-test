@@ -6,7 +6,9 @@ import { MobileAccessLayout } from "./pages/mobile-access/MobileAccessLayout";
 import { ResumoDashboard } from "./dashboards/ResumoDashboard";
 import { CidadesDashboard } from "./dashboards/CidadesDashboard";
 import { SitesDashboard } from "./dashboards/SitesDashboard";
-import { CoreDashboard } from "./dashboards/CoreDashboard";
+import { TrafficLayout } from "./pages/traffic/TrafficLayout";
+import { TrafegoResumoExecutivo } from "./dashboards/TrafegoResumoExecutivo";
+import { TrafegoYtd } from "./dashboards/TrafegoYtd";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +32,11 @@ export function App() {
               <Route path="cidades" element={<CidadesDashboard />} />
               <Route path="sites" element={<SitesDashboard />} />
             </Route>
-            <Route path="core" element={<CoreDashboard />} />
+            <Route path="trafego" element={<TrafficLayout />}>
+              <Route index element={<Navigate to="resumo-executivo" replace />} />
+              <Route path="resumo-executivo" element={<TrafegoResumoExecutivo />} />
+              <Route path="ytd" element={<TrafegoYtd />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

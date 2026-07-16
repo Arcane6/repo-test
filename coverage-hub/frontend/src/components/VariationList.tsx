@@ -1,4 +1,12 @@
-import type { CoreVariacaoItem } from "../api/core";
+/** Item de uma lista de variação (nome + %, delta e total). Genérico —
+ * antes vinha do módulo Core (removido); mantido local pra o componente
+ * seguir reutilizável por qualquer módulo. */
+export interface VariacaoItem {
+  label: string;
+  pct: number;
+  delta_pb: number;
+  total_pb: number;
+}
 
 interface VariationListProps {
   title: string;
@@ -6,7 +14,7 @@ interface VariationListProps {
   /** true = crescimento (verde), false = queda (vermelho) — mesma cor em
    * todos os itens da lista, já que cada painel é só um dos dois lados. */
   positive: boolean;
-  items: CoreVariacaoItem[];
+  items: VariacaoItem[];
 }
 
 const fmtPb = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
