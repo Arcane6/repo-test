@@ -17,8 +17,15 @@ export default defineConfig(({ command }) => ({
   server: {
     // Durante o dev (npm run dev), proxeia as chamadas de API para o Flask
     // rodando em paralelo, evitando CORS e mantendo as mesmas URLs de prod.
+    // IMPORTANTE: cada módulo com prefixo próprio precisa entrar aqui. O
+    // Core usa /core/api/* — sem esta linha, em dev as chamadas do Core
+    // caíam no index.html do próprio Vite (HTML 200) e o front estourava
+    // "Unexpected token '<', <!doctype". Proxeamos só /core/api (a rota de
+    // dados), nunca /core sozinho — esse é a página da SPA, servida pelo
+    // Vite no cliente.
     proxy: {
       '/mobile-access/api': 'http://127.0.0.1:5000',
+      '/core/api': 'http://127.0.0.1:5000',
       '/api': 'http://127.0.0.1:5000',
     },
   },
