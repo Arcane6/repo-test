@@ -19,13 +19,12 @@ testar com stub, sem Oracle real no sandbox), no mesmo espírito do módulo
 de Acesso Móvel.
 """
 
-import string as _string
-
 from database.oracle import execute_query
 
 from modules.traffic.queries import (
-    MESES_WIDE,
-    PLANEJADO_WIDE,
+    PLANEJADO_POR_CAMADA,
+    PLANEJADO_POR_UF,
+    PLANEJADO_TOP_MUNICIPIOS,
     REALIZADO_POR_MUNICIPIO,
     REALIZADO_POR_MES,
 )
@@ -97,27 +96,42 @@ def _build_municipio_clause(values, params):
     return f"AND UPPER(TRIM(MUNICIPIO_NOME)) IN ({', '.join(ph)})"
 
 
-def _template_fields(sql_template):
-    return {name for _, name, _, _ in _string.Formatter().parse(sql_template) if name}
-
-
-def _apply_filters(sql_template, filters, params):
-    fields = _template_fields(sql_template)
-    fill = {}
-    if "uf_filter" in fields:
-        fill["uf_filter"] = _build_uf_clause(_normalize_list(filters.get("ufs")), params)
-    if "municipio_filter" in fields:
-        fill["municipio_filter"] = _build_municipio_clause(_normalize_list(filters.get("municipios")), params)
-    return sql_template.format(**fill)
 
 
 # ---------------------------------------------------------------------------
 # Fetch
 # ---------------------------------------------------------------------------
 
-def _planejado_rows(filters, ano=ANO_PLANO):
+def _plan_camada_rows(filters, ano=ANO_PLANO):
+    """Planejado agregado por TIPO_TRAF (Oracle faz o GROUP BY) — 5 linhas,
+    cada uma com os 12 meses somados nacionalmente. A linha 'Consolidado' dá
+    série/total/YTD; as camadas dão o split. Substitui o pull de ~28k linhas."""
     params = {"ano": ano}
-    sql = _apply_filters(PLANEJADO_WIDE, filters, params)
+    sql = PLANEJADO_POR_CAMADA.format(
+        uf_filter=_build_uf_clause(_normalize_list(filters.get("ufs")), params),
+        municipio_filter=_build_municipio_clause(_normalize_list(filters.get("municipios")), params),
+    )
+    return execute_query(sql, params) or []
+
+
+def _plan_top_municipios(filters, ano=ANO_PLANO):
+    """Top 15 municípios do plano (Oracle ordena e corta) — 15 linhas."""
+    params = {"ano": ano}
+    sql = PLANEJADO_TOP_MUNICIPIOS.format(
+        uf_filter=_build_uf_clause(_normalize_list(filters.get("ufs")), params),
+        municipio_filter=_build_municipio_clause(_normalize_list(filters.get("municipios")), params),
+    )
+    rows = execute_query(sql, params) or []
+    return [{"label": r.get("municipio_nome") or "N/D", "value": round(_num(r.get("total_ano")), 4)} for r in rows]
+
+
+def _plan_por_uf_rows(filters, ano=ANO_PLANO):
+    """Planejado agregado por UF (só Consolidado), 12 meses — ~27 linhas."""
+    params = {"ano": ano}
+    sql = PLANEJADO_POR_UF.format(
+        uf_filter=_build_uf_clause(_normalize_list(filters.get("ufs")), params),
+        municipio_filter=_build_municipio_clause(_normalize_list(filters.get("municipios")), params),
+    )
     return execute_query(sql, params) or []
 
 
@@ -151,33 +165,20 @@ def _rz_mes_totais(filters, ano):
 
 
 # ---------------------------------------------------------------------------
-# Cálculos — PLANEJADO (a partir das linhas WIDE)
+# Cálculos — PLANEJADO (a partir das linhas JÁ AGREGADAS)
 # ---------------------------------------------------------------------------
 
-def _plan_consolidado(rows):
-    """Só as linhas Consolidado (o total oficial)."""
-    return [r for r in rows if str(r.get("tipo_traf") or "").strip().upper() == "CONSOLIDADO"]
+# Nas linhas agregadas os meses vêm como colunas m01..m12 (SUM de cada mês).
+def _mes_cols(row):
+    return [_num(row.get(f"m{i:02d}")) for i in range(1, 13)]
 
 
-def _plan_por_mes(rows):
-    """Série mensal do planejado (Consolidado), somando municípios.
-    Retorna lista de 12 valores (Jan..Dez) em PB."""
-    cons = _plan_consolidado(rows)
-    totais = [0.0] * 12
-    for r in cons:
-        for i, mes in enumerate(MESES_WIDE):
-            totais[i] += _num(r.get(mes.lower()))
-    return [round(v, 4) for v in totais]
-
-
-def _plan_total_ano(rows):
-    return round(sum(_plan_por_mes(rows)), 4)
-
-
-def _plan_ytd(rows, mes_max):
-    """Acumulado Jan..mes_max (1-based) do planejado Consolidado."""
-    por_mes = _plan_por_mes(rows)
-    return round(sum(por_mes[:mes_max]), 4)
+def _plan_meses_consolidado(camada_rows):
+    """Série mensal nacional (12 valores PB) da linha Consolidado."""
+    for r in camada_rows:
+        if str(r.get("tipo_traf") or "").strip().upper() == "CONSOLIDADO":
+            return [round(v, 4) for v in _mes_cols(r)]
+    return [0.0] * 12
 
 
 # Camadas que compõem o total de forma ADITIVA (sem sobreposição). A
@@ -189,28 +190,25 @@ def _plan_ytd(rows, mes_max):
 CAMADAS_ADITIVAS = {"2G/3G", "4G", "5G"}
 
 
-def _plan_por_camada(rows):
+def _plan_por_camada(camada_rows):
     """Split aditivo do planejado por tecnologia ({2G/3G, 4G, 5G}, que soma
-    o Consolidado). Exclui 'Consolidado' e a camada combinada '4G/5G' pra
-    não dobrar o total."""
-    agg = {}
-    for r in rows:
+    o Consolidado), das linhas agregadas por TIPO_TRAF."""
+    out = []
+    for r in camada_rows:
         tt = str(r.get("tipo_traf") or "").strip()
         if tt not in CAMADAS_ADITIVAS:
             continue
-        total = sum(_num(r.get(m.lower())) for m in MESES_WIDE)
-        agg[tt] = agg.get(tt, 0.0) + total
-    return [{"label": k, "value": round(v, 4)} for k, v in sorted(agg.items(), key=lambda kv: kv[1], reverse=True)]
+        out.append({"label": tt, "value": round(sum(_mes_cols(r)), 4)})
+    return sorted(out, key=lambda x: x["value"], reverse=True)
 
 
-def _plan_ranking_municipios(rows, limit=15):
-    cons = _plan_consolidado(rows)
+def _plan_uf_ytd(uf_rows, mes_max):
+    """{UF: total_pb} do planejado acumulado Jan..mes_max, das linhas por UF."""
     agg = {}
-    for r in cons:
-        nome = r.get("municipio_nome") or "N/D"
-        agg[nome] = agg.get(nome, 0.0) + sum(_num(r.get(m.lower())) for m in MESES_WIDE)
-    ranked = sorted(agg.items(), key=lambda kv: kv[1], reverse=True)[:limit]
-    return [{"label": k, "value": round(v, 4)} for k, v in ranked]
+    for r in uf_rows:
+        uf = str(r.get("estado") or "N/D").strip().upper()
+        agg[uf] = round(sum(_mes_cols(r)[:mes_max]), 4) if mes_max else 0.0
+    return agg
 
 
 # ---------------------------------------------------------------------------
@@ -288,7 +286,9 @@ def get_resumo_executivo(filters):
     Realizado agregado no Oracle: em vez de puxar ~140k linhas cruas por
     ano, cada `_rz_municipio_rows` volta ~5,5k (uma por município) e cada
     `_rz_mes_totais` volta 12 (uma por mês)."""
-    pl26 = _planejado_rows(filters, ano=ANO_PLANO)
+    cam26 = _plan_camada_rows(filters, ano=ANO_PLANO)
+    plan_mensal = _plan_meses_consolidado(cam26)   # 12 valores PB (nacional)
+    plano_ano = round(sum(plan_mensal), 4)
     # Mês corrente (YTD) sai da série mensal de 2026 (12 linhas, barato).
     rz26_mes = _rz_mes_totais(filters, ANO_FECHAMENTO_ATUAL)
     mes_max = max(rz26_mes) if rz26_mes else 0
@@ -305,7 +305,6 @@ def get_resumo_executivo(filters):
     }
 
     # --- Raia 2: Plano 26 — curva mensal planejada + REALIZADO até o YTD ---
-    plan_mensal = _plan_por_mes(pl26)          # 12 valores
     serie_mensal = [
         {
             "mes": MESES_LABEL[i],
@@ -318,23 +317,22 @@ def get_resumo_executivo(filters):
     ]
     plano_26 = {
         "ano": ANO_PLANO,
-        "trafego_planejado_pb": _plan_total_ano(pl26),
+        "trafego_planejado_pb": plano_ano,
         "mes_ate": MESES_LABEL[mes_max - 1] if mes_max else None,
         "serie_mensal": serie_mensal,
-        "por_camada": _plan_por_camada(pl26),
-        "ranking_municipios": _plan_ranking_municipios(pl26),
+        "por_camada": _plan_por_camada(cam26),
+        "ranking_municipios": _plan_top_municipios(filters, ANO_PLANO),
     }
 
     # --- Raia 3: Fechamento 26 (realizado YTD) + aderência, YoY e projeção ---
     rz26_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ATUAL, mes_max=mes_max) if mes_max else []
     realizado_ytd = _rz_total(rz26_mun)
-    planejado_ytd = _plan_ytd(pl26, mes_max) if mes_max else 0.0
+    planejado_ytd = round(sum(plan_mensal[:mes_max]), 4) if mes_max else 0.0
     # YoY: mesmo período (Jan..mes_max) do ano anterior — soma da série
     # mensal de 2025 até o mês corrente (reaproveita a query por mês).
     rz25_mes = _rz_mes_totais(filters, ANO_FECHAMENTO_ANTERIOR) if mes_max else {}
     realizado_ytd_ano_ant = round(sum(v for m, v in rz25_mes.items() if m <= mes_max), 4)
     # Projeção linear de fechamento do ano (run-rate) vs plano cheio.
-    plano_ano = _plan_total_ano(pl26)
     projecao_ano = round(realizado_ytd / mes_max * 12, 4) if mes_max else 0.0
     tec26 = _rz_por_tecnologia(rz26_mun)
     fechamento_26 = {
@@ -360,13 +358,13 @@ def get_resumo_executivo(filters):
 def get_ytd(filters):
     """Tráfego YTD: planejado × realizado acumulado por mês (2026), com
     aderência ao plano e ranking por UF."""
-    pl = _planejado_rows(filters, ano=ANO_PLANO)
+    cam = _plan_camada_rows(filters, ano=ANO_PLANO)
+    plan_mensal = _plan_meses_consolidado(cam)   # 12 valores
     rz_mensal = _rz_mes_totais(filters, ANO_FECHAMENTO_ATUAL)   # {mes: pb}, 12 linhas
     mes_max = max(rz_mensal) if rz_mensal else 0
-    # Por UF (YTD) sai da agregação por município já filtrada até o mês corrente.
+    # Por UF (YTD): planejado agregado por UF + realizado agregado por município.
     rz_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ATUAL, mes_max=mes_max) if mes_max else []
-
-    plan_mensal = _plan_por_mes(pl)          # 12 valores
+    plan_uf = _plan_uf_ytd(_plan_por_uf_rows(filters, ANO_PLANO), mes_max)
 
     # Série acumulada mês a mês até o mês corrente.
     serie = []
@@ -385,11 +383,7 @@ def get_ytd(filters):
     realizado_ytd = round(acc_real, 4)
     planejado_ytd = round(acc_plan, 4)
 
-    # Ranking por UF: planejado vs realizado YTD.
-    plan_uf = {}
-    for r in _plan_consolidado(pl):
-        uf = str(r.get("estado") or "N/D").strip().upper()
-        plan_uf[uf] = plan_uf.get(uf, 0.0) + sum(_num(r.get(MESES_WIDE[i].lower())) for i in range(mes_max or 12))
+    # Ranking por UF: planejado vs realizado YTD (plan_uf já calculado acima).
     real_uf = _rz_por_uf(rz_mun)
     ufs = sorted(set(plan_uf) | set(real_uf), key=lambda u: real_uf.get(u, 0.0), reverse=True)
     por_uf = [
