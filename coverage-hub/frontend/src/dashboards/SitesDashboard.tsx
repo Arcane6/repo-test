@@ -41,7 +41,7 @@ export function SitesDashboard() {
     : [];
 
   return (
-    <div>
+    <div className="tim-page-enter">
       <div className="mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span className="tim-eyebrow">Inventário de sites físicos</span>
       </div>

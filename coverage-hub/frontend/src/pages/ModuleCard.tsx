@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import type { ModuleInfo } from "../api/modules";
 
-export function ModuleCard({ m }: { m: ModuleInfo }) {
+export function ModuleCard({ m, index = 0 }: { m: ModuleInfo; index?: number }) {
   const content = (
     <div className="card border-0 shadow-sm h-100">
       <div className="module-card-top" />
@@ -30,7 +30,7 @@ export function ModuleCard({ m }: { m: ModuleInfo }) {
   );
 
   return (
-    <div className="col-md-6 col-lg-4">
+    <div className="col-md-6 col-lg-4 tim-reveal-item" style={{ "--reveal-i": index } as React.CSSProperties}>
       {m.enabled ? (
         <Link
           to={m.url}

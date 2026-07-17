@@ -77,7 +77,7 @@ export function TrafegoResumoExecutivo() {
   const vsPlanoAno = f26?.atingimento_plano_pct != null ? Number((f26.atingimento_plano_pct - 100).toFixed(1)) : null;
 
   return (
-    <div>
+    <div className="tim-page-enter">
       {error && (
         <div className="alert alert-danger d-flex align-items-start gap-2" role="alert">
           <i className="bi bi-exclamation-triangle-fill mt-1" />
