@@ -51,7 +51,7 @@ export function KpiDeltaCard({
   deltas,
 }: KpiDeltaCardProps) {
   return (
-    <div className="kpi-card">
+    <div className="kpi-card" style={{ "--kpi-accent": accentColor } as React.CSSProperties}>
       <div className="d-flex justify-content-between align-items-start mb-2">
         <span className="kpi-card-label">{label}</span>
         <div

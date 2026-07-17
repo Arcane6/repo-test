@@ -428,10 +428,35 @@ consome token; se o token não existe, cria-se o token primeiro.
   `Navbar`) alcancem estaticamente** — quebra o split.
 - **Comandos**: `npm run dev` (Vite + proxy pro Flask) · `npm run build`
   (tsc + vite, gera `static/dist/`) · `npm run lint` (oxlint).
-- **Contribuição**: antes de estilizar na mão, procure token/classe
-  existente; novo padrão visual entra primeiro como token/classe aqui
-  documentada, depois no componente. PRs de UI sempre com screenshot
-  antes/depois (Playwright headless contra o Flask stubbado).
+- **Guia de componentes (use ESTES antes de criar)**:
+  - `<PageHeader>` — topo de todo módulo (breadcrumb + ícone + título +
+    subtítulo + slot de ações). Não repita esse markup na mão.
+  - `<KpiDeltaCard>` — card de número/entidade com ícone, `accentColor`
+    (vira a barra lateral de destaque via `--kpi-accent`), valor com
+    count-up automático, e badges de delta (verde/vermelho semântico).
+  - `<ChartPanel>` — card padrão de gráfico (título + `<SourceBadge>` +
+    toolbar de export imagem/Excel + `<Chart>` + skeleton na 1ª carga).
+    Todo gráfico entra por aqui; nunca `echarts.init` fora do `<Chart>`.
+  - `<SourceBadge table="..." />` — chip "de onde vem o número" (tabela +
+    referência mais recente). Todo gráfico/tabela deveria ter.
+  - `<Skeleton>` — placeholder shimmer; é o vocabulário único de loading
+    (dado, rota, primeira carga).
+  - Gráficos: montar `option` pelos builders de `charts/optionBuilders.ts`
+    (catálogo) e deixar o `chartTheme` aplicar cor/fonte/grade. Não
+    reescrever eixo/tooltip do zero.
+  - Sub-abas de módulo: `nav nav-tabs` do Bootstrap com `<NavLink>` — o
+    CSS já transforma no estilo underline do design system.
+- **Convenções visuais fechadas** (não reabrir sem motivo):
+  - Cards usam `.card.shadow-sm` → elevação `--shadow-md`, hover eleva.
+  - KPI card: barra lateral = `accentColor`; número com `tabular-nums` +
+    count-up. Tabela: cabeçalho em small-caps técnica.
+  - Eixo de valor dos gráficos **sem número** (só rótulo na barra) e
+    **sem gridline** — forçado central no `chartTheme`. Reativar só com
+    `axisLabel:{show:true}`/`splitLine:{show:true}` explícito no builder.
+- **Contribuição**: antes de estilizar na mão, procure token/classe/
+  componente existente; novo padrão visual entra primeiro como token/
+  classe aqui documentada, depois no componente. PRs de UI sempre com
+  screenshot antes/depois (Playwright headless contra o Flask stubbado).
 
 ## Fontes de dados Oracle
 
