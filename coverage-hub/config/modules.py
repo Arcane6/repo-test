@@ -11,10 +11,10 @@ MODULES = [
     {
         "key": "traffic",
         "name": "Tráfego",
-        "description": "Tráfego planejado × realizado e market share TIM × OI por município, UF e regional",
+        "description": "Tráfego planejado × realizado por município, UF e regional",
         "url": "/trafego/",
         "icon": "bi-graph-up",
-        "color": "#7DC242",
+        "color": "#42C286",
         "enabled": True,
     },
     {
