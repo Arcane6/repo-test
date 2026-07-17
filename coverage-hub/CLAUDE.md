@@ -368,6 +368,60 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     `SitesComboChart`) usa `useState` local, não um store global — só
     vira store global se precisar propagar pra outros painéis.
 
+## Design System (fonte da verdade visual)
+
+**Filosofia**: dashboard executivo premium — hierarquia clara, movimento
+com propósito (nunca decorativo), dado como protagonista. Bootstrap fica
+como grid/base estrutural; a identidade visual vem da **camada de tokens**
+em `frontend/src/styles/index.css` (topo do arquivo). Regra de ouro:
+**componente não usa valor mágico** de cor/espaço/raio/sombra/duração —
+consome token; se o token não existe, cria-se o token primeiro.
+
+- **Tipografia**: `Inter Variable` self-hosted via
+  `@fontsource-variable/inter` (o projeto proíbe CDN). Headings com
+  `letter-spacing: -0.015em`. Números que se alinham (KPIs, tabelas,
+  badges) usam `font-variant-numeric: tabular-nums` — sem "dança" de
+  largura quando o valor muda. O canvas do ECharts **não herda CSS**: a
+  fonte é aplicada via `CHART_FONT` no `theme/chartTheme.ts`.
+- **Tokens estruturais** (globais, não variam por tema):
+  - Spacing: `--space-1..7` (4/8/12/16/24/32/48px — múltiplos de 4).
+  - Raios: `--radius-sm|md|lg|xl` (6/10/14/20 — chips/botões/cards/hero).
+  - Sombras: `--shadow-sm|md|lg` (em camadas, sutis; no dark ficam mais
+    escuras e a separação passa a ser feita por borda, não por sombra).
+  - Motion: `--motion-fast|base|slow` (150/250/420ms) +
+    `--ease-out` (expo-out, hover/entradas) e `--ease-in-out` (trocas de
+    tema/estado). `prefers-reduced-motion` zera tudo — sempre respeitar.
+- **Tokens de tema** (`--tim-*`, variam por `[data-theme]`): dark é
+  **azul-tintado** (`#0b0f17`/`#131a26`), não cinza neutro — coerência com
+  a marca. Cores de marca: `--brand-primary #003399`,
+  `--brand-primary-deep #001a66`, `--brand-accent #42C286`.
+  As cores do `chartTheme.ts` **replicam** esses valores em hex (canvas
+  não lê CSS var) — mudou lá, muda cá.
+- **Acessibilidade**: `:focus-visible` global com `--tim-focus-ring`
+  (anel azul, visível nos dois temas). Meta AA mínimo.
+- **Elevação**: todos os cards usam `.card.shadow-sm` (Bootstrap), que é
+  sobrescrito centralmente pra `--shadow-md` — mudar elevação do portal
+  inteiro = 1 linha.
+- **Bibliotecas adotadas e recusadas** (decidido em diagnóstico):
+  `@fontsource-variable/inter` ✅ (tipografia própria sem CDN);
+  Tailwind/shadcn ❌ (reescrever tudo sobre outra base de estilo = risco
+  de regressão sem ganho visual equivalente); trocar ECharts por
+  Tremor/Recharts ❌ (perderia gauge, Venn e labels validados);
+  trocar bootstrap-icons ❌ (já é um set único e consistente).
+- **Performance = UX**: rotas são **code-splitted** (`React.lazy` em
+  `App.tsx`) — a Home carrega ~267 KB de JS; ECharts (~580 KB), Leaflet
+  (~195 KB) e react-select (~89 KB) só baixam na rota que os usa. O
+  fallback do `Suspense` usa o MESMO `<Skeleton/>` (shimmer) dos loadings
+  de dado — transição de rota e loading parecem um sistema só. **Não
+  importar ECharts/Leaflet em nada que a Home ou o shell (`Layout`,
+  `Navbar`) alcancem estaticamente** — quebra o split.
+- **Comandos**: `npm run dev` (Vite + proxy pro Flask) · `npm run build`
+  (tsc + vite, gera `static/dist/`) · `npm run lint` (oxlint).
+- **Contribuição**: antes de estilizar na mão, procure token/classe
+  existente; novo padrão visual entra primeiro como token/classe aqui
+  documentada, depois no componente. PRs de UI sempre com screenshot
+  antes/depois (Playwright headless contra o Flask stubbado).
+
 ## Fontes de dados Oracle
 
 | Tabela/View | Uso | Observações |

@@ -5,45 +5,135 @@
 @import "leaflet/dist/leaflet.css";
 @import "leaflet.markercluster/dist/MarkerCluster.css";
 @import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+/* Tipografia da casa: Inter Variable, self-hosted via npm (o projeto proíbe
+ * CDN). Uma fonte variável = todos os pesos num único woff2. */
+@import "@fontsource-variable/inter/index.css";
 
 /* =============================================================================
- * TIM Technical Planning — tema claro/escuro (portado de static/css/app.css)
+ * TIM Technical Planning — DESIGN TOKENS
+ * -----------------------------------------------------------------------------
+ * Fonte única de verdade visual. Regras:
+ *  - Componente NUNCA usa valor mágico de cor/espaço/raio/sombra/duração —
+ *    consome token. Precisou de um valor que não existe? Cria token aqui.
+ *  - Tokens de tema (cores) variam por [data-theme]; tokens estruturais
+ *    (spacing/radius/shadow/motion) são globais.
  * ============================================================================= */
 
+:root {
+  /* ---- Tipografia ---- */
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* ---- Marca ---- */
+  --brand-primary: #003399;      /* azul TIM — identidade principal */
+  --brand-primary-deep: #001a66; /* fim dos gradientes da marca */
+  --brand-accent: #42C286;       /* verde — dado positivo/ação secundária */
+
+  /* ---- Escala de espaçamento (múltiplos de 4px) ---- */
+  --space-1: 0.25rem;  /* 4  */
+  --space-2: 0.5rem;   /* 8  */
+  --space-3: 0.75rem;  /* 12 */
+  --space-4: 1rem;     /* 16 */
+  --space-5: 1.5rem;   /* 24 */
+  --space-6: 2rem;     /* 32 */
+  --space-7: 3rem;     /* 48 */
+
+  /* ---- Raios ---- */
+  --radius-sm: 6px;    /* chips, badges */
+  --radius-md: 10px;   /* botões, inputs */
+  --radius-lg: 14px;   /* cards */
+  --radius-xl: 20px;   /* hero, painéis grandes */
+
+  /* ---- Sombras (em camadas, sutis — nada de borrão pesado) ---- */
+  --shadow-sm: 0 1px 2px rgba(2, 12, 40, 0.06);
+  --shadow-md: 0 1px 2px rgba(2, 12, 40, 0.05), 0 4px 12px rgba(2, 12, 40, 0.07);
+  --shadow-lg: 0 2px 4px rgba(2, 12, 40, 0.05), 0 12px 32px rgba(2, 12, 40, 0.12);
+
+  /* ---- Motion (durações + easings com propósito) ----
+   * fast: feedback imediato (hover/press) · base: transições de estado ·
+   * slow: entradas de página/entidade. ease-out-expo dá o toque "snappy
+   * mas suave" de produto premium. */
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 420ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---- Tokens de tema ---- */
 :root,
 [data-theme="light"] {
   --tim-bg: #f6f8fa;
   --tim-card-bg: #ffffff;
-  --tim-card-border: rgba(0, 0, 0, 0.05);
-  --tim-text: #212529;
-  --tim-text-muted: #6c757d;
-  --tim-heading: #212529;
-  --tim-navbar-bg-1: #003399;
-  --tim-navbar-bg-2: #001a66;
+  --tim-card-border: rgba(13, 27, 58, 0.07);
+  --tim-text: #1c2433;
+  --tim-text-muted: #647082;
+  --tim-heading: #101828;
+  --tim-navbar-bg-1: var(--brand-primary);
+  --tim-navbar-bg-2: var(--brand-primary-deep);
   --tim-footer-bg: #ffffff;
-  --tim-hover-bg: #f1f3f5;
-  --tim-table-stripe: rgba(0, 0, 0, 0.03);
+  --tim-hover-bg: #f1f4f8;
+  --tim-table-stripe: rgba(13, 27, 58, 0.03);
+  --tim-focus-ring: rgba(0, 51, 153, 0.35);
 }
 
+/* Dark refinado: pretos com temperatura azul (coerente com a marca) em vez
+ * de cinza neutro — cards levemente mais claros que o fundo, bordas em vez
+ * de sombras carregando a separação (sombra não lê em fundo escuro). */
 [data-theme="dark"] {
-  --tim-bg: #0f1419;
-  --tim-card-bg: #1a1f28;
-  --tim-card-border: rgba(255, 255, 255, 0.08);
-  --tim-text: #e6edf3;
-  --tim-text-muted: #8b949e;
-  --tim-heading: #f0f6fc;
+  --tim-bg: #0b0f17;
+  --tim-card-bg: #131a26;
+  --tim-card-border: rgba(148, 170, 220, 0.10);
+  --tim-text: #dbe4f0;
+  --tim-text-muted: #8494ab;
+  --tim-heading: #eef3fa;
   --tim-navbar-bg-1: #001a66;
   --tim-navbar-bg-2: #000d33;
-  --tim-footer-bg: #1a1f28;
-  --tim-hover-bg: #262c37;
-  --tim-table-stripe: rgba(255, 255, 255, 0.03);
+  --tim-footer-bg: #131a26;
+  --tim-hover-bg: #1c2536;
+  --tim-table-stripe: rgba(148, 170, 220, 0.035);
+  --tim-focus-ring: rgba(122, 162, 255, 0.45);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 body {
   margin: 0;
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
   background: var(--tim-bg);
   color: var(--tim-text);
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background var(--motion-base) var(--ease-in-out), color var(--motion-base) var(--ease-in-out);
+}
+
+/* Números tabulares em todo lugar que alinha dígitos (KPIs, tabelas) —
+ * evita "dança" de largura quando o valor muda. */
+.kpi-card-value,
+.table,
+.badge {
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3, h4, h5, h6, .card-title {
+  font-family: var(--font-sans);
+  letter-spacing: -0.015em; /* tracking apertado = leitura de display premium */
+}
+
+/* ---- Acessibilidade: foco de teclado visível e consistente (AA) ---- */
+:focus-visible {
+  outline: 2px solid var(--tim-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Movimento reduzido: respeita a preferência do SO ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -85,7 +175,18 @@ body {
   background: var(--tim-card-bg);
   color: var(--tim-text);
   border-color: var(--tim-card-border);
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  border-radius: var(--radius-lg);
+  transition: background var(--motion-base) var(--ease-in-out),
+    color var(--motion-base) var(--ease-in-out),
+    border-color var(--motion-base) var(--ease-in-out),
+    box-shadow var(--motion-base) var(--ease-out);
+}
+
+/* O utilitário .shadow-sm do Bootstrap está em todos os cards do app —
+ * sobrescrever ele com o token muda a elevação do portal inteiro num
+ * lugar só (sombra em camadas, mais "produto", menos "borrão"). */
+.card.shadow-sm {
+  box-shadow: var(--shadow-md) !important;
 }
 
 .card .card-title,
