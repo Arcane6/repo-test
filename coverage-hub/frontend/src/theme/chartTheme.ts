@@ -9,20 +9,26 @@ interface ThemePalette {
   splitLine: string;
 }
 
+// Mesma família tipográfica do resto do portal (tokens em styles/index.css).
+// Canvas do ECharts não herda CSS — precisa ser dito aqui explicitamente.
+const CHART_FONT = '"Inter Variable", system-ui, sans-serif';
+
+// Cores alinhadas aos tokens de tema do styles/index.css (o canvas não lê
+// CSS vars — os hex daqui precisam acompanhar mudanças de lá).
 const PALETTES: Record<Theme, ThemePalette> = {
   light: {
-    text: "#212529",
+    text: "#1c2433",
     tooltipBg: "#ffffff",
-    tooltipBorder: "#dddddd",
-    axisLine: "#999999",
-    splitLine: "#eeeeee",
+    tooltipBorder: "#e3e8f0",
+    axisLine: "#9aa5b5",
+    splitLine: "#edf0f5",
   },
   dark: {
-    text: "#e6edf3",
-    tooltipBg: "#1a1f28",
-    tooltipBorder: "#3d444d",
-    axisLine: "#3d444d",
-    splitLine: "#262c37",
+    text: "#dbe4f0",
+    tooltipBg: "#131a26",
+    tooltipBorder: "#2c3850",
+    axisLine: "#3d4a63",
+    splitLine: "#1c2536",
   },
 };
 
@@ -48,7 +54,7 @@ export function applyChartTheme(
 
   const themed: AnyRecord = {
     ...opt,
-    textStyle: { color: p.text, ...(opt.textStyle as AnyRecord) },
+    textStyle: { color: p.text, fontFamily: CHART_FONT, ...(opt.textStyle as AnyRecord) },
   };
 
   if (opt.tooltip) {
@@ -56,8 +62,11 @@ export function applyChartTheme(
     const list = asArray(opt.tooltip as AnyRecord | AnyRecord[]).map((t) => ({
       backgroundColor: p.tooltipBg,
       borderColor: p.tooltipBorder,
+      // Sombra + raio do tooltip seguindo o design system (tokens --shadow-md
+      // e --radius-md — valores replicados porque o canvas não lê CSS vars).
+      extraCssText: "box-shadow: 0 4px 12px rgba(2,12,40,0.12); border-radius: 10px;",
       ...t,
-      textStyle: { color: p.text, ...(t.textStyle as AnyRecord) },
+      textStyle: { color: p.text, fontFamily: CHART_FONT, ...(t.textStyle as AnyRecord) },
     }));
     themed.tooltip = isArr ? list : list[0];
   }

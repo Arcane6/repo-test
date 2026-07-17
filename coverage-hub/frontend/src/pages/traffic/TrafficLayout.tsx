@@ -14,7 +14,7 @@ export function TrafficLayout() {
       <PageHeader
         icon="bi bi-graph-up"
         title="Tráfego"
-        subtitle="Tráfego planejado × realizado e market share TIM × OI"
+        subtitle="Tráfego planejado × realizado por município, UF e regional"
         breadcrumb={[{ label: "Home", to: "/" }, { label: "Tráfego" }]}
       />
 
