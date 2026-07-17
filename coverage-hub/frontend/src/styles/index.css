@@ -936,3 +936,104 @@ h1, h2, h3, h4, h5, h6, .card-title {
 .tim-hero .tim-hero-inner > *:nth-child(2) { animation-delay: 70ms; }
 .tim-hero .tim-hero-inner > *:nth-child(3) { animation-delay: 140ms; }
 .tim-hero .tim-hero-inner > *:nth-child(4) { animation-delay: 210ms; }
+
+/* =============================================================================
+ * POLISH DOS DASHBOARDS  (PR E)
+ * Refinamentos finos, todos data-independentes: hierarquia, cabeçalhos de
+ * card, tabs, tabelas e badges — coerentes com os tokens.
+ * ============================================================================= */
+
+/* ---- KPI card: barra de destaque com a cor de accent (identidade sem
+ * poluir), número maior e "top município" com peso certo. ---- */
+.kpi-card {
+  position: relative;
+  overflow: hidden;
+  padding-left: 22px;
+}
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--kpi-accent, var(--brand-primary));
+  opacity: 0.9;
+}
+.kpi-card-icon { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kpi-accent, var(--brand-primary)) 18%, transparent); }
+
+/* ---- Cabeçalho de card (ChartPanel): título com um pouco mais de peso e
+ * o subtítulo com respiro. ---- */
+.card .card-body > .d-flex > div > .d-flex h6.fw-bold { font-size: 0.98rem; }
+
+/* ---- SourceBadge: chip mais discreto e "de dados". ---- */
+.tim-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--tim-text-muted);
+  background: var(--tim-hover-bg);
+  border: 1px solid var(--tim-card-border);
+  white-space: nowrap;
+}
+.tim-source-badge i { opacity: 0.7; font-size: 0.72rem; }
+.tim-source-badge-ref {
+  padding-left: 5px;
+  margin-left: 3px;
+  border-left: 1px solid var(--tim-card-border);
+  color: var(--tim-heading);
+  font-weight: 700;
+}
+
+/* ---- nav-tabs (sub-abas de módulo, ex.: Resumo Executivo / Tráfego YTD):
+ * some com a "caixinha" default do Bootstrap, vira underline animado. ---- */
+.nav-tabs {
+  border-bottom: 1px solid var(--tim-card-border);
+  gap: 0.25rem;
+}
+.nav-tabs .nav-link {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--tim-text-muted);
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+  transition: color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
+}
+.nav-tabs .nav-link:hover {
+  color: var(--tim-heading);
+  background: var(--tim-hover-bg);
+  border-color: transparent;
+}
+.nav-tabs .nav-link.active {
+  color: var(--brand-primary);
+  background: transparent;
+  border-bottom-color: var(--brand-primary);
+}
+[data-theme="dark"] .nav-tabs .nav-link.active { color: #7aa2ff; border-bottom-color: #7aa2ff; }
+
+/* ---- Tabelas: cabeçalho em "small caps" técnica, hover mais suave. ---- */
+.table > thead th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tim-text-muted);
+  border-bottom: 1px solid var(--tim-card-border);
+}
+.table > tbody > tr { transition: background var(--motion-fast) var(--ease-out); }
+
+/* ---- Delta badges (KPI): pill com cor semântica mais viva. ---- */
+.kpi-delta-badge.up { background: color-mix(in srgb, #2e7d32 14%, transparent); color: #2e7d32; }
+.kpi-delta-badge.down { background: color-mix(in srgb, #c62828 14%, transparent); color: #c62828; }
+[data-theme="dark"] .kpi-delta-badge.up { color: #6ee7a8; }
+[data-theme="dark"] .kpi-delta-badge.down { color: #ff8a8a; }
+
+/* ---- Filtro (react-select) e card do filtro: respiro + foco coerente. ---- */
+.card .row.g-3.align-items-end { row-gap: 0.75rem; }
+
+/* ---- raia-badge: leve sombra pra "descolar" do fundo. ---- */
+.raia-badge { box-shadow: var(--shadow-sm); }
