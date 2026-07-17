@@ -23,7 +23,7 @@ export function ResumoDashboard() {
   const hasFocus = Boolean(focusedTec || focusedRegional || focusedProjeto);
 
   return (
-    <div>
+    <div className="tim-page-enter">
       <div className="mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span className="tim-eyebrow">Resumo executivo</span>
         {hasFocus && (

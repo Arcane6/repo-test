@@ -13,17 +13,28 @@ export function HomePage() {
   const enabledCount = (modules ?? []).filter((m) => m.enabled).length;
 
   return (
-    <>
-      <div className="tim-hero py-5">
-        <div className="container">
+    <div className="tim-page-enter">
+      <div className="tim-hero">
+        <div className="container tim-hero-inner">
           <span className="tim-hero-kicker">
             <i className="bi bi-broadcast" /> Planejamento técnico de rede
           </span>
           <h1 className="fw-bold mb-2 text-white">TIM Technical Planning</h1>
-          <p className="lead mb-0 text-white-50" style={{ maxWidth: "48ch" }}>
-            Cobertura, plano de rollout e projeções num só portal — dados
+          <p className="lead mb-0 tim-hero-lead" style={{ maxWidth: "52ch" }}>
+            Cobertura, rollout, tráfego e projeções num só portal — dados
             direto da rede, sem planilha.
           </p>
+          <div className="tim-hero-stats">
+            <span className="tim-hero-stat">
+              <strong>{modules ? enabledCount : "—"}</strong> módulos ativos
+            </span>
+            <span className="tim-hero-stat">
+              <i className="bi bi-geo-alt" /> 5.570 municípios
+            </span>
+            <span className="tim-hero-stat">
+              <i className="bi bi-lightning-charge" /> Dados ao vivo do Oracle
+            </span>
+          </div>
         </div>
       </div>
 
@@ -46,7 +57,7 @@ export function HomePage() {
                 <div className="col-md-6 col-lg-4" key={i}>
                   <div className="card border-0 shadow-sm h-100">
                     <div className="card-body p-4">
-                      <Skeleton height={52} width={52} radius={12} className="mb-3" />
+                      <Skeleton height={52} width={52} radius={14} className="mb-3" />
                       <Skeleton height={20} width="60%" className="mb-2" />
                       <Skeleton height={14} width="90%" className="mb-1" />
                       <Skeleton height={14} width="70%" />
@@ -54,9 +65,9 @@ export function HomePage() {
                   </div>
                 </div>
               ))
-            : modules?.map((m) => <ModuleCard m={m} key={m.key} />)}
+            : modules?.map((m, i) => <ModuleCard m={m} key={m.key} index={i} />)}
         </div>
       </div>
-    </>
+    </div>
   );
 }

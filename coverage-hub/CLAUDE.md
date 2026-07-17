@@ -408,6 +408,17 @@ consome token; se o token não existe, cria-se o token primeiro.
   de regressão sem ganho visual equivalente); trocar ECharts por
   Tremor/Recharts ❌ (perderia gauge, Venn e labels validados);
   trocar bootstrap-icons ❌ (já é um set único e consistente).
+- **Motion (utilitários prontos, use estes antes de inventar)**:
+  - `<CountUpNumber text="270,6" />` — anima o número "subindo" até o
+    valor (efeito contador). Só numérico (nome/`—` renderiza direto);
+    interpola do valor anterior no re-filtro; respeita reduced-motion.
+    Já embutido no `KpiDeltaCard` — todo KPI conta sozinho. Único uso da
+    lib `motion` (fica nos chunks lazy de dashboard, não na Home).
+  - Classe **`.tim-reveal`** / **`.tim-page-enter`** (fade+rise) no root de
+    página/dashboard — entra na navegação. **`.tim-reveal-item`** +
+    `style={{ "--reveal-i": i }}` faz a grade entrar em cascata (Home).
+  - Hover/press/entrada são **CSS puro** (transform/opacity, 60fps) —
+    não pendurar `motion` em hover; o CSS já cobre.
 - **Performance = UX**: rotas são **code-splitted** (`React.lazy` em
   `App.tsx`) — a Home carrega ~267 KB de JS; ECharts (~580 KB), Leaflet
   (~195 KB) e react-select (~89 KB) só baixam na rota que os usa. O

@@ -1,3 +1,5 @@
+import { CountUpNumber } from "./CountUpNumber";
+
 interface DeltaSpec {
   label: string;
   pct: number | null;
@@ -61,7 +63,7 @@ export function KpiDeltaCard({
       </div>
 
       <div className="kpi-card-value" style={secondaryValue ? { color: accentColor, fontSize: "1.4rem" } : undefined}>
-        {value}
+        <CountUpNumber text={value} />
         {unit && <span className="kpi-card-value-unit">{unit}</span>}
       </div>
       {secondaryValue && <div className="kpi-card-secondary">{secondaryValue}</div>}

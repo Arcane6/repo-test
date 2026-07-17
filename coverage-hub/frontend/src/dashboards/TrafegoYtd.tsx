@@ -35,7 +35,7 @@ export function TrafegoYtd() {
   ]);
 
   return (
-    <div>
+    <div className="tim-page-enter">
       {error && (
         <div className="alert alert-danger d-flex align-items-start gap-2" role="alert">
           <i className="bi bi-exclamation-triangle-fill mt-1" />
