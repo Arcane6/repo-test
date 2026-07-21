@@ -57,6 +57,8 @@ export function FilterBar({ fields }: FilterBarProps) {
               <Select
                 isMulti
                 styles={multiStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
                 placeholder="Todas as UFs"
                 options={ufOptions.map((u) => ({ value: u, label: u }))}
                 value={uf.map((u) => ({ value: u, label: u }))}
@@ -71,6 +73,8 @@ export function FilterBar({ fields }: FilterBarProps) {
               <AsyncSelect
                 isMulti
                 styles={multiStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
                 placeholder="Digite um município..."
                 loadOptions={loadMunicipios}
                 value={municipio.map((m) => ({ value: m, label: m }))}
@@ -90,6 +94,8 @@ export function FilterBar({ fields }: FilterBarProps) {
               <Select
                 isMulti
                 styles={multiStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
                 placeholder="Todas as tecnologias"
                 options={tecOptions}
                 value={tecnologia.map((t) => ({ value: t, label: t }))}
@@ -108,6 +114,8 @@ export function FilterBar({ fields }: FilterBarProps) {
               <label className="form-label fw-bold small">Ano</label>
               <Select
                 styles={singleStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
                 placeholder="Ano"
                 options={anos.map((a) => ({ value: String(a), label: String(a) }))}
                 value={ano ? { value: ano, label: ano } : null}

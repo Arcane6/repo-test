@@ -1,30 +1,35 @@
 """
 Service do módulo Transporte (perfil de infraestrutura de TX + migração).
 
-Regras de negócio:
-- **Mídia** = 1º token do TIPO_TX (FO/MW/SAT/LL/SLS/N/I); vazio → "Não
-  definido". **RanSharing** (CLASSIFICACAO='RANSHARING') sobrescreve a mídia
-  pra **RS** — o usuário pediu RS como um dos tipos, e ele não existe no
-  TIPO_TX. (Se um dia quiser RS sem sobrescrever a mídia física, é só tirar
-  o override em `_media`.)
-- **Capacidade** = 2º token (10G/1G/<1G) ou "Outros" (LEO/IPSEC/...).
+**Toda a agregação acontece no Oracle** (ver queries.py): as contagens por
+mídia, capacidade, migração, MAKE/BUY e fiberização saem de `GROUP BY` no
+banco. Aqui a gente só monta a cláusula de filtro, dispara as queries e
+reformata os poucos grupos que voltam pro shape de JSON que o front espera.
+
+Regras de negócio (implementadas em SQL, documentadas aqui):
+- **Mídia** = 1º token do TIPO_TX (FO/MW/SAT/LL/SLS); token desconhecido →
+  'N/I'; coluna vazia → NULL, que aqui vira "Não definido". **RanSharing**
+  (CLASSIFICACAO='RANSHARING') sobrescreve a mídia pra 'RS'.
+- **Capacidade** = 2º token (10G/1G/<1G) ou "Outros"; sem 2º token → fora do
+  denominador de %10G.
 - **Fiberização** = FO ÷ sites com mídia definida (exclui "Não definido").
 - **% 10G** = sites 10G ÷ sites com capacidade conhecida.
 - **Raias**: Fechamento 2025 = TIPO_TX_25 · Plano 26 = TIPO_TX_PLAN (só os
-  sites com plano explícito, ~ poucos) · Fechamento 26 = TIPO_TX_26.
+  sites com plano explícito) · Fechamento 26 = TIPO_TX_26.
 """
 
 from database.oracle import execute_query
 
-from modules.transport.queries import TX_PROFILE
+from modules.transport import queries as q
 
 MEDIA_ORDER = ["FO", "MW", "RS", "SAT", "LL", "SLS", "N/I", "Não definido"]
-MEDIA_TOKENS = {"FO", "MW", "SAT", "LL", "SLS"}
 CAP_ORDER = ["10G", "1G", "<1G", "Outros"]
+TECS = ["2G", "3G", "4G", "5G"]
+UNDEF = "Não definido"
 
 
 # ---------------------------------------------------------------------------
-# Filtros (UF direto, Município via ponte IBGE — igual Tráfego)
+# Filtros (UF direto, Regional direto, Município via ponte IBGE — igual Tráfego)
 # ---------------------------------------------------------------------------
 
 def _normalize_list(value):
@@ -43,7 +48,7 @@ def _build_uf_clause(values, params):
         key = f"uf_{i}"
         params[key] = v.upper()
         ph.append(f":{key}")
-    return f"AND UPPER(TRIM(UF)) IN ({', '.join(ph)})"
+    return f" AND UPPER(TRIM(UF)) IN ({', '.join(ph)})"
 
 
 def _build_regional_clause(values, params):
@@ -54,7 +59,7 @@ def _build_regional_clause(values, params):
         key = f"reg_{i}"
         params[key] = v.upper()
         ph.append(f":{key}")
-    return f"AND UPPER(TRIM(REGIONAL)) IN ({', '.join(ph)})"
+    return f" AND UPPER(TRIM(REGIONAL)) IN ({', '.join(ph)})"
 
 
 def _build_municipio_clause(values, params):
@@ -68,7 +73,7 @@ def _build_municipio_clause(values, params):
         params[key] = v
         ph.append(f":{key}")
     in_list = ", ".join(ph)
-    return f"""AND TO_CHAR(IBGE_ID) IN (
+    return f""" AND TO_CHAR(IBGE_ID) IN (
         SELECT SUBSTR(TO_CHAR(IBGE), 1, 6)
         FROM NTW_OP.MUNICIPIOS_FECHAMENTO
         WHERE TRUNC(DT_CARGA) = (SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO)
@@ -76,38 +81,24 @@ def _build_municipio_clause(values, params):
     )"""
 
 
-def _rows(filters):
+def _filters(filters):
+    """Monta a cláusula única 'AND ...' compartilhada por todas as queries."""
     params = {}
-    sql = TX_PROFILE.format(
-        uf_filter=_build_uf_clause(_normalize_list(filters.get("ufs")), params),
-        municipio_filter=_build_municipio_clause(_normalize_list(filters.get("municipios")), params),
-        regional_filter=_build_regional_clause(_normalize_list(filters.get("regionais")), params),
+    clause = (
+        _build_uf_clause(_normalize_list(filters.get("ufs")), params)
+        + _build_municipio_clause(_normalize_list(filters.get("municipios")), params)
+        + _build_regional_clause(_normalize_list(filters.get("regionais")), params)
     )
-    return execute_query(sql, params) or []
+    return clause, params
 
 
 # ---------------------------------------------------------------------------
-# Parsing de mídia / capacidade
+# Helpers de reformatação (os grupos já vêm agregados do banco)
 # ---------------------------------------------------------------------------
 
-def _media(tipo_tx, classificacao):
-    if str(classificacao or "").strip().upper() == "RANSHARING":
-        return "RS"
-    tt = str(tipo_tx or "").strip()
-    if not tt:
-        return "Não definido"
-    tok = tt.split()[0].upper()
-    if tok == "N/I":
-        return "N/I"
-    return tok if tok in MEDIA_TOKENS else "N/I"
-
-
-def _capacity(tipo_tx):
-    parts = str(tipo_tx or "").strip().split(None, 1)
-    if len(parts) < 2:
-        return None
-    cap = parts[1].strip().upper()
-    return cap if cap in {"10G", "1G", "<1G"} else "Outros"
+def _media_label(value):
+    """NULL do banco (coluna vazia) → 'Não definido'; o resto vem pronto."""
+    return value if value else UNDEF
 
 
 def _ordered_media(counts):
@@ -116,30 +107,28 @@ def _ordered_media(counts):
     return known + sorted(extra)
 
 
-def _media_counts(rows, tx_key):
-    agg = {}
+def _collapse(rows, key):
+    """Colapsa a matriz de transição numa contagem 1-D por mídia/capacidade."""
+    out = {}
     for r in rows:
-        m = _media(r.get(tx_key), r.get("classificacao"))
-        agg[m] = agg.get(m, 0) + 1
-    return agg
+        label = _media_label(r.get(key))
+        out[label] = out.get(label, 0) + int(r.get("n") or 0)
+    return out
 
 
-# ---------------------------------------------------------------------------
-# Perfil por raia
-# ---------------------------------------------------------------------------
-
-def _perfil(rows, tx_key):
-    media_counts = {}
-    cap_counts = {}
+def _collapse_cap(rows, key):
+    out = {}
     for r in rows:
-        m = _media(r.get(tx_key), r.get("classificacao"))
-        media_counts[m] = media_counts.get(m, 0) + 1
-        c = _capacity(r.get(tx_key))
-        if c:
-            cap_counts[c] = cap_counts.get(c, 0) + 1
+        c = r.get(key)
+        if not c:  # sem 2º token → fora do denominador de %10G
+            continue
+        out[c] = out.get(c, 0) + int(r.get("n") or 0)
+    return out
 
-    total = len(rows)
-    definidos = total - media_counts.get("Não definido", 0)
+
+def _perfil(media_counts, cap_counts):
+    total = sum(media_counts.values())
+    definidos = total - media_counts.get(UNDEF, 0)
     fo = media_counts.get("FO", 0)
     cap_total = sum(cap_counts.values())
     return {
@@ -158,25 +147,28 @@ def _perfil(rows, tx_key):
 
 def get_resumo_executivo(filters):
     """3 raias: Fechamento 2025 (TX_25) · Plano 26 (TX_PLAN) · Fechamento 26
-    (TX_26). A raia Plano usa só os sites com plano explícito de
-    transformação (TIPO_TX_PLAN preenchido)."""
-    rows = _rows(filters)
+    (TX_26). Tudo agregado no Oracle: 3 queries (transição de mídia,
+    transição de capacidade e perfil do plano)."""
+    clause, params = _filters(filters)
 
-    fechamento_2025 = _perfil(rows, "tipo_tx_25")
-    fechamento_26 = _perfil(rows, "tipo_tx_26")
+    trans = execute_query(q.media_transition_sql(clause), params) or []
+    cap = execute_query(q.cap_transition_sql(clause), params) or []
+    plano = execute_query(q.plano_profile_sql(clause), params) or []
 
-    # Plano 26: só quem tem transformação planejada (TX_PLAN preenchido) — o
-    # resto fica como está, então não faz sentido no denominador do plano.
-    rows_plano = [r for r in rows if str(r.get("tipo_tx_plan") or "").strip()]
-    plano_26 = _perfil(rows_plano, "tipo_tx_plan")
+    m25 = _collapse(trans, "de")
+    m26 = _collapse(trans, "para")
+    c25 = _collapse_cap(cap, "c25")
+    c26 = _collapse_cap(cap, "c26")
 
-    # Variação de mídia 25→26 (pro destaque da raia Fechamento 26).
-    m25 = _media_counts(rows, "tipo_tx_25")
-    m26 = _media_counts(rows, "tipo_tx_26")
+    fechamento_2025 = _perfil(m25, c25)
+    fechamento_26 = _perfil(m26, c26)
+    plano_26 = _perfil(_collapse(plano, "media"), _collapse_cap(plano, "capac"))
+
+    # Variação de mídia 25→26 (destaque da raia Fechamento 26).
     medias = _ordered_media({**m25, **m26})
     fechamento_26["variacao"] = [
         {"label": m, "delta": m26.get(m, 0) - m25.get(m, 0)}
-        for m in medias if m not in ("Não definido",)
+        for m in medias if m != UNDEF
     ]
 
     return {
@@ -187,52 +179,56 @@ def get_resumo_executivo(filters):
 
 
 def get_composicao(filters):
-    """Aba 2 — Composição & Migração 25×26."""
-    rows = _rows(filters)
-    m25 = _media_counts(rows, "tipo_tx_25")
-    m26 = _media_counts(rows, "tipo_tx_26")
+    """Aba 2 — Composição & Migração 25×26. Agregado no Oracle: matriz de
+    transição (serve composição + migração), MAKE/BUY e fiberização por
+    regional/tecnologia."""
+    clause, params = _filters(filters)
+
+    trans = execute_query(q.media_transition_sql(clause), params) or []
+    make_buy_rows = execute_query(q.make_buy_sql(clause), params) or []
+    reg_rows = execute_query(q.fiber_por_regional_sql(clause), params) or []
+    tec_rows = execute_query(q.fiber_por_tecnologia_sql(clause), params) or []
+
+    m25 = _collapse(trans, "de")
+    m26 = _collapse(trans, "para")
 
     # Barras 25×26 por mídia (a "variação de composição por tipo" pedida).
-    medias = [m for m in _ordered_media({**m25, **m26}) if m != "Não definido"]
+    medias = [m for m in _ordered_media({**m25, **m26}) if m != UNDEF]
     por_midia = [
         {"midia": m, "c25": m25.get(m, 0), "c26": m26.get(m, 0), "delta": m26.get(m, 0) - m25.get(m, 0)}
         for m in medias
     ]
 
-    # Fluxos de migração 25→26 (só quem mudou de mídia, ambas definidas).
-    mig = {}
-    for r in rows:
-        a = _media(r.get("tipo_tx_25"), r.get("classificacao"))
-        b = _media(r.get("tipo_tx_26"), r.get("classificacao"))
-        if a != b and "Não definido" not in (a, b):
-            mig[(a, b)] = mig.get((a, b), 0) + 1
-    migracao = [
-        {"de": k[0], "para": k[1], "value": v}
-        for k, v in sorted(mig.items(), key=lambda kv: kv[1], reverse=True)
-    ][:10]
+    # Fluxos de migração 25→26 (só quem mudou de mídia; exclui "Não definido").
+    migracao = sorted(
+        (
+            {"de": _media_label(r.get("de")), "para": _media_label(r.get("para")),
+             "value": int(r.get("n") or 0)}
+            for r in trans
+            if _media_label(r.get("de")) != _media_label(r.get("para"))
+            and UNDEF not in (_media_label(r.get("de")), _media_label(r.get("para")))
+        ),
+        key=lambda x: x["value"], reverse=True,
+    )[:10]
 
-    # MAKE × BUY (estratégia de construção de fibra).
-    make_buy = {}
-    for r in rows:
-        mm = str(r.get("metodo_construtivo_fo") or "").strip() or "N/D"
-        make_buy[mm] = make_buy.get(mm, 0) + 1
-    make_buy_items = [
-        {"label": k, "value": v}
-        for k, v in sorted(make_buy.items(), key=lambda kv: kv[1], reverse=True)
-        if k != "N/D"
-    ]
+    # MAKE × BUY (estratégia de construção de fibra) — nulos já saíram no SQL.
+    make_buy = sorted(
+        ({"label": r.get("metodo"), "value": int(r.get("n") or 0)} for r in make_buy_rows),
+        key=lambda x: x["value"], reverse=True,
+    )
 
-    # Fiberização por regional (onde a fibra está adiantada/atrasada), base 26.
+    # Fiberização por regional (base 26): FO ÷ definidos por regional.
     reg = {}
-    for r in rows:
-        rg = str(r.get("regional") or "N/D").strip() or "N/D"
+    for r in reg_rows:
+        rg = r.get("regional") or "N/D"
         d = reg.setdefault(rg, {"total": 0, "definidos": 0, "fo": 0})
-        m = _media(r.get("tipo_tx_26"), r.get("classificacao"))
-        d["total"] += 1
-        if m != "Não definido":
-            d["definidos"] += 1
-        if m == "FO":
-            d["fo"] += 1
+        media = _media_label(r.get("media"))
+        n = int(r.get("n") or 0)
+        d["total"] += n
+        if media != UNDEF:
+            d["definidos"] += n
+        if media == "FO":
+            d["fo"] += n
     por_regional = sorted(
         [
             {"regional": k, "total": v["total"],
@@ -242,27 +238,22 @@ def get_composicao(filters):
         key=lambda x: x["pct_fibra"], reverse=True,
     )
 
-    # Fiberização por tecnologia de rádio servida (presença), base 26 —
-    # crítico: sites 5G precisam de fibra de alta capacidade.
-    tec = {t: {"total": 0, "fo": 0} for t in ["2G", "3G", "4G", "5G"]}
-    for r in rows:
-        tecs = str(r.get("tecnologia") or "")
-        m = _media(r.get("tipo_tx_26"), r.get("classificacao"))
-        for t in ["2G", "3G", "4G", "5G"]:
-            if t in tecs:
-                tec[t]["total"] += 1
-                if m == "FO":
-                    tec[t]["fo"] += 1
-    por_tecnologia = [
-        {"tec": t, "total": tec[t]["total"],
-         "pct_fibra": round(tec[t]["fo"] / tec[t]["total"] * 100, 1) if tec[t]["total"] else 0.0}
-        for t in ["2G", "3G", "4G", "5G"]
-    ]
+    # Fiberização por tecnologia de rádio (base 26) — 1 linha de agregação
+    # condicional (um site multi-rádio conta em cada tecnologia servida).
+    tr = tec_rows[0] if tec_rows else {}
+    por_tecnologia = []
+    for t in TECS:
+        total = int(tr.get(f"tot_{t[0].lower()}g") or 0)
+        fo = int(tr.get(f"fo_{t[0].lower()}g") or 0)
+        por_tecnologia.append({
+            "tec": t, "total": total,
+            "pct_fibra": round(fo / total * 100, 1) if total else 0.0,
+        })
 
     return {
         "por_midia": por_midia,
         "migracao": migracao,
-        "make_buy": make_buy_items,
+        "make_buy": make_buy,
         "por_regional": por_regional,
         "por_tecnologia": por_tecnologia,
     }
