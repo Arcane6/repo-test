@@ -34,6 +34,8 @@ export function TrafficFilterBar() {
             <Select
               isMulti
               styles={multiStyles}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+              menuPosition="fixed"
               placeholder="Todas as UFs"
               options={ufOptions.map((u) => ({ value: u, label: u }))}
               value={uf.map((u) => ({ value: u, label: u }))}
@@ -46,6 +48,8 @@ export function TrafficFilterBar() {
             <AsyncSelect
               isMulti
               styles={multiStyles}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+              menuPosition="fixed"
               placeholder="Digite um município..."
               loadOptions={loadMunicipios}
               value={municipio.map((m) => ({ value: m, label: m }))}

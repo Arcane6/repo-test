@@ -20,6 +20,13 @@ export function themedSelectStyles<Option, IsMulti extends boolean>(): StylesCon
       backgroundColor: "var(--tim-card-bg)",
       zIndex: 20,
     }),
+    // Os cards das raias/painéis usam `transform` (hover/entrada), e todo
+    // elemento com transform cria um NOVO stacking context — isso aprisionava
+    // o dropdown atrás da Raia 1, por mais alto que fosse o z-index do menu.
+    // Renderizamos o menu num portal pro <body> (menuPortalTarget), e aqui
+    // damos o z-index que garante que ele fique acima de tudo (navbar sticky
+    // do Bootstrap é ~1030).
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
     singleValue: (base) => ({ ...base, color: "var(--tim-text)" }),
     input: (base) => ({ ...base, color: "var(--tim-text)" }),
     placeholder: (base) => ({ ...base, color: "var(--tim-text-muted)" }),

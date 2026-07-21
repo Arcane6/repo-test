@@ -28,6 +28,8 @@ export function TransportFilterBar() {
           <div className="col-md">
             <label className="form-label fw-bold small">UF</label>
             <Select isMulti styles={multi} placeholder="Todas as UFs"
+              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+              menuPosition="fixed"
               options={ufOptions.map((u) => ({ value: u, label: u }))}
               value={uf.map((u) => ({ value: u, label: u }))}
               onChange={(s) => setValues("uf", s.map((x) => x.value))} />
@@ -35,6 +37,8 @@ export function TransportFilterBar() {
           <div className="col-md">
             <label className="form-label fw-bold small">Regional</label>
             <Select isMulti styles={multi} placeholder="Todas as regionais"
+              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+              menuPosition="fixed"
               options={REGIONAIS.map((r) => ({ value: r, label: r }))}
               value={regional.map((r) => ({ value: r, label: r }))}
               onChange={(s) => setValues("regional", s.map((x) => x.value))} />
@@ -42,6 +46,8 @@ export function TransportFilterBar() {
           <div className="col-md">
             <label className="form-label fw-bold small">Município</label>
             <AsyncSelect isMulti styles={multi} placeholder="Digite um município..."
+              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+              menuPosition="fixed"
               loadOptions={loadMunicipios}
               value={municipio.map((m) => ({ value: m, label: m }))}
               onChange={(s) => setValues("municipio", s.map((x) => x.value))} />

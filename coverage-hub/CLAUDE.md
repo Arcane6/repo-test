@@ -300,9 +300,16 @@ Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
 `/transport`, duas abas (mesmo padrão do Tráfego): **Resumo Executivo**
 (3 raias) e **Composição & Migração 25×26**.
 
-- **Tabela pequena, muitos cortes → puxa 1 vez e agrega no Python** (ao
-  contrário do Tráfego, que multiplicava por ano×operadora×mês e por isso
-  agrega no Oracle). Documentado em `queries.py`.
+- **Agregação no Oracle, não no servidor** (mesmo princípio do Tráfego):
+  toda contagem sai de `GROUP BY` no banco — a taxonomia `<MÍDIA>
+  <CAPACIDADE>` é decodificada em SQL com `REGEXP_SUBSTR`, e o Python só
+  reformata os poucos grupos que voltam. Nunca trafegamos as ~33k linhas
+  cruas. As queries são montadas por `_media_expr`/`_cap_expr` +
+  builders (`media_transition_sql`, `cap_transition_sql`,
+  `plano_profile_sql`, `make_buy_sql`, `fiber_por_regional_sql`,
+  `fiber_por_tecnologia_sql`) em `queries.py`. A matriz de transição
+  25→26 (`GROUP BY mídia25, mídia26`) serve vários números de uma vez
+  (composição, variação e migração).
 - **Tipo de transporte = `<MÍDIA> <CAPACIDADE>`** em `TIPO_TX_25` /
   `TIPO_TX_26` / `TIPO_TX_PLAN` (ex.: "FO 10G", "MW <1G", "SAT LEO").
   - **Mídia** = 1º token (FO/MW/SAT/LL/SLS/N/I); vazio → "Não definido".
