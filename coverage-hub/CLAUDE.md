@@ -293,6 +293,45 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     aderência ficam distorcidos localmente — Jan/Fev realizados vazios) e
     não há **2025**; em produção o Oracle tem o histórico completo.
 
+## Módulo Transporte (`modules/transport/`) — perfil de infraestrutura de TX
+
+Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
+`NTW_OP.REL_TX_PROFILE` (1 linha por site, snapshot único, ~33k linhas). Prefixo
+`/transport`, duas abas (mesmo padrão do Tráfego): **Resumo Executivo**
+(3 raias) e **Composição & Migração 25×26**.
+
+- **Tabela pequena, muitos cortes → puxa 1 vez e agrega no Python** (ao
+  contrário do Tráfego, que multiplicava por ano×operadora×mês e por isso
+  agrega no Oracle). Documentado em `queries.py`.
+- **Tipo de transporte = `<MÍDIA> <CAPACIDADE>`** em `TIPO_TX_25` /
+  `TIPO_TX_26` / `TIPO_TX_PLAN` (ex.: "FO 10G", "MW <1G", "SAT LEO").
+  - **Mídia** = 1º token (FO/MW/SAT/LL/SLS/N/I); vazio → "Não definido".
+  - **RS (RanSharing)** NÃO está no TIPO_TX — vem de
+    `CLASSIFICACAO='RANSHARING'`, e o service **sobrescreve** a mídia pra
+    RS (o usuário pediu RS como um dos tipos). Se um dia quiser RS sem
+    apagar a mídia física, remover o override em `_media`.
+  - **Capacidade** = 2º token (10G/1G/<1G) ou "Outros".
+  - **Fiberização** = FO ÷ sites com mídia definida; **% 10G** = 10G ÷
+    sites com capacidade conhecida.
+- **Raias**: Fechamento 2025 (`TIPO_TX_25`) · Plano 26 (`TIPO_TX_PLAN` —
+  só os ~461 sites com transformação planejada; o resto fica como está) ·
+  Fechamento 26 (`TIPO_TX_26`) + variação de mídia 25→26.
+- **Aba 2**: barras 25×26 por mídia, top migrações (MW→FO etc.), MAKE×BUY
+  (`METODO_CONSTRUTIVO_FO`), fiberização por regional e **por tecnologia
+  de rádio** (usa as cores canônicas — ver abaixo).
+- Filtro: UF + **Regional** (dimensão limpa aqui) + Município (ponte IBGE,
+  igual Tráfego). Store próprio (`store/transportFilters.ts`).
+
+### Cores por tecnologia/mídia — fonte ÚNICA (`frontend/src/theme.ts`)
+
+Regra fechada a pedido do usuário: **toda quebra por tecnologia de rádio
+(2G/3G/4G/5G) usa `techColor()`/`TECH_COLORS`** (2G `#1E88E5`, 3G
+`#E53935`, 4G `#F5C518`, 5G `#7DC242`) — nunca cores locais. O módulo
+Tráfego usava cores próprias (2G cinza etc.) e **foi corrigido** pra usar
+o mapa canônico. Mídia de transporte (FO/MW/RS/SAT/LL/SLS) tem sua paleta
+semântica própria em `TRANSPORT_COLORS` (fibra=verde, MW=âmbar,
+SAT=roxo...), também fonte única.
+
 ## Convenções de backend
 
 - **Templates SQL com placeholders**: cada query é uma string Python com

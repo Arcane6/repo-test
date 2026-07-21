@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from modules.core.routes import core_bp
 from modules.mobile_access.routes import mobile_access_bp
 from modules.traffic.routes import traffic_bp
+from modules.transport.routes import transport_bp
 
 
 app = Flask(__name__)
@@ -15,6 +16,7 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.register_blueprint(core_bp)
 app.register_blueprint(mobile_access_bp)
 app.register_blueprint(traffic_bp)
+app.register_blueprint(transport_bp)
 
 DIST_DIR = os.path.join(app.static_folder, "dist")
 

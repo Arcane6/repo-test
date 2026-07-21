@@ -1,0 +1,34 @@
+import { NavLink, Outlet } from "react-router-dom";
+import { PageHeader } from "../../components/PageHeader";
+import { TransportFilterBar } from "../../components/TransportFilterBar";
+
+/** Módulo Transporte (perfil de infraestrutura de TX). Duas abas: Resumo
+ * Executivo (3 raias) e Composição & Migração 25×26. */
+export function TransportLayout() {
+  return (
+    <div className="container-fluid mt-4">
+      <PageHeader
+        icon="bi bi-diagram-3"
+        title="Transporte"
+        subtitle="Perfil de infraestrutura de transporte (backhaul) e migração para fibra"
+        breadcrumb={[{ label: "Home", to: "/" }, { label: "Transporte" }]}
+      />
+
+      <ul className="nav nav-tabs mb-4" role="tablist">
+        <li className="nav-item" role="presentation">
+          <NavLink className={({ isActive }) => "nav-link" + (isActive ? " active" : "")} to="resumo-executivo" role="tab">
+            <i className="bi bi-clipboard-data me-1" /> Resumo Executivo
+          </NavLink>
+        </li>
+        <li className="nav-item" role="presentation">
+          <NavLink className={({ isActive }) => "nav-link" + (isActive ? " active" : "")} to="composicao" role="tab">
+            <i className="bi bi-arrow-left-right me-1" /> Composição &amp; Migração
+          </NavLink>
+        </li>
+      </ul>
+
+      <TransportFilterBar />
+      <Outlet />
+    </div>
+  );
+}

@@ -30,6 +30,15 @@ const TrafegoResumoExecutivo = lazy(() =>
 const TrafegoYtd = lazy(() =>
   import("./dashboards/TrafegoYtd").then((m) => ({ default: m.TrafegoYtd })),
 );
+const TransportLayout = lazy(() =>
+  import("./pages/transport/TransportLayout").then((m) => ({ default: m.TransportLayout })),
+);
+const TransporteResumoExecutivo = lazy(() =>
+  import("./dashboards/TransporteResumoExecutivo").then((m) => ({ default: m.TransporteResumoExecutivo })),
+);
+const TransporteComposicao = lazy(() =>
+  import("./dashboards/TransporteComposicao").then((m) => ({ default: m.TransporteComposicao })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +99,18 @@ export function App() {
               <Route index element={<Navigate to="resumo-executivo" replace />} />
               <Route path="resumo-executivo" element={<TrafegoResumoExecutivo />} />
               <Route path="ytd" element={<TrafegoYtd />} />
+            </Route>
+            <Route
+              path="transport"
+              element={
+                <Suspense fallback={<RouteFallback />}>
+                  <TransportLayout />
+                </Suspense>
+              }
+            >
+              <Route index element={<Navigate to="resumo-executivo" replace />} />
+              <Route path="resumo-executivo" element={<TransporteResumoExecutivo />} />
+              <Route path="composicao" element={<TransporteComposicao />} />
             </Route>
           </Route>
         </Routes>
