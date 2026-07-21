@@ -99,7 +99,7 @@ export function TransporteResumoExecutivo() {
         subtitle="Backlog de transformação de transporte planejada (destino)">
         <div className="row g-3">
           <div className="col-md-4">
-            <KpiDeltaCard label="Sites com Plano" icon="bi bi-tools" accentColor="#F5A623"
+            <KpiDeltaCard label="Sites no Plano" icon="bi bi-tools" accentColor="#F5A623"
               value={r2 ? fmtInt(r2.total_sites) : "—"} secondaryValue="transformação de TX planejada" deltas={[]} />
           </div>
           <div className="col-md-8">
