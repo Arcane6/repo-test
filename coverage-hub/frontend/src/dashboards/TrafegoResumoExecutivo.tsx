@@ -5,6 +5,7 @@ import { KpiDeltaCard } from "../components/KpiDeltaCard";
 import { donutOption, horizontalBarsOption, trafficPlanVsRealOption } from "../charts/optionBuilders";
 import { trafficApi, type LabeledValue } from "../api/traffic";
 import { useTrafficFilterStore } from "../store/trafficFilters";
+import { techColor } from "../theme";
 
 const fmtPb = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 const fmtPct = (v: number | null | undefined) =>
@@ -17,16 +18,14 @@ const RAIA = {
   r3: "#7DC242",
 };
 
-const TECH_COLOR: Record<string, string> = {
-  "2G": "#9E9E9E",
-  "2G/3G": "#9E9E9E",
-  "3G": "#B0BEC5",
-  "4G": "#1E88E5",
-  "5G": "#7DC242",
-};
+// Cores de tecnologia = mapa canônico do portal (theme.ts). "2G/3G" (camada
+// combinada do planejado) herda o tom do 3G — é legado agrupado.
+function techColorTraffic(label: string): string {
+  return label === "2G/3G" ? "#E53935" : techColor(label);
+}
 
 function toDonut(items: LabeledValue[]) {
-  return items.map((i) => ({ label: i.label, value: i.value, color: TECH_COLOR[i.label] ?? "#003399" }));
+  return items.map((i) => ({ label: i.label, value: i.value, color: techColorTraffic(i.label) }));
 }
 
 /** Bloco de raia com o mesmo destaque visual do Resumo do Acesso Móvel
