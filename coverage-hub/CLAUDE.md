@@ -296,7 +296,7 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
 ## Módulo Transporte (`modules/transport/`) — perfil de infraestrutura de TX
 
 Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
-`REL_TX_PROFILE` (1 linha por site, snapshot único, ~33k linhas). Prefixo
+`NTW_OP.REL_TX_PROFILE` (1 linha por site, snapshot único, ~33k linhas). Prefixo
 `/transport`, duas abas (mesmo padrão do Tráfego): **Resumo Executivo**
 (3 raias) e **Composição & Migração 25×26**.
 

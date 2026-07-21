@@ -1,7 +1,7 @@
 """
 Query do módulo Transporte (perfil de infraestrutura de TX).
 
-Fonte: REL_TX_PROFILE — 1 linha por site (END_ID), snapshot único. Tabela
+Fonte: NTW_OP.REL_TX_PROFILE — 1 linha por site (END_ID), snapshot único. Tabela
 pequena (~33k linhas) e com MUITOS cortes ortogonais (mídia, capacidade,
 MAKE/BUY, tecnologia rádio, regional, migração 25→26). Por isso — ao
 contrário do Tráfego, que multiplicava por ano×operadora×mês (~140k) — aqui
@@ -31,7 +31,7 @@ SELECT
     TIPO_TX_26,
     TIPO_TX_PLAN,
     CLASSIFICACAO
-FROM REL_TX_PROFILE
+FROM NTW_OP.REL_TX_PROFILE
 WHERE 1 = 1
 {uf_filter}
 {municipio_filter}
