@@ -39,7 +39,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
           <ChartPanel
             title="Novas Cidades por Regional"
             subtitle="Clique num regional pra filtrar toda a aba"
-            sourceTable="MUNICIPIOS_FECHAMENTO"
+            sourceTable="REL_CIDADES_PLANEJADO_26"
             height={340}
             option={regionalDonutOption(citiesAnf?.slices ?? [], "Novas cidades", focusedRegional)}
             loading={loadingCitiesAnf}

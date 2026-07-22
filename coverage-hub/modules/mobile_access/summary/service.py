@@ -286,14 +286,22 @@ def get_r1_vendors(filters):
 
 def get_r2_new_cities_by_anf(filters):
     """
-    Novas cidades por REGIONAL (TNE, TCN, TSP, etc.).
-    Nome de função mantido pra não quebrar rota, mas agora usa REGIONAL.
-    """
-    params, ano_int = _prepare_params(filters)
-    params["plan_start"] = _dt.date(ano_int, 1, 1)
-    params["plan_end"]   = _dt.date(ano_int, 12, 31)
+    Novas cidades por REGIONAL (TNE, TCO, TSP, etc.) — PLANO 26.
 
-    sql = _apply_geo_all(R2_NEW_CITIES_BY_ANF, filters, params)
+    Fonte: NTW_OP.REL_CIDADES_PLANEJADO_26, lista fechada (1 linha por IBGE)
+    das cidades novas do plano — não tem MES_REF/DT_CARGA, então sem recorte
+    de data. Município filtra via ponte IBGE (mesmo padrão de Tráfego/
+    Transporte) porque o nome de município nesta tabela pode não bater
+    caractere-a-caractere com o nome resolvido no autocomplete do filtro
+    (que busca em MUNICIPIOS_FECHAMENTO).
+    """
+    params = {}
+    mun_clause = _build_municipio_ibge_clause(
+        "IBGE", _normalize_list(filters.get("municipios")), "mun", params
+    )
+    template = R2_NEW_CITIES_BY_ANF.replace("{municipio_filter}", mun_clause)
+
+    sql = _apply_geo_all(template, filters, params)
     rows = execute_query(sql, params) or []
     total = sum((r.get("cidades", 0) or 0) for r in rows)
     return {

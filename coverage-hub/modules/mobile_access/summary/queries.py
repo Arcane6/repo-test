@@ -194,19 +194,17 @@ ORDER BY qtd DESC
 # ===========================================================================
 
 # ---------- Novas cidades por regional (ANF) — plano 26 ----------
-# Fonte: MUNICIPIOS_FECHAMENTO com MES_DIV_5G no ano-plano
-# Foca 5G (que é onde há expansão real de cidades)
+# Fonte: REL_CIDADES_PLANEJADO_26 — lista FECHADA das cidades novas do plano
+# (1 linha por IBGE, sem data/recorte de mês; não é base de realizado). Antes
+# usava MUNICIPIOS_FECHAMENTO com MES_DIV_5G, que é fechamento/realizado —
+# trocado a pedido do usuário porque misturava a raia de Plano com dado real.
 
 R2_NEW_CITIES_BY_ANF = """
 SELECT
     REGIONAL AS agrupador,
-    COUNT(DISTINCT IBGE) AS cidades
-FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-WHERE TRUNC(DT_CARGA) = (
-    SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-)
-AND MES_DIV_5G BETWEEN :plan_start AND :plan_end
-AND REGIONAL IS NOT NULL
+    COUNT(*) AS cidades
+FROM NTW_OP.REL_CIDADES_PLANEJADO_26
+WHERE 1 = 1
 {uf_filter}
 {municipio_filter}
 {regional_filter}
