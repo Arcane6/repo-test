@@ -108,12 +108,30 @@ export interface ReconDivergencia {
 export interface TransportReconResponse {
   total_tx: number;
   em_ambas: number;
+  comparaveis: number;
+  sem_media: number;
   so_no_tx: number;
   concordantes: number;
   divergentes: number;
   pct_concordancia: number | null;
   matriz: ReconCell[];
   top_divergencias: ReconDivergencia[];
+}
+
+export interface ReconDivergenciaRow {
+  end_id: string;
+  ibge: string;
+  uf: string;
+  municipio: string;
+  tipo_tx: string;
+  tipo_base: string;
+  media_tx: string;
+  media_base: string;
+}
+export interface TransportReconDivergResponse {
+  rows: ReconDivergenciaRow[];
+  total: number;
+  truncated: boolean;
 }
 
 export const transportApi = {
@@ -127,4 +145,6 @@ export const transportApi = {
     fetchJson<TransportGeoResponse>(`${BASE}/geo-points?${query(f)}`),
   reconciliacao: (f: TransportFilters) =>
     fetchJson<TransportReconResponse>(`${BASE}/reconciliacao?${query(f)}`),
+  reconciliacaoDivergencias: (f: TransportFilters) =>
+    fetchJson<TransportReconDivergResponse>(`${BASE}/reconciliacao/divergencias?${query(f)}`),
 };

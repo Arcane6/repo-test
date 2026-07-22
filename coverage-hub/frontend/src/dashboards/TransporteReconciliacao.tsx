@@ -3,6 +3,7 @@ import { ChartPanel } from "../components/ChartPanel";
 import { KpiDeltaCard } from "../components/KpiDeltaCard";
 import { SourceBadge } from "../components/SourceBadge";
 import { horizontalBarsOption } from "../charts/optionBuilders";
+import { downloadSheet } from "../utils/excelExport";
 import { transportApi, type ReconCell } from "../api/transport";
 import { useTransportFilterStore } from "../store/transportFilters";
 import { TRANSPORT_COLORS, TRANSPORT_ORDER } from "../theme";
@@ -86,7 +87,31 @@ export function TransporteReconciliacao() {
     retry: false,
   });
 
+  const { data: div } = useQuery({
+    queryKey: ["transport-reconciliacao-div", uf, municipio, regional],
+    queryFn: () => transportApi.reconciliacaoDivergencias(filters),
+    retry: false,
+  });
+
   const pct = data?.pct_concordancia;
+  const divRows = div?.rows ?? [];
+
+  function exportDivergencias() {
+    downloadSheet("transporte-divergencias-cadastro.xlsx", {
+      name: "Divergências",
+      columns: [
+        { header: "END_ID", key: "end_id" },
+        { header: "UF", key: "uf" },
+        { header: "Município", key: "municipio" },
+        { header: "IBGE", key: "ibge" },
+        { header: "Tipo TX_PROFILE", key: "tipo_tx" },
+        { header: "Tipo Base Única", key: "tipo_base" },
+        { header: "Mídia TX", key: "media_tx" },
+        { header: "Mídia Base", key: "media_base" },
+      ],
+      rows: divRows,
+    });
+  }
 
   return (
     <div className="tim-page-enter">
@@ -109,8 +134,8 @@ export function TransporteReconciliacao() {
 
       <div className="row g-3">
         <div className="col-md-3">
-          <KpiDeltaCard label="Sites nas Duas Bases" icon="bi bi-diagram-2" accentColor="#003399"
-            value={data ? fmtInt(data.em_ambas) : "—"} secondaryValue="com par por END_ID" deltas={[]} />
+          <KpiDeltaCard label="Sites Comparáveis" icon="bi bi-diagram-2" accentColor="#003399"
+            value={data ? fmtInt(data.comparaveis) : "—"} secondaryValue="mídia definida nas duas bases" deltas={[]} />
         </div>
         <div className="col-md-3">
           <KpiDeltaCard label="Concordância de Mídia" icon="bi bi-check2-circle" accentColor="#2E9E5B"
@@ -118,11 +143,11 @@ export function TransporteReconciliacao() {
         </div>
         <div className="col-md-3">
           <KpiDeltaCard label="Divergências" icon="bi bi-exclamation-diamond" accentColor="#E53935"
-            value={data ? fmtInt(data.divergentes) : "—"} secondaryValue="mídia diferente entre bases" deltas={[]} />
+            value={data ? fmtInt(data.divergentes) : "—"} secondaryValue="mídia definida e diferente" deltas={[]} />
         </div>
         <div className="col-md-3">
-          <KpiDeltaCard label="Só no TX_PROFILE" icon="bi bi-question-circle" accentColor="#F5A623"
-            value={data ? fmtInt(data.so_no_tx) : "—"} secondaryValue="sem par na Base Única" deltas={[]} />
+          <KpiDeltaCard label="Sem Mídia Definida" icon="bi bi-dash-circle" accentColor="#90A4AE"
+            value={data ? fmtInt(data.sem_media) : "—"} secondaryValue="fora da comparação (≥1 base vazia)" deltas={[]} />
         </div>
       </div>
 
@@ -144,6 +169,61 @@ export function TransporteReconciliacao() {
             exportSheet={{ name: "Divergências", columns: [
               { header: "TX_PROFILE", key: "tx" }, { header: "Base Única", key: "base" }, { header: "Sites", key: "value" },
             ], rows: data?.top_divergencias ?? [] }} />
+        </div>
+      </div>
+
+      <div className="row g-3 mt-1">
+        <div className="col-12">
+          <div className="card shadow-sm">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-start mb-1 flex-wrap gap-2">
+                <div>
+                  <div className="d-flex align-items-center gap-2 mb-1">
+                    <h6 className="fw-bold mb-0">Worklist de Correção — Sites Divergentes</h6>
+                    <SourceBadge table={src} />
+                  </div>
+                  <small className="text-muted d-block">
+                    Cada linha é um site cuja mídia difere entre as bases — a lista pra time de cadastro corrigir.
+                    {div ? ` ${fmtInt(div.total)} sites${div.truncated ? "+ (limitado a 5.000; refine o filtro)" : ""}.` : ""}
+                  </small>
+                </div>
+                <button className="btn btn-sm btn-outline-success" onClick={exportDivergencias} disabled={divRows.length === 0}>
+                  <i className="bi bi-file-earmark-excel me-1" /> Exportar Excel
+                </button>
+              </div>
+              <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                <table className="table table-sm table-hover align-middle mb-0" style={{ fontSize: 13 }}>
+                  <thead style={{ position: "sticky", top: 0, background: "var(--tim-card-bg)", zIndex: 1 }}>
+                    <tr>
+                      <th>END_ID</th><th>UF</th><th>Município</th><th>IBGE</th>
+                      <th>Tipo TX_PROFILE</th><th>Tipo Base Única</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {divRows.length === 0 ? (
+                      <tr><td colSpan={6} className="text-center text-muted py-3">Nenhuma divergência de cadastro.</td></tr>
+                    ) : (
+                      divRows.slice(0, 500).map((r, i) => (
+                        <tr key={`${r.end_id}-${i}`}>
+                          <td className="fw-bold">{r.end_id}</td>
+                          <td>{r.uf}</td>
+                          <td>{r.municipio}</td>
+                          <td>{r.ibge}</td>
+                          <td><span style={{ color: TRANSPORT_COLORS[r.media_tx] }}>{r.tipo_tx || r.media_tx}</span></td>
+                          <td><span style={{ color: TRANSPORT_COLORS[r.media_base] }}>{r.tipo_base || r.media_base}</span></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {divRows.length > 500 && (
+                <small className="text-muted d-block mt-2">
+                  Mostrando os primeiros 500 na tela — use <strong>Exportar Excel</strong> pra baixar todos ({fmtInt(divRows.length)}).
+                </small>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
