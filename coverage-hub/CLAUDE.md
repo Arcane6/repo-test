@@ -340,9 +340,16 @@ Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
   mesmo ID nas duas) comparando a **mídia** no `REL_TX_PROFILE` (`TIPO_TX_26`,
   Fech.26) × a mídia "atual" da Base Única (`MEIO_TX_ATUAL`, no `MES_REF` mais
   recente). Mostra concordância, matriz de confusão (diagonal = bate) e as
-  maiores divergências de cadastro. Endpoint `/api/reconciliacao`
-  (`reconciliacao_sql` + `total_tx_sql` em `queries.py`; filtros qualificados
-  com `t.` via `_filters(..., prefix="t.")`). ⚠️ **Números ainda não
+  maiores divergências de cadastro, **+ worklist** (tabela site a site com
+  END_ID/UF/município/IBGE/tipo em cada base, exportável pra Excel — a lista
+  de correção). **"Não definido"/"-" em qualquer lado NÃO conta como
+  divergência** (é dado faltando, não conflito): a concordância é calculada
+  só sobre os "comparáveis" (mídia definida nas duas bases); os demais entram
+  num KPI "Sem mídia definida". Endpoints `/api/reconciliacao` +
+  `/api/reconciliacao/divergencias` (`reconciliacao_sql`, `total_tx_sql`,
+  `reconciliacao_divergencias_sql` em `queries.py`; `_base_media_expr`
+  normaliza '-'→NULL; filtros qualificados com `t.` via
+  `_filters(..., prefix="t.")`). ⚠️ **Números ainda não
   validados contra o Oracle real** (não temos a Base Única no sandbox) — a
   lógica/shape foi conferida com uma Base Única sintética; validar os totais
   no primeiro deploy. A Base Única tem 3 colunas de TX que espelham a

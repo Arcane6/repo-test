@@ -213,6 +213,14 @@ ORDER BY {dim}
 BASE_UNICA = "NTW_OP.TB_FT_BASE_UNICA_SITES"
 
 
+def _base_media_expr():
+    """Mídia da Base Única (MEIO_TX_ATUAL). Vazio e '-' viram NULL — o
+    service trata como 'Não definido' e NÃO conta como divergência (é dado
+    faltando, não conflito de cadastro)."""
+    col = "TRIM(b.MEIO_TX_ATUAL)"
+    return f"CASE WHEN {col} IS NULL OR {col} = '-' THEN NULL ELSE UPPER({col}) END"
+
+
 def reconciliacao_sql(filters_t):
     """Matriz mídia(TX_PROFILE Fech.26) × mídia(Base Única atual) pros sites
     presentes nas DUAS bases (inner join por END_ID, Base no MES_REF mais
@@ -220,7 +228,7 @@ def reconciliacao_sql(filters_t):
     `filters_t` traz os filtros de UF/regional/município já qualificados
     com 't.' (lado do TX_PROFILE)."""
     media_tx = _media_expr("t.TIPO_TX_26", classif="t.CLASSIFICACAO")
-    media_base = "UPPER(TRIM(b.MEIO_TX_ATUAL))"
+    media_base = _base_media_expr()
     return f"""
 SELECT
     {media_tx} AS media_tx,
@@ -232,6 +240,35 @@ JOIN {BASE_UNICA} b
  AND b.MES_REF = (SELECT MAX(MES_REF) FROM {BASE_UNICA})
 WHERE 1 = 1 {filters_t}
 GROUP BY {media_tx}, {media_base}
+"""
+
+
+def reconciliacao_divergencias_sql(filters_t, limit=5000):
+    """Lista site a site das divergências REAIS (mídia definida nas DUAS bases
+    e diferente entre elas) — a worklist de correção. Traz o tipo bruto de
+    cada base (TIPO_TX_26 × MEIO_TX_CAPACIDADE) e o IBGE pra localizar."""
+    media_tx = _media_expr("t.TIPO_TX_26", classif="t.CLASSIFICACAO")
+    media_base = _base_media_expr()
+    return f"""
+SELECT
+    t.END_ID       AS end_id,
+    t.IBGE_ID      AS ibge_id,
+    t.UF           AS uf,
+    t.MUNICIPIO    AS municipio,
+    t.TIPO_TX_26   AS tipo_tx,
+    b.MEIO_TX_CAPACIDADE AS tipo_base,
+    {media_tx}  AS media_tx,
+    {media_base} AS media_base
+FROM {TABLE} t
+JOIN {BASE_UNICA} b
+  ON b.END_ID = t.END_ID
+ AND b.MES_REF = (SELECT MAX(MES_REF) FROM {BASE_UNICA})
+WHERE 1 = 1 {filters_t}
+  AND {media_tx} IS NOT NULL
+  AND {media_base} IS NOT NULL
+  AND {media_tx} <> {media_base}
+ORDER BY t.UF, t.MUNICIPIO, t.END_ID
+FETCH FIRST {int(limit)} ROWS ONLY
 """
 
 

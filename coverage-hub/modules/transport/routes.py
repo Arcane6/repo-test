@@ -53,3 +53,9 @@ def api_geo_points():
 def api_reconciliacao():
     """Comparação REL_TX_PROFILE × Base Única de Sites por END_ID (aba 4)."""
     return jsonify(service.get_reconciliacao(_geo_filters()))
+
+
+@transport_bp.route("/api/reconciliacao/divergencias")
+def api_reconciliacao_divergencias():
+    """Worklist de correção: sites com mídia divergente entre as bases."""
+    return jsonify(service.get_reconciliacao_divergencias(_geo_filters()))

@@ -317,7 +317,7 @@ def get_reconciliacao(filters):
     total_row = execute_query(q.total_tx_sql(clause_t), params) or [{}]
     total_tx = int((total_row[0] or {}).get("n") or 0)
 
-    matched = concord = 0
+    matched = comparaveis = concord = 0
     matriz = []
     divergencias = []
     for r in matrix_rows:
@@ -325,6 +325,11 @@ def get_reconciliacao(filters):
         mb = _media_label(r.get("media_base"))
         n = int(r.get("n") or 0)
         matched += n
+        # "Não definido"/"-" em qualquer lado = dado faltando, não
+        # divergência de cadastro — fica fora da matriz e das métricas.
+        if UNDEF in (mt, mb):
+            continue
+        comparaveis += n
         matriz.append({"tx": mt, "base": mb, "n": n})
         if mt == mb:
             concord += n
@@ -335,13 +340,39 @@ def get_reconciliacao(filters):
     return {
         "total_tx": total_tx,
         "em_ambas": matched,
+        "comparaveis": comparaveis,
+        "sem_media": matched - comparaveis,
         "so_no_tx": max(total_tx - matched, 0),
         "concordantes": concord,
-        "divergentes": matched - concord,
-        "pct_concordancia": round(concord / matched * 100, 1) if matched else None,
+        "divergentes": comparaveis - concord,
+        "pct_concordancia": round(concord / comparaveis * 100, 1) if comparaveis else None,
         "matriz": matriz,
         "top_divergencias": divergencias[:10],
     }
+
+
+_DIVERG_LIMIT = 5000
+
+
+def get_reconciliacao_divergencias(filters):
+    """Worklist de correção: um registro por site divergente (mídia definida
+    e diferente entre as bases), com o tipo bruto de cada base e o IBGE."""
+    clause_t, params = _filters(filters, prefix="t.")
+    rows = execute_query(q.reconciliacao_divergencias_sql(clause_t, _DIVERG_LIMIT), params) or []
+    out = [
+        {
+            "end_id": r.get("end_id"),
+            "ibge": r.get("ibge_id"),
+            "uf": r.get("uf"),
+            "municipio": r.get("municipio"),
+            "tipo_tx": r.get("tipo_tx"),
+            "tipo_base": r.get("tipo_base"),
+            "media_tx": _media_label(r.get("media_tx")),
+            "media_base": _media_label(r.get("media_base")),
+        }
+        for r in rows
+    ]
+    return {"rows": out, "total": len(out), "truncated": len(out) >= _DIVERG_LIMIT}
 
 
 def get_geo_points(filters):
