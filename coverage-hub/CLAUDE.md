@@ -342,10 +342,12 @@ Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
   recente). Mostra concordância, matriz de confusão (diagonal = bate) e as
   maiores divergências de cadastro, **+ worklist** (tabela site a site com
   END_ID/UF/município/IBGE/tipo em cada base, exportável pra Excel — a lista
-  de correção). **"Não definido"/"-" em qualquer lado NÃO conta como
-  divergência** (é dado faltando, não conflito): a concordância é calculada
-  só sobre os "comparáveis" (mídia definida nas duas bases); os demais entram
-  num KPI "Sem mídia definida". Endpoints `/api/reconciliacao` +
+  de correção). **"Não definido" (TX vazio) e "-" (Base vazio) são o MESMO
+  valor: nulo.** Então vazio==vazio conta como **concordância**; divergência
+  é só quando **ambas as bases têm mídia definida e diferente** (vermelho); e
+  "vazio de um lado, mídia do outro" vira **falta cadastro** (cinza, KPI
+  próprio — não é conflito). Invariante: `em_ambas = concordantes +
+  divergentes + falta_cadastro`. Endpoints `/api/reconciliacao` +
   `/api/reconciliacao/divergencias` (`reconciliacao_sql`, `total_tx_sql`,
   `reconciliacao_divergencias_sql` em `queries.py`; `_base_media_expr`
   normaliza '-'→NULL; filtros qualificados com `t.` via
