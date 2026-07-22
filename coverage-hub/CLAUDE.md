@@ -420,7 +420,11 @@ SAT=roxo...), também fonte única.
 
 - **`<Chart/>`** (`charts/Chart.tsx`) é o único componente que fala
   direto com ECharts (init/resize/dispose/click/tema). Nunca chame
-  `echarts.init` fora dele.
+  `echarts.init` fora dele. Comportamento embutido: em donut com número
+  central (série `pie` + `title.text`, i.e. `regionalDonutOption`/
+  `vendorDonutSideOption`), ligar/desligar fatia na **legenda recalcula o
+  total do centro** (listener de `legendselectchanged` no próprio wrapper —
+  nenhum builder precisa fazer nada pra ganhar isso).
 - **`optionBuilders.ts`** é o catálogo de "moldes" de gráfico
   (`barsByTechOption`, `horizontalBarsOption`, `donutOption`,
   `stackedBarsOption`, `regionalSunburstOption`, `vendorDonutSideOption`,
@@ -544,10 +548,10 @@ consome token; se o token não existe, cria-se o token primeiro.
 | `NTW_OP.MUNICIPIOS_FECHAMENTO` | Presença 2G/3G/4G/5G por município (aba Cidades), Cidades por Regional | Sempre filtrar `TRUNC(DT_CARGA) = MAX(DT_CARGA)` — carga histórica, não só o último dia |
 | `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | **Recorte de `MES_REF` depende da tela**: a **aba Sites** usa `MES_REF = MAX(MES_REF)` (inventário atual, sempre o mais recente); a **raia Fechamento 25 do Resumo** usa o **fechamento de dezembro do ano anterior ao plano** (`TRUNC(MES_REF,'MM') = TRUNC(:baseline_date,'MM')`, com `baseline_date = 31/dez/ano-1`) — é um fechamento histórico, não o load mais novo. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado), `LATITUDE`/`LONGITUDE` (coordenada do site, confirmadas — usadas em `SITES_GEO_POINTS`) e, segundo o usuário, coluna(s) de fornecedor por tecnologia (nome exato ainda não confirmado) |
 | `NTW_MABE.BASE_TB_END_ID_NEW` | Fornecedor (vendor) dominante por site | Cascata de colunas `VENDOR_NR_*`/`VENDOR_LTE_*`/`VENDOR_UMTS_*`/`VENDOR_GSM_*` via `COALESCE`, maior banda primeiro dentro de cada tec |
-| `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente |
+| `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente. **Grão = OC, não endereço**: a mesma Casa Nova gera 2+ OCs (4G e 5G separadas) — contagens de "sites/endereços" devem deduplicar por `(COD_IBGE, ID_MASTER_PIVOT)` (`COUNT(DISTINCT ...)` em `R2_VENDORS_NEW_SITES`; era `COUNT(*)` e inflava 2171 vs ~1000 reais, pego cruzando com a meta do `TB_NEXUS_CN_CE`) |
 | `NTW_OP.REL_CIDADES_PLANEJADO_26` | Novas Cidades por Regional (Raia 2 — "Novas Cidades por Regional") | Lista **fechada** das cidades novas do plano 26: 1 linha por `IBGE` (`REGIONAL, UF, ANF, MUNICIPIO, IBGE`), sem `MES_REF`/`DT_CARGA` — `GROUP BY REGIONAL, COUNT(*)` direto, sem recorte de data. Município filtra via ponte IBGE (`_build_municipio_ibge_clause`), não por nome direto — evita mismatch de acentuação com o autocomplete (que busca em `MUNICIPIOS_FECHAMENTO`). Antes esse gráfico usava `MUNICIPIOS_FECHAMENTO` com `MES_DIV_5G` (fechamento/realizado) — trocado porque misturava a raia de Plano com dado já realizado. |
 | `TB_NEXUS_FINANCEIRO` | CAPEX/OPEX/LEASE por tipo | Usada só no rateio "Orçamento por Tecnologia" — sem schema/join direto, rateada por nº de OCs |
-| `TB_NEXUS_CN_CE` | CAC (custo de aquisição) por tech/tipo de casa | Rateio "Endereço por Tecnologia" (CN x CE) |
+| `TB_NEXUS_CN_CE` | CAC por tech/tipo de casa; também é a **meta de Casa Nova** | Rateio "Endereço por Tecnologia" (CN x CE). Na leitura de meta, `CAC` com `TIPO_CASA='CN'` é a **contagem-meta de endereços novos** (4G 755 + 5G 245 = 1000) — fonte do toggle "Meta NEXUS" no donut Fornecedores EoY 26 (`/api/summary/r2/casa-nova-nexus`). É **nacional** (sem UF/regional) — não responde aos filtros, e o subtítulo do card avisa. |
 | `VW_CAPEX_MASTER_FULL@NEXUS_LINK` | **Mapeada, ainda não integrada** — ver abaixo | Acesso via DB link `NEXUS_LINK` |
 | `REL_TRAFEGO_CIDADES_WIDE` | Tráfego **planejado** (módulo Tráfego) | 1 linha por (município, `TIPO_TRAF`), 12 meses em COLUNAS (`JANEIRO`..`DEZEMBRO`), `ANO`. `TIPO_TRAF='Consolidado'` é o total (NÃO somar as camadas). Valores em **PB**. `MUNICIPIO_ID`=IBGE 6 díg. Versão `REL_TRAFEGO_CIDADES_LONG` tem os meses em linha |
 | `REL_DS013_TRAFEGO_REALIZADO` | Tráfego **realizado** + base de usuários (módulo Tráfego) | 1 linha por (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz TIM e OI → market share. `S_MEGABYTE_TOTAL` em MB (÷1e9 = PB); colunas por tec aditivas |

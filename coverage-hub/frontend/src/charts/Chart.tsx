@@ -69,6 +69,39 @@ export function Chart({ option, onClick, height = 360, loading, instanceRef }: C
     loading ? chart.showLoading() : chart.hideLoading();
   }, [option, loading, theme]);
 
+  // Donuts com número central (title.text = total): quando a legenda
+  // liga/desliga uma fatia, o total do centro acompanha a seleção — antes o
+  // número ficava congelado no total cheio, contradizendo o gráfico visível.
+  // Só se aplica a séries pie com title (os donuts regionalDonutOption /
+  // vendorDonutSideOption); barras/linhas com título nunca chegam aqui.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const opt = option as {
+      title?: { text?: unknown };
+      series?: Array<{ type?: string; data?: Array<{ name: string; value: number }> }>;
+    };
+    const series = Array.isArray(opt.series) ? opt.series[0] : undefined;
+    const hasCenterTotal =
+      opt.title && !Array.isArray(opt.title) && opt.title.text != null &&
+      series?.type === "pie" && Array.isArray(series.data);
+    if (!hasCenterTotal) return;
+
+    const handler = (params: unknown) => {
+      const selected = (params as { selected: Record<string, boolean> }).selected ?? {};
+      const total = series!.data!.reduce(
+        (sum, d) => sum + (selected[d.name] === false ? 0 : d.value || 0),
+        0,
+      );
+      chart.setOption({ title: { text: total.toLocaleString("pt-BR") } });
+    };
+
+    chart.on("legendselectchanged", handler);
+    return () => {
+      chart.off("legendselectchanged", handler);
+    };
+  }, [option]);
+
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !onClick) return;

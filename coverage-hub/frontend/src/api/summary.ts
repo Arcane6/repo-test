@@ -56,6 +56,11 @@ export interface SlicesResponse {
   total: number;
 }
 
+export interface CasaNovaNexusResponse {
+  total: number;
+  por_tech: { tech: string; qtd: number }[];
+}
+
 export interface RegionalSeriesResponse {
   categories: string[];
   series: TechSeries[];
@@ -100,6 +105,9 @@ export const summaryApi = {
     fetchJson<SlicesResponse>(`${BASE}/r2/new-cities-by-anf?${query(f)}`),
   r2VendorsNewSites: (f: SummaryFilters) =>
     fetchJson<LabeledValue[]>(`${BASE}/r2/vendors-new-sites?${query(f)}`),
+  /** Meta NEXUS de Casa Nova — nacional, não recebe filtros. */
+  r2CasaNovaNexus: () =>
+    fetchJson<CasaNovaNexusResponse>(`${BASE}/r2/casa-nova-nexus`),
   r2TopProjects: (f: SummaryFilters) =>
     fetchJson<ProjectItem[]>(`${BASE}/r2/top-projects?${query(f)}`),
   r2OrcamentoPorTecnologia: (f: SummaryFilters) =>

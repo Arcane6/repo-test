@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import type * as echarts from "echarts/core";
 import type { EChartsCoreOption } from "echarts/core";
 import { Chart } from "../charts/Chart";
@@ -22,6 +22,8 @@ interface ChartPanelProps {
   exportSheet?: SheetSpec;
   /** Tabela(s)-fonte do gráfico — mostra o badge "de onde vem esse número" ao lado do título. */
   sourceTable?: string | string[];
+  /** Controles extras no cabeçalho (ex.: seletor de fonte de dado do card). */
+  headerExtra?: ReactNode;
 }
 
 /**
@@ -39,6 +41,7 @@ export function ChartPanel({
   imageFilename,
   exportSheet,
   sourceTable,
+  headerExtra,
 }: ChartPanelProps) {
   const instanceRef = useRef<echarts.ECharts | null>(null);
 
@@ -58,6 +61,7 @@ export function ChartPanel({
               {sourceTable && <SourceBadge table={sourceTable} />}
             </div>
             {subtitle && <small className="text-muted d-block mb-2">{subtitle}</small>}
+            {headerExtra}
           </div>
           <ChartToolbar
             onDownloadImage={
