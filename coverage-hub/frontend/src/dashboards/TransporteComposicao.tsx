@@ -45,7 +45,7 @@ export function TransporteComposicao() {
     retry: false,
   });
 
-  const src = "TB_FT_BASE_UNICA_SITES";
+  const src = "REL_TX_PROFILE";
 
   return (
     <div className="tim-page-enter">

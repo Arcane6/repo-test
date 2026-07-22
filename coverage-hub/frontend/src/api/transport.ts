@@ -68,9 +68,40 @@ export interface TransportComposicaoResponse {
   por_tecnologia: FiberTecnologia[];
 }
 
+export interface RolloutAno {
+  ano: string;
+  value: number;
+}
+
+export interface TransportInfraResponse {
+  por_solucao: LabeledValue[];
+  por_provedor: LabeledValue[];
+  por_status: LabeledValue[];
+  por_classificacao: LabeledValue[];
+  por_rollout: RolloutAno[];
+}
+
+export interface TransportGeoPoint {
+  end_id: string;
+  uf: string;
+  municipio: string;
+  lat: number;
+  lon: number;
+  media: string;
+  color: string;
+}
+
+export interface TransportGeoResponse {
+  points: TransportGeoPoint[];
+}
+
 export const transportApi = {
   resumoExecutivo: (f: TransportFilters) =>
     fetchJson<TransportResumoResponse>(`${BASE}/resumo-executivo?${query(f)}`),
   composicao: (f: TransportFilters) =>
     fetchJson<TransportComposicaoResponse>(`${BASE}/composicao?${query(f)}`),
+  infraestrutura: (f: TransportFilters) =>
+    fetchJson<TransportInfraResponse>(`${BASE}/infraestrutura?${query(f)}`),
+  geoPoints: (f: TransportFilters) =>
+    fetchJson<TransportGeoResponse>(`${BASE}/geo-points?${query(f)}`),
 };

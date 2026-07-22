@@ -82,12 +82,12 @@ export function TransporteResumoExecutivo() {
         </div>
         <div className="row g-3 mt-1">
           <div className="col-lg-5">
-            <ChartPanel title="Composição por Mídia" subtitle="Fechamento 2025" sourceTable="TB_FT_BASE_UNICA_SITES"
+            <ChartPanel title="Composição por Mídia" subtitle="Fechamento 2025" sourceTable="REL_TX_PROFILE"
               height={300} option={donutOption(mediaDonut(r1?.por_midia ?? []))} loading={loading}
               imageFilename="transporte-2025-midia.png" />
           </div>
           <div className="col-lg-7">
-            <ChartPanel title="Capacidade do Backhaul" subtitle="Fechamento 2025 (nº de sites)" sourceTable="TB_FT_BASE_UNICA_SITES"
+            <ChartPanel title="Capacidade do Backhaul" subtitle="Fechamento 2025 (nº de sites)" sourceTable="REL_TX_PROFILE"
               height={300} option={capBars(r1?.por_capacidade ?? [])} loading={loading}
               imageFilename="transporte-2025-capacidade.png" />
           </div>
@@ -103,7 +103,7 @@ export function TransporteResumoExecutivo() {
               value={r2 ? fmtInt(r2.total_sites) : "—"} secondaryValue="transformação de TX planejada" deltas={[]} />
           </div>
           <div className="col-md-8">
-            <ChartPanel title="Destino Planejado por Mídia" subtitle="Para onde os sites do plano vão" sourceTable="TB_FT_BASE_UNICA_SITES"
+            <ChartPanel title="Destino Planejado por Mídia" subtitle="Para onde os sites do plano vão" sourceTable="REL_TX_PROFILE"
               height={220} option={donutOption(mediaDonut(r2?.por_midia ?? []))} loading={loading}
               imageFilename="transporte-plano26-midia.png" />
           </div>
@@ -129,7 +129,7 @@ export function TransporteResumoExecutivo() {
         </div>
         <div className="row g-3 mt-1">
           <div className="col-lg-5">
-            <ChartPanel title="Composição por Mídia" subtitle="Fechamento 26" sourceTable="TB_FT_BASE_UNICA_SITES"
+            <ChartPanel title="Composição por Mídia" subtitle="Fechamento 26" sourceTable="REL_TX_PROFILE"
               height={300} option={donutOption(mediaDonut(r3?.por_midia ?? []))} loading={loading}
               imageFilename="transporte-26-midia.png" />
           </div>

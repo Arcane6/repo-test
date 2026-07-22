@@ -326,6 +326,19 @@ Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
 - **Aba 2**: barras 25×26 por mídia, top migrações (MW→FO etc.), MAKE×BUY
   (`METODO_CONSTRUTIVO_FO`), fiberização por regional e **por tecnologia
   de rádio** (usa as cores canônicas — ver abaixo).
+- **Aba 3 (Infraestrutura & Fornecimento)**: usa colunas próprias da
+  `REL_TX_PROFILE` que não apareciam nas outras abas — **mapa** dos sites
+  colorido por mídia (`LATITUDE`/`LONGITUDE`, ponto-a-ponto via `TransportMap`,
+  mesmo wrapper Leaflet do módulo Sites), **solução técnica** (`SOLUCAO`:
+  FTTS CAP comprada × FTTS MAKE própria × MW), **status** (`STS_END_ID`),
+  **camada de rede** (`CLASSIFICACAO`), **top provedores de fibra**
+  (`PROVEDOR` — quem fornece o backhaul comprado) e **rollout por ano**
+  (`ANO_ROLLOUT`). Endpoints `/api/infraestrutura` (tudo `GROUP BY` no
+  Oracle) e `/api/geo-points` (pontos do mapa). **Não usa a Base Única de
+  Sites** — todo o módulo Transporte lê só de `REL_TX_PROFILE` (o join por
+  `END_ID` com `TB_FT_BASE_UNICA_SITES` fica pendente: falta confirmar se o
+  `END_ID` de transporte casa com o de site móvel e o nome da coluna de
+  fornecedor de rádio; não ligar às cegas).
 - Filtro: UF + **Regional** (dimensão limpa aqui) + Município (ponte IBGE,
   igual Tráfego). Store próprio (`store/transportFilters.ts`).
 
