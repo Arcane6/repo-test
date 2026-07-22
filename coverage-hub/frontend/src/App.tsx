@@ -42,6 +42,9 @@ const TransporteComposicao = lazy(() =>
 const TransporteInfraestrutura = lazy(() =>
   import("./dashboards/TransporteInfraestrutura").then((m) => ({ default: m.TransporteInfraestrutura })),
 );
+const TransporteReconciliacao = lazy(() =>
+  import("./dashboards/TransporteReconciliacao").then((m) => ({ default: m.TransporteReconciliacao })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -115,6 +118,7 @@ export function App() {
               <Route path="resumo-executivo" element={<TransporteResumoExecutivo />} />
               <Route path="composicao" element={<TransporteComposicao />} />
               <Route path="infraestrutura" element={<TransporteInfraestrutura />} />
+              <Route path="reconciliacao" element={<TransporteReconciliacao />} />
             </Route>
           </Route>
         </Routes>

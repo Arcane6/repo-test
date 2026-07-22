@@ -31,6 +31,11 @@ export function TransportLayout() {
             <i className="bi bi-geo-alt me-1" /> Infraestrutura &amp; Fornecimento
           </NavLink>
         </li>
+        <li className="nav-item" role="presentation">
+          <NavLink className={({ isActive }) => "nav-link" + (isActive ? " active" : "")} to="reconciliacao" role="tab">
+            <i className="bi bi-shuffle me-1" /> Comparação de Bases
+          </NavLink>
+        </li>
       </ul>
 
       <TransportFilterBar />

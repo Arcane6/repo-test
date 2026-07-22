@@ -30,12 +30,13 @@ _MEDIA_TOKENS = "('FO', 'MW', 'SAT', 'LL', 'SLS')"
 _CAP_TOKENS = "('10G', '1G', '<1G')"
 
 
-def _media_expr(col):
-    """SQL que resolve a mídia de uma coluna TIPO_TX (com override de RS)."""
+def _media_expr(col, classif="CLASSIFICACAO"):
+    """SQL que resolve a mídia de uma coluna TIPO_TX (com override de RS).
+    `classif` permite qualificar a coluna CLASSIFICACAO num JOIN (ex.: 't.')."""
     tok = f"UPPER(REGEXP_SUBSTR(TRIM({col}), '[^[:space:]]+', 1, 1))"
     return (
         "CASE "
-        "WHEN UPPER(TRIM(CLASSIFICACAO)) = 'RANSHARING' THEN 'RS' "
+        f"WHEN UPPER(TRIM({classif})) = 'RANSHARING' THEN 'RS' "
         f"WHEN TRIM({col}) IS NULL THEN NULL "
         f"WHEN {tok} IN {_MEDIA_TOKENS} THEN {tok} "
         "ELSE 'N/I' END"
@@ -197,6 +198,50 @@ WHERE 1 = 1 {filters}
   AND REGEXP_LIKE(TRIM(ANO_ROLLOUT), '^[0-9]{{4}}$')
 GROUP BY {dim}
 ORDER BY {dim}
+"""
+
+
+# ---------------------------------------------------------------------------
+# Aba 4 — Reconciliação REL_TX_PROFILE × Base Única de Sites.
+# Único ponto do módulo que TOCA a Base Única: join por END_ID (o usuário
+# confirmou que é o mesmo END_ID nas duas). A Base Única traz o TX "atual"
+# (inventário no MES_REF mais recente) em 3 colunas — MEIO_TX_ATUAL (mídia
+# já parseada), MEIO_TX_CAPACIDADE (<mídia> <capacidade>) e SOLUCAO_FO
+# (MAKE/BUY). Aqui comparamos a MÍDIA: TX_PROFILE (Fech.26) × Base (atual).
+# ---------------------------------------------------------------------------
+
+BASE_UNICA = "NTW_OP.TB_FT_BASE_UNICA_SITES"
+
+
+def reconciliacao_sql(filters_t):
+    """Matriz mídia(TX_PROFILE Fech.26) × mídia(Base Única atual) pros sites
+    presentes nas DUAS bases (inner join por END_ID, Base no MES_REF mais
+    recente). A diagonal é concordância; o resto é divergência de cadastro.
+    `filters_t` traz os filtros de UF/regional/município já qualificados
+    com 't.' (lado do TX_PROFILE)."""
+    media_tx = _media_expr("t.TIPO_TX_26", classif="t.CLASSIFICACAO")
+    media_base = "UPPER(TRIM(b.MEIO_TX_ATUAL))"
+    return f"""
+SELECT
+    {media_tx} AS media_tx,
+    {media_base} AS media_base,
+    COUNT(*) AS n
+FROM {TABLE} t
+JOIN {BASE_UNICA} b
+  ON b.END_ID = t.END_ID
+ AND b.MES_REF = (SELECT MAX(MES_REF) FROM {BASE_UNICA})
+WHERE 1 = 1 {filters_t}
+GROUP BY {media_tx}, {media_base}
+"""
+
+
+def total_tx_sql(filters_t):
+    """Total de sites no TX_PROFILE (com os mesmos filtros) — pra medir
+    quantos NÃO têm par na Base Única (só_no_tx = total − em_ambas)."""
+    return f"""
+SELECT COUNT(*) AS n
+FROM {TABLE} t
+WHERE 1 = 1 {filters_t}
 """
 
 
