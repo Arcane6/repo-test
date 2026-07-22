@@ -257,3 +257,75 @@ def get_composicao(filters):
         "por_regional": por_regional,
         "por_tecnologia": por_tecnologia,
     }
+
+
+# ---------------------------------------------------------------------------
+# Aba 3 — Infraestrutura & Fornecimento
+# ---------------------------------------------------------------------------
+
+def _labeled(rows, top=None):
+    """[{label, value}] ordenado desc; opcionalmente só o top-N."""
+    out = sorted(
+        ({"label": r.get("label"), "value": int(r.get("n") or 0)} for r in rows if r.get("label")),
+        key=lambda x: x["value"], reverse=True,
+    )
+    return out[:top] if top else out
+
+
+def get_infraestrutura(filters):
+    """Aba 3 — perfil de infra/fornecimento a partir de colunas próprias da
+    REL_TX_PROFILE (solução, provedor, status, classificação, rollout).
+    Tudo agregado no Oracle."""
+    clause, params = _filters(filters)
+
+    solucao = execute_query(q.por_solucao_sql(clause), params) or []
+    provedor = execute_query(q.por_provedor_sql(clause), params) or []
+    status = execute_query(q.por_status_sql(clause), params) or []
+    classif = execute_query(q.por_classificacao_sql(clause), params) or []
+    rollout = execute_query(q.por_rollout_sql(clause), params) or []
+
+    return {
+        "por_solucao": _labeled(solucao),
+        "por_provedor": _labeled(provedor, top=10),
+        "por_status": _labeled(status),
+        "por_classificacao": _labeled(classif),
+        # rollout já vem ordenado por ano no SQL; mantém a ordem cronológica.
+        "por_rollout": [
+            {"ano": r.get("label"), "value": int(r.get("n") or 0)}
+            for r in rollout if r.get("label")
+        ],
+    }
+
+
+# Paleta de mídia no backend (espelha TRANSPORT_COLORS do front) — o mapa
+# precisa da cor pronta em cada ponto, como faz o mapa de Sites.
+_MEDIA_COLORS = {
+    "FO": "#2E9E5B", "MW": "#F5A623", "RS": "#00ACC1", "SAT": "#7B1FA2",
+    "LL": "#607D8B", "SLS": "#EC407A", "N/I": "#B0BEC5",
+}
+_MEDIA_UNDEF_COLOR = "#CFD8DC"
+
+
+def get_geo_points(filters):
+    """Um ponto por site de transporte (END_ID, lat/long, mídia+cor) — o
+    mapa é ponto-a-ponto (não agregável sem perder a coordenada)."""
+    clause, params = _filters(filters)
+    rows = execute_query(q.geo_points_sql(clause), params) or []
+    points = []
+    for r in rows:
+        try:
+            lat = float(r.get("latitude"))
+            lon = float(r.get("longitude"))
+        except (TypeError, ValueError):
+            continue
+        media = _media_label(r.get("media"))
+        points.append({
+            "end_id": r.get("end_id"),
+            "uf": r.get("uf"),
+            "municipio": r.get("municipio"),
+            "lat": lat,
+            "lon": lon,
+            "media": media,
+            "color": _MEDIA_COLORS.get(media, _MEDIA_UNDEF_COLOR),
+        })
+    return {"points": points}

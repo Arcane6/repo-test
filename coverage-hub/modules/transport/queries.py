@@ -144,3 +144,74 @@ SELECT
 FROM {TABLE}
 WHERE 1 = 1 {filters}
 """
+
+
+# ---------------------------------------------------------------------------
+# Aba 3 — Infraestrutura & Fornecimento. Colunas próprias da REL_TX_PROFILE
+# que ainda não usávamos; tudo agregado no Oracle (exceto o mapa, que por
+# natureza é ponto-a-ponto).
+# ---------------------------------------------------------------------------
+
+def _dim_count_sql(dim_expr, filters, drop_null=True):
+    """Query genérica 'GROUP BY <dim>, COUNT(*)' — a base de quase todos os
+    cards de infraestrutura. `drop_null` tira quem tem a dimensão vazia."""
+    extra = f" AND {dim_expr} IS NOT NULL" if drop_null else ""
+    return f"""
+SELECT {dim_expr} AS label, COUNT(*) AS n
+FROM {TABLE}
+WHERE 1 = 1 {filters}{extra}
+GROUP BY {dim_expr}
+"""
+
+
+def por_solucao_sql(filters):
+    """Solução técnica do enlace (FTTS CAP = fibra comprada, FTTS MAKE =
+    própria, MW = microondas). Coluna 100% preenchida."""
+    return _dim_count_sql("UPPER(TRIM(SOLUCAO))", filters)
+
+
+def por_provedor_sql(filters):
+    """Provedor do backhaul comprado (VTAL, GGNET, Desktop, Oi...) — de quem
+    a TIM depende na fibra de terceiros. Só onde há provedor informado."""
+    return _dim_count_sql("UPPER(TRIM(PROVEDOR))", filters)
+
+
+def por_status_sql(filters):
+    """Status do END_ID (Ativado / Remanejado / Desativado). 100% preenchido."""
+    return _dim_count_sql("INITCAP(TRIM(STS_END_ID))", filters)
+
+
+def por_classificacao_sql(filters):
+    """Camada de rede do enlace (Acesso / Transporte / Core / RanSharing...)."""
+    return _dim_count_sql("UPPER(TRIM(CLASSIFICACAO))", filters)
+
+
+def por_rollout_sql(filters):
+    """Ano de rollout do site de transporte — curva temporal de entrada.
+    Só considera anos plausíveis (4 dígitos) pra descartar sujeira."""
+    dim = "TRIM(ANO_ROLLOUT)"
+    return f"""
+SELECT {dim} AS label, COUNT(*) AS n
+FROM {TABLE}
+WHERE 1 = 1 {filters}
+  AND REGEXP_LIKE(TRIM(ANO_ROLLOUT), '^[0-9]{{4}}$')
+GROUP BY {dim}
+ORDER BY {dim}
+"""
+
+
+def geo_points_sql(filters):
+    """Um ponto por site de transporte, colorido pela mídia (base 26). O
+    mapa é ponto-a-ponto por natureza — não dá pra agregar sem perder a
+    coordenada; descarta sites sem lat/long."""
+    media = _media_expr("TIPO_TX_26")
+    return f"""
+SELECT
+    END_ID, UF, MUNICIPIO,
+    LATITUDE, LONGITUDE,
+    {media} AS media
+FROM {TABLE}
+WHERE 1 = 1 {filters}
+  AND LATITUDE IS NOT NULL
+  AND LONGITUDE IS NOT NULL
+"""
