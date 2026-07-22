@@ -317,35 +317,34 @@ def get_reconciliacao(filters):
     total_row = execute_query(q.total_tx_sql(clause_t), params) or [{}]
     total_tx = int((total_row[0] or {}).get("n") or 0)
 
-    matched = comparaveis = concord = 0
+    matched = concord = diverg = gap = 0
     matriz = []
     divergencias = []
     for r in matrix_rows:
+        # "Não definido" (TX vazio) e "-" (Base vazio) são o MESMO valor: nulo.
+        # _media_label mapeia ambos pra "Não definido", então vazio==vazio bate.
         mt = _media_label(r.get("media_tx"))
         mb = _media_label(r.get("media_base"))
         n = int(r.get("n") or 0)
         matched += n
-        # "Não definido"/"-" em qualquer lado = dado faltando, não
-        # divergência de cadastro — fica fora da matriz e das métricas.
-        if UNDEF in (mt, mb):
-            continue
-        comparaveis += n
         matriz.append({"tx": mt, "base": mb, "n": n})
         if mt == mb:
-            concord += n
-        else:
+            concord += n            # inclui vazio==vazio (as duas concordam)
+        elif UNDEF in (mt, mb):
+            gap += n                # uma base tem mídia, a outra vazia — falta
+        else:                       # cadastro; NÃO é conflito de cadastro.
+            diverg += n             # divergência REAL: ambas definidas e ≠
             divergencias.append({"tx": mt, "base": mb, "value": n})
     divergencias.sort(key=lambda x: x["value"], reverse=True)
 
     return {
         "total_tx": total_tx,
         "em_ambas": matched,
-        "comparaveis": comparaveis,
-        "sem_media": matched - comparaveis,
         "so_no_tx": max(total_tx - matched, 0),
         "concordantes": concord,
-        "divergentes": comparaveis - concord,
-        "pct_concordancia": round(concord / comparaveis * 100, 1) if comparaveis else None,
+        "divergentes": diverg,
+        "falta_cadastro": gap,
+        "pct_concordancia": round(concord / matched * 100, 1) if matched else None,
         "matriz": matriz,
         "top_divergencias": divergencias[:10],
     }

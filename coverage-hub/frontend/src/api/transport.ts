@@ -108,11 +108,10 @@ export interface ReconDivergencia {
 export interface TransportReconResponse {
   total_tx: number;
   em_ambas: number;
-  comparaveis: number;
-  sem_media: number;
   so_no_tx: number;
   concordantes: number;
   divergentes: number;
+  falta_cadastro: number;
   pct_concordancia: number | null;
   matriz: ReconCell[];
   top_divergencias: ReconDivergencia[];

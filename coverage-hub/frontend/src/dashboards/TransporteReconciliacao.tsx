@@ -18,11 +18,15 @@ function presentMedias(matriz: ReconCell[]): string[] {
   return TRANSPORT_ORDER.filter((m) => seen.has(m));
 }
 
-/** Cor da célula: diagonal (concordância) em verde suave; fora da diagonal
- * (divergência) em vermelho com opacidade proporcional ao volume. */
-function cellStyle(n: number, isDiag: boolean, maxOff: number): React.CSSProperties {
+const UNDEF = "Não definido";
+
+/** Cor da célula: diagonal (concordância, inclui vazio=vazio) em verde; fora
+ * da diagonal com nulo dos dois lados = "falta cadastro" em cinza (não é
+ * conflito); divergência real (ambas definidas e ≠) em vermelho graduado. */
+function cellStyle(n: number, isDiag: boolean, isGap: boolean, maxOff: number): React.CSSProperties {
   if (n === 0) return { background: "transparent", color: "var(--tim-text-muted)" };
   if (isDiag) return { background: "rgba(46,158,91,0.18)", color: "var(--tim-text)", fontWeight: 700 };
+  if (isGap) return { background: "rgba(144,164,174,0.20)", color: "var(--tim-text-muted)" };
   const a = maxOff > 0 ? 0.12 + 0.55 * (n / maxOff) : 0.3;
   return { background: `rgba(229,57,53,${a.toFixed(3)})`, color: n / maxOff > 0.5 ? "#fff" : "var(--tim-text)" };
 }
@@ -31,7 +35,8 @@ function cellStyle(n: number, isDiag: boolean, maxOff: number): React.CSSPropert
 function ConfusionMatrix({ matriz }: { matriz: ReconCell[] }) {
   const medias = presentMedias(matriz);
   const lookup = new Map(matriz.map((c) => [`${c.tx}|${c.base}`, c.n]));
-  const maxOff = Math.max(1, ...matriz.filter((c) => c.tx !== c.base).map((c) => c.n));
+  // escala do vermelho só sobre divergência REAL (ambas definidas e ≠)
+  const maxOff = Math.max(1, ...matriz.filter((c) => c.tx !== c.base && c.tx !== UNDEF && c.base !== UNDEF).map((c) => c.n));
 
   return (
     <div className="card shadow-sm h-100">
@@ -42,8 +47,9 @@ function ConfusionMatrix({ matriz }: { matriz: ReconCell[] }) {
         </div>
         <small className="text-muted d-block mb-3">
           Linha = mídia no TX_PROFILE (Fech. 26) · Coluna = mídia na Base Única (atual).
-          A <span style={{ color: "#2E9E5B", fontWeight: 700 }}>diagonal</span> é concordância;
-          fora dela, <span style={{ color: "#E53935", fontWeight: 700 }}>divergência</span> de cadastro.
+          <span style={{ color: "#2E9E5B", fontWeight: 700 }}> Verde</span> = concordância (inclui vazio=vazio);
+          <span style={{ color: "#E53935", fontWeight: 700 }}> vermelho</span> = divergência real;
+          <span style={{ color: "#78909C", fontWeight: 700 }}> cinza</span> = falta cadastro (1 base vazia).
         </small>
         <div style={{ overflowX: "auto" }}>
           <table className="table table-sm mb-0" style={{ textAlign: "center", minWidth: 420 }}>
@@ -61,8 +67,9 @@ function ConfusionMatrix({ matriz }: { matriz: ReconCell[] }) {
                   <td style={{ textAlign: "left", fontWeight: 700, fontSize: 12, color: TRANSPORT_COLORS[tx] }}>{tx}</td>
                   {medias.map((base) => {
                     const n = lookup.get(`${tx}|${base}`) ?? 0;
+                    const isGap = tx !== base && (tx === UNDEF || base === UNDEF);
                     return (
-                      <td key={base} style={{ fontSize: 12, ...cellStyle(n, tx === base, maxOff) }}>
+                      <td key={base} style={{ fontSize: 12, ...cellStyle(n, tx === base, isGap, maxOff) }}>
                         {n === 0 ? "·" : fmtInt(n)}
                       </td>
                     );
@@ -134,20 +141,20 @@ export function TransporteReconciliacao() {
 
       <div className="row g-3">
         <div className="col-md-3">
-          <KpiDeltaCard label="Sites Comparáveis" icon="bi bi-diagram-2" accentColor="#003399"
-            value={data ? fmtInt(data.comparaveis) : "—"} secondaryValue="mídia definida nas duas bases" deltas={[]} />
+          <KpiDeltaCard label="Sites nas Duas Bases" icon="bi bi-diagram-2" accentColor="#003399"
+            value={data ? fmtInt(data.em_ambas) : "—"} secondaryValue="com par por END_ID" deltas={[]} />
         </div>
         <div className="col-md-3">
           <KpiDeltaCard label="Concordância de Mídia" icon="bi bi-check2-circle" accentColor="#2E9E5B"
-            value={pct != null ? `${pct.toLocaleString("pt-BR")}%` : "—"} secondaryValue="TX_PROFILE = Base Única" deltas={[]} />
+            value={pct != null ? `${pct.toLocaleString("pt-BR")}%` : "—"} secondaryValue="mesma mídia (vazio=vazio conta)" deltas={[]} />
         </div>
         <div className="col-md-3">
           <KpiDeltaCard label="Divergências" icon="bi bi-exclamation-diamond" accentColor="#E53935"
-            value={data ? fmtInt(data.divergentes) : "—"} secondaryValue="mídia definida e diferente" deltas={[]} />
+            value={data ? fmtInt(data.divergentes) : "—"} secondaryValue="ambas com mídia, e diferente" deltas={[]} />
         </div>
         <div className="col-md-3">
-          <KpiDeltaCard label="Sem Mídia Definida" icon="bi bi-dash-circle" accentColor="#90A4AE"
-            value={data ? fmtInt(data.sem_media) : "—"} secondaryValue="fora da comparação (≥1 base vazia)" deltas={[]} />
+          <KpiDeltaCard label="Falta Cadastro" icon="bi bi-dash-circle" accentColor="#F5A623"
+            value={data ? fmtInt(data.falta_cadastro) : "—"} secondaryValue="1 base com mídia, a outra vazia" deltas={[]} />
         </div>
       </div>
 
