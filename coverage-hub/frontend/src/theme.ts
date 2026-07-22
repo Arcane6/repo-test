@@ -23,15 +23,18 @@ export function techColor(tec: string): string {
 export const TRANSPORT_COLORS: Record<string, string> = {
   FO: "#2E9E5B",   // Fibra Ótica — verde (o objetivo da modernização)
   MW: "#F5A623",   // Microwave — âmbar (legado que sai)
-  RS: "#00ACC1",   // RanSharing — teal
   SAT: "#7B1FA2",  // Satélite — roxo
   LL: "#607D8B",   // Leased Line — azul-cinza
   SLS: "#EC407A",  // SLS — rosa
+  // RS não é mídia no TX_PROFILE (override removido) — a cor fica só pra
+  // quando a BASE ÚNICA reporta 'RS' na matriz de reconciliação.
+  RS: "#00ACC1",
   "N/I": "#B0BEC5", // Não informado
   "Não definido": "#CFD8DC",
 };
 
-/** Ordem de exibição das mídias (melhor → pior/legado → indefinido). */
-export const TRANSPORT_ORDER = ["FO", "MW", "RS", "SAT", "LL", "SLS", "N/I", "Não definido"];
+/** Ordem de exibição das mídias (melhor → pior/legado → indefinido).
+ * Sem RS: o TX_PROFILE não produz mais essa categoria. */
+export const TRANSPORT_ORDER = ["FO", "MW", "SAT", "LL", "SLS", "N/I", "Não definido"];
 
 export const TIM_BRAND_COLOR = "#003399";

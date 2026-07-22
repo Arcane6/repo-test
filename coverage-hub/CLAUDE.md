@@ -313,10 +313,16 @@ Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
 - **Tipo de transporte = `<MÍDIA> <CAPACIDADE>`** em `TIPO_TX_25` /
   `TIPO_TX_26` / `TIPO_TX_PLAN` (ex.: "FO 10G", "MW <1G", "SAT LEO").
   - **Mídia** = 1º token (FO/MW/SAT/LL/SLS/N/I); vazio → "Não definido".
-  - **RS (RanSharing)** NÃO está no TIPO_TX — vem de
-    `CLASSIFICACAO='RANSHARING'`, e o service **sobrescreve** a mídia pra
-    RS (o usuário pediu RS como um dos tipos). Se um dia quiser RS sem
-    apagar a mídia física, remover o override em `_media`.
+  - **RS (RanSharing) NÃO é mídia** — decisão FECHADA do usuário ("não
+    existe essa merda"): o override antigo (mídia='RS' quando
+    `CLASSIFICACAO='RANSHARING'`) foi **removido**. Ele congelava 372 sites
+    como RS nas duas raias (delta 0 sempre) e escondia migrações reais
+    (ex.: SAT→FO). Ransharing = **posse**, visível na "Camada de Rede"
+    (aba Infraestrutura, `CLASSIFICACAO`). Exceção: na **reconciliação**, o
+    lado Base Única ainda reporta 'RS' (`MEIO_TX_ATUAL` traz esse valor) —
+    aparece como divergência real e como coluna extra da matriz
+    (`presentMedias` inclui mídias fora do `TRANSPORT_ORDER`). NUNCA
+    reintroduzir o override.
   - **Capacidade** = 2º token (10G/1G/<1G) ou "Outros".
   - **Fiberização** = FO ÷ sites com mídia definida; **% 10G** = 10G ÷
     sites com capacidade conhecida.
@@ -368,7 +374,7 @@ Regra fechada a pedido do usuário: **toda quebra por tecnologia de rádio
 (2G/3G/4G/5G) usa `techColor()`/`TECH_COLORS`** (2G `#1E88E5`, 3G
 `#E53935`, 4G `#F5C518`, 5G `#7DC242`) — nunca cores locais. O módulo
 Tráfego usava cores próprias (2G cinza etc.) e **foi corrigido** pra usar
-o mapa canônico. Mídia de transporte (FO/MW/RS/SAT/LL/SLS) tem sua paleta
+o mapa canônico. Mídia de transporte (FO/MW/SAT/LL/SLS) tem sua paleta
 semântica própria em `TRANSPORT_COLORS` (fibra=verde, MW=âmbar,
 SAT=roxo...), também fonte única.
 

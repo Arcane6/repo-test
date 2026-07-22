@@ -14,8 +14,12 @@ de agregações que retornam ≤ ~64 linhas cada.
 Expressões-chave (montadas por `_media_expr` / `_cap_expr`):
 - **Mídia** = 1º token do TIPO_TX ∈ {FO, MW, SAT, LL, SLS}; token
   desconhecido → 'N/I'; coluna vazia → NULL (o service mapeia p/ "Não
-  definido"). **RanSharing** (CLASSIFICACAO='RANSHARING') sobrescreve a
-  mídia pra 'RS' — RS não existe no TIPO_TX, veio desse override.
+  definido"). **RanSharing NÃO é mídia**: mídia (FO/MW/...) e posse
+  (ransharing) são dimensões diferentes — o antigo override que forçava
+  mídia='RS' quando CLASSIFICACAO='RANSHARING' foi REMOVIDO a pedido do
+  usuário (congelava 372 sites nas duas raias, delta 0 sempre, e escondia
+  migrações reais tipo SAT→FO). Ransharing segue visível na aba
+  Infraestrutura ("Camada de Rede", via CLASSIFICACAO).
 - **Capacidade** = 2º token ∈ {10G, 1G, <1G}; outro → 'Outros'; sem 2º
   token → NULL (excluído do denominador de %10G).
 - **TECNOLOGIA** é uma string multi-rádio ("2G/3G/4G/5G"); a presença de
@@ -25,18 +29,16 @@ Expressões-chave (montadas por `_media_expr` / `_cap_expr`):
 TABLE = "NTW_OP.REL_TX_PROFILE"
 
 # 1º token (mídia): tudo que não for uma mídia física conhecida vira 'N/I';
-# coluna em branco vira NULL. O override de RanSharing vem antes de tudo.
+# coluna em branco vira NULL.
 _MEDIA_TOKENS = "('FO', 'MW', 'SAT', 'LL', 'SLS')"
 _CAP_TOKENS = "('10G', '1G', '<1G')"
 
 
-def _media_expr(col, classif="CLASSIFICACAO"):
-    """SQL que resolve a mídia de uma coluna TIPO_TX (com override de RS).
-    `classif` permite qualificar a coluna CLASSIFICACAO num JOIN (ex.: 't.')."""
+def _media_expr(col):
+    """SQL que resolve a mídia física de uma coluna TIPO_TX."""
     tok = f"UPPER(REGEXP_SUBSTR(TRIM({col}), '[^[:space:]]+', 1, 1))"
     return (
         "CASE "
-        f"WHEN UPPER(TRIM({classif})) = 'RANSHARING' THEN 'RS' "
         f"WHEN TRIM({col}) IS NULL THEN NULL "
         f"WHEN {tok} IN {_MEDIA_TOKENS} THEN {tok} "
         "ELSE 'N/I' END"
@@ -227,7 +229,7 @@ def reconciliacao_sql(filters_t):
     recente). A diagonal é concordância; o resto é divergência de cadastro.
     `filters_t` traz os filtros de UF/regional/município já qualificados
     com 't.' (lado do TX_PROFILE)."""
-    media_tx = _media_expr("t.TIPO_TX_26", classif="t.CLASSIFICACAO")
+    media_tx = _media_expr("t.TIPO_TX_26")
     media_base = _base_media_expr()
     return f"""
 SELECT
@@ -247,7 +249,7 @@ def reconciliacao_divergencias_sql(filters_t, limit=5000):
     """Lista site a site das divergências REAIS (mídia definida nas DUAS bases
     e diferente entre elas) — a worklist de correção. Traz o tipo bruto de
     cada base (TIPO_TX_26 × MEIO_TX_CAPACIDADE) e o IBGE pra localizar."""
-    media_tx = _media_expr("t.TIPO_TX_26", classif="t.CLASSIFICACAO")
+    media_tx = _media_expr("t.TIPO_TX_26")
     media_base = _base_media_expr()
     return f"""
 SELECT

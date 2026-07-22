@@ -11,11 +11,15 @@ import { TRANSPORT_COLORS, TRANSPORT_ORDER } from "../theme";
 const src = "REL_TX_PROFILE × TB_FT_BASE_UNICA_SITES";
 const fmtInt = (n: number) => n.toLocaleString("pt-BR");
 
-/** Mídias presentes na matriz, na ordem canônica (só as que aparecem). */
+/** Mídias presentes na matriz, na ordem canônica + extras no fim. A Base
+ * Única pode reportar valores fora do rol do TX_PROFILE (ex.: 'RS', que lá
+ * é tratado como mídia) — esses entram como colunas extras, não somem. */
 function presentMedias(matriz: ReconCell[]): string[] {
   const seen = new Set<string>();
   for (const c of matriz) { seen.add(c.tx); seen.add(c.base); }
-  return TRANSPORT_ORDER.filter((m) => seen.has(m));
+  const canon = TRANSPORT_ORDER.filter((m) => seen.has(m));
+  const extras = [...seen].filter((m) => !TRANSPORT_ORDER.includes(m)).sort();
+  return [...canon, ...extras];
 }
 
 const UNDEF = "Não definido";
