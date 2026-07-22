@@ -95,6 +95,27 @@ export interface TransportGeoResponse {
   points: TransportGeoPoint[];
 }
 
+export interface ReconCell {
+  tx: string;
+  base: string;
+  n: number;
+}
+export interface ReconDivergencia {
+  tx: string;
+  base: string;
+  value: number;
+}
+export interface TransportReconResponse {
+  total_tx: number;
+  em_ambas: number;
+  so_no_tx: number;
+  concordantes: number;
+  divergentes: number;
+  pct_concordancia: number | null;
+  matriz: ReconCell[];
+  top_divergencias: ReconDivergencia[];
+}
+
 export const transportApi = {
   resumoExecutivo: (f: TransportFilters) =>
     fetchJson<TransportResumoResponse>(`${BASE}/resumo-executivo?${query(f)}`),
@@ -104,4 +125,6 @@ export const transportApi = {
     fetchJson<TransportInfraResponse>(`${BASE}/infraestrutura?${query(f)}`),
   geoPoints: (f: TransportFilters) =>
     fetchJson<TransportGeoResponse>(`${BASE}/geo-points?${query(f)}`),
+  reconciliacao: (f: TransportFilters) =>
+    fetchJson<TransportReconResponse>(`${BASE}/reconciliacao?${query(f)}`),
 };

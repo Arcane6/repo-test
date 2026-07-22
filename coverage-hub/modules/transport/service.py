@@ -40,7 +40,7 @@ def _normalize_list(value):
     return [str(v).strip() for v in value if str(v).strip()]
 
 
-def _build_uf_clause(values, params):
+def _build_uf_clause(values, params, prefix=""):
     if not values:
         return ""
     ph = []
@@ -48,10 +48,10 @@ def _build_uf_clause(values, params):
         key = f"uf_{i}"
         params[key] = v.upper()
         ph.append(f":{key}")
-    return f" AND UPPER(TRIM(UF)) IN ({', '.join(ph)})"
+    return f" AND UPPER(TRIM({prefix}UF)) IN ({', '.join(ph)})"
 
 
-def _build_regional_clause(values, params):
+def _build_regional_clause(values, params, prefix=""):
     if not values:
         return ""
     ph = []
@@ -59,10 +59,10 @@ def _build_regional_clause(values, params):
         key = f"reg_{i}"
         params[key] = v.upper()
         ph.append(f":{key}")
-    return f" AND UPPER(TRIM(REGIONAL)) IN ({', '.join(ph)})"
+    return f" AND UPPER(TRIM({prefix}REGIONAL)) IN ({', '.join(ph)})"
 
 
-def _build_municipio_clause(values, params):
+def _build_municipio_clause(values, params, prefix=""):
     """Ponte por IBGE (mesma de Tráfego/sites): resolve nome → IBGE via
     MUNICIPIOS_FECHAMENTO e filtra IBGE_ID (6 dígitos)."""
     if not values:
@@ -73,7 +73,7 @@ def _build_municipio_clause(values, params):
         params[key] = v
         ph.append(f":{key}")
     in_list = ", ".join(ph)
-    return f""" AND TO_CHAR(IBGE_ID) IN (
+    return f""" AND TO_CHAR({prefix}IBGE_ID) IN (
         SELECT SUBSTR(TO_CHAR(IBGE), 1, 6)
         FROM NTW_OP.MUNICIPIOS_FECHAMENTO
         WHERE TRUNC(DT_CARGA) = (SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO)
@@ -81,13 +81,14 @@ def _build_municipio_clause(values, params):
     )"""
 
 
-def _filters(filters):
-    """Monta a cláusula única 'AND ...' compartilhada por todas as queries."""
+def _filters(filters, prefix=""):
+    """Monta a cláusula única 'AND ...' compartilhada pelas queries. `prefix`
+    qualifica as colunas (ex.: 't.') quando há JOIN e risco de ambiguidade."""
     params = {}
     clause = (
-        _build_uf_clause(_normalize_list(filters.get("ufs")), params)
-        + _build_municipio_clause(_normalize_list(filters.get("municipios")), params)
-        + _build_regional_clause(_normalize_list(filters.get("regionais")), params)
+        _build_uf_clause(_normalize_list(filters.get("ufs")), params, prefix)
+        + _build_municipio_clause(_normalize_list(filters.get("municipios")), params, prefix)
+        + _build_regional_clause(_normalize_list(filters.get("regionais")), params, prefix)
     )
     return clause, params
 
@@ -304,6 +305,43 @@ _MEDIA_COLORS = {
     "LL": "#607D8B", "SLS": "#EC407A", "N/I": "#B0BEC5",
 }
 _MEDIA_UNDEF_COLOR = "#CFD8DC"
+
+
+def get_reconciliacao(filters):
+    """Aba 4 — compara a mídia no TX_PROFILE (Fech.26) com a mídia "atual"
+    da Base Única de Sites (MEIO_TX_ATUAL), pros sites que existem nas duas
+    bases (join por END_ID). Mostra concordância, matriz de confusão e as
+    maiores divergências de cadastro entre as bases."""
+    clause_t, params = _filters(filters, prefix="t.")
+    matrix_rows = execute_query(q.reconciliacao_sql(clause_t), params) or []
+    total_row = execute_query(q.total_tx_sql(clause_t), params) or [{}]
+    total_tx = int((total_row[0] or {}).get("n") or 0)
+
+    matched = concord = 0
+    matriz = []
+    divergencias = []
+    for r in matrix_rows:
+        mt = _media_label(r.get("media_tx"))
+        mb = _media_label(r.get("media_base"))
+        n = int(r.get("n") or 0)
+        matched += n
+        matriz.append({"tx": mt, "base": mb, "n": n})
+        if mt == mb:
+            concord += n
+        else:
+            divergencias.append({"tx": mt, "base": mb, "value": n})
+    divergencias.sort(key=lambda x: x["value"], reverse=True)
+
+    return {
+        "total_tx": total_tx,
+        "em_ambas": matched,
+        "so_no_tx": max(total_tx - matched, 0),
+        "concordantes": concord,
+        "divergentes": matched - concord,
+        "pct_concordancia": round(concord / matched * 100, 1) if matched else None,
+        "matriz": matriz,
+        "top_divergencias": divergencias[:10],
+    }
 
 
 def get_geo_points(filters):

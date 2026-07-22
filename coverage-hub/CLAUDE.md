@@ -334,11 +334,22 @@ Perfil do backhaul/transporte e a **migração pra fibra**. Fonte:
   **camada de rede** (`CLASSIFICACAO`), **top provedores de fibra**
   (`PROVEDOR` — quem fornece o backhaul comprado) e **rollout por ano**
   (`ANO_ROLLOUT`). Endpoints `/api/infraestrutura` (tudo `GROUP BY` no
-  Oracle) e `/api/geo-points` (pontos do mapa). **Não usa a Base Única de
-  Sites** — todo o módulo Transporte lê só de `REL_TX_PROFILE` (o join por
-  `END_ID` com `TB_FT_BASE_UNICA_SITES` fica pendente: falta confirmar se o
-  `END_ID` de transporte casa com o de site móvel e o nome da coluna de
-  fornecedor de rádio; não ligar às cegas).
+  Oracle) e `/api/geo-points` (pontos do mapa).
+- **Aba 4 (Comparação de Bases / reconciliação)**: **único** ponto do módulo
+  que TOCA a Base Única. Join por `END_ID` (confirmado pelo usuário que é o
+  mesmo ID nas duas) comparando a **mídia** no `REL_TX_PROFILE` (`TIPO_TX_26`,
+  Fech.26) × a mídia "atual" da Base Única (`MEIO_TX_ATUAL`, no `MES_REF` mais
+  recente). Mostra concordância, matriz de confusão (diagonal = bate) e as
+  maiores divergências de cadastro. Endpoint `/api/reconciliacao`
+  (`reconciliacao_sql` + `total_tx_sql` em `queries.py`; filtros qualificados
+  com `t.` via `_filters(..., prefix="t.")`). ⚠️ **Números ainda não
+  validados contra o Oracle real** (não temos a Base Única no sandbox) — a
+  lógica/shape foi conferida com uma Base Única sintética; validar os totais
+  no primeiro deploy. A Base Única tem 3 colunas de TX que espelham a
+  `REL_TX_PROFILE` (`MEIO_TX_ATUAL`=mídia, `MEIO_TX_CAPACIDADE`=`TIPO_TX`,
+  `SOLUCAO_FO`=`METODO_CONSTRUTIVO_FO`) e **não** tem coluna de fornecedor de
+  rádio (por isso aquele join caiu). As outras 3 abas seguem lendo só de
+  `REL_TX_PROFILE`.
 - Filtro: UF + **Regional** (dimensão limpa aqui) + Município (ponte IBGE,
   igual Tráfego). Store próprio (`store/transportFilters.ts`).
 
