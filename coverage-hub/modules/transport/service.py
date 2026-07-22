@@ -8,8 +8,12 @@ reformata os poucos grupos que voltam pro shape de JSON que o front espera.
 
 Regras de negócio (implementadas em SQL, documentadas aqui):
 - **Mídia** = 1º token do TIPO_TX (FO/MW/SAT/LL/SLS); token desconhecido →
-  'N/I'; coluna vazia → NULL, que aqui vira "Não definido". **RanSharing**
-  (CLASSIFICACAO='RANSHARING') sobrescreve a mídia pra 'RS'.
+  'N/I'; coluna vazia → NULL, que aqui vira "Não definido". RanSharing NÃO
+  é mídia (o override antigo foi removido — ver queries.py); a posse
+  ransharing fica na "Camada de Rede" (aba Infraestrutura, CLASSIFICACAO).
+  Obs.: na reconciliação, o lado da BASE ÚNICA ainda pode dizer 'RS' (o
+  MEIO_TX_ATUAL de lá traz RS como valor) — aparece como divergência real,
+  o que é honesto: as bases discordam mesmo.
 - **Capacidade** = 2º token (10G/1G/<1G) ou "Outros"; sem 2º token → fora do
   denominador de %10G.
 - **Fiberização** = FO ÷ sites com mídia definida (exclui "Não definido").
@@ -22,7 +26,9 @@ from database.oracle import execute_query
 
 from modules.transport import queries as q
 
-MEDIA_ORDER = ["FO", "MW", "RS", "SAT", "LL", "SLS", "N/I", "Não definido"]
+MEDIA_ORDER = ["FO", "MW", "SAT", "LL", "SLS", "RS", "N/I", "Não definido"]
+# "RS" fica na ordem SÓ pra ordenar o que vem do lado Base Única na
+# reconciliação (MEIO_TX_ATUAL traz 'RS'); o TX_PROFILE não produz mais RS.
 CAP_ORDER = ["10G", "1G", "<1G", "Outros"]
 TECS = ["2G", "3G", "4G", "5G"]
 UNDEF = "Não definido"

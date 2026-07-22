@@ -1,9 +1,15 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { horizontalBarsOption, regionalSunburstOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
+
+/** Fonte do nº de "Casa Nova a contratar" no donut de fornecedores:
+ *  - rollout: TB_ROLLOUT_ACESSO deduplicado por endereço (responde aos filtros)
+ *  - nexus:   meta TB_NEXUS_CN_CE (755 CN 4G + 245 CN 5G = 1000; NACIONAL,
+ *             não recorta por UF/regional — por isso o aviso no subtítulo) */
+type CasaNovaFonte = "rollout" | "nexus";
 
 export function Raia3({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais, projetos } = filters;
@@ -22,6 +28,20 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
     queryKey: ["summary-r3-vendors", uf, municipio, ano, regionais, projetos],
     queryFn: () => summaryApi.r3Vendors(filters),
   });
+
+  const [cnFonte, setCnFonte] = useState<CasaNovaFonte>("rollout");
+  const { data: cnNexus } = useQuery({
+    queryKey: ["summary-r2-casa-nova-nexus"],
+    queryFn: () => summaryApi.r2CasaNovaNexus(),
+  });
+
+  // Com a fonte NEXUS, o valor da fatia "A Contratar" vira a meta nacional
+  // (o resto do donut — Base 25 por vendor — não muda de fonte).
+  const vendorSlices = (vendors ?? []).map((v) =>
+    cnFonte === "nexus" && v.label.toUpperCase().includes("A CONTRATAR") && cnNexus
+      ? { ...v, value: cnNexus.total }
+      : v,
+  );
 
   const { data: projects, isFetching: loadingProjects } = useQuery({
     queryKey: ["summary-r3-projects", uf, municipio, ano, regionais, projetos],
@@ -87,10 +107,38 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-4">
           <ChartPanel
             title="Fornecedores EoY 26"
-            subtitle="Sites físicos · Base 25 existentes + Casa Nova a contratar"
-            sourceTable={["BASE_TB_END_ID_NEW", "TB_ROLLOUT_ACESSO"]}
+            subtitle={
+              cnFonte === "rollout"
+                ? "Sites físicos · Base 25 + Casa Nova (endereços únicos do rollout)"
+                : "Sites físicos · Base 25 + Casa Nova (meta NEXUS — nacional, não filtra)"
+            }
+            sourceTable={
+              cnFonte === "rollout"
+                ? ["BASE_TB_END_ID_NEW", "TB_ROLLOUT_ACESSO"]
+                : ["BASE_TB_END_ID_NEW", "TB_NEXUS_CN_CE"]
+            }
             height={340}
-            option={vendorDonutSideOption(vendors ?? [])}
+            headerExtra={
+              <div className="btn-group btn-group-sm mb-1" role="group" aria-label="Fonte do nº de Casa Nova">
+                <button
+                  type="button"
+                  className={`btn ${cnFonte === "rollout" ? "btn-primary" : "btn-outline-secondary"}`}
+                  onClick={() => setCnFonte("rollout")}
+                  title="Endereços únicos do plano (TB_ROLLOUT_ACESSO, deduplicado) — responde aos filtros"
+                >
+                  Rollout
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${cnFonte === "nexus" ? "btn-primary" : "btn-outline-secondary"}`}
+                  onClick={() => setCnFonte("nexus")}
+                  title="Meta NEXUS (TB_NEXUS_CN_CE) — nacional, não recorta por filtro"
+                >
+                  Meta NEXUS
+                </button>
+              </div>
+            }
+            option={vendorDonutSideOption(vendorSlices)}
             loading={loadingVendors}
             imageFilename="r3-fornecedores-eoy26.png"
             exportSheet={{
@@ -99,7 +147,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
                 { header: "Fornecedor", key: "label" },
                 { header: "Sites", key: "value" },
               ],
-              rows: vendors ?? [],
+              rows: vendorSlices,
             }}
           />
         </div>

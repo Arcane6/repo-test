@@ -22,6 +22,7 @@ from modules.mobile_access.summary.queries import (
     R1_VENDORS,
     R2_NEW_CITIES_BY_ANF,
     R2_VENDORS_NEW_SITES,
+    R2_CASA_NOVA_NEXUS,
     R2_TOP_PROJECTS,
     R2_ORCAMENTO_POR_TECNOLOGIA,
     R2_ENDERECO_POR_TECNOLOGIA,
@@ -286,14 +287,22 @@ def get_r1_vendors(filters):
 
 def get_r2_new_cities_by_anf(filters):
     """
-    Novas cidades por REGIONAL (TNE, TCN, TSP, etc.).
-    Nome de função mantido pra não quebrar rota, mas agora usa REGIONAL.
-    """
-    params, ano_int = _prepare_params(filters)
-    params["plan_start"] = _dt.date(ano_int, 1, 1)
-    params["plan_end"]   = _dt.date(ano_int, 12, 31)
+    Novas cidades por REGIONAL (TNE, TCO, TSP, etc.) — PLANO 26.
 
-    sql = _apply_geo_all(R2_NEW_CITIES_BY_ANF, filters, params)
+    Fonte: NTW_OP.REL_CIDADES_PLANEJADO_26, lista fechada (1 linha por IBGE)
+    das cidades novas do plano — não tem MES_REF/DT_CARGA, então sem recorte
+    de data. Município filtra via ponte IBGE (mesmo padrão de Tráfego/
+    Transporte) porque o nome de município nesta tabela pode não bater
+    caractere-a-caractere com o nome resolvido no autocomplete do filtro
+    (que busca em MUNICIPIOS_FECHAMENTO).
+    """
+    params = {}
+    mun_clause = _build_municipio_ibge_clause(
+        "IBGE", _normalize_list(filters.get("municipios")), "mun", params
+    )
+    template = R2_NEW_CITIES_BY_ANF.replace("{municipio_filter}", mun_clause)
+
+    sql = _apply_geo_all(template, filters, params)
     rows = execute_query(sql, params) or []
     total = sum((r.get("cidades", 0) or 0) for r in rows)
     return {
@@ -345,6 +354,21 @@ def get_r2_vendors_new_sites(filters):
         color = VENDOR_COLORS_PLAN.get(name.upper(), "#888888")
         result.append({"label": name, "value": value, "color": color})
     return result
+
+
+def get_casa_nova_nexus():
+    """Meta de Casa Nova do NEXUS (TB_NEXUS_CN_CE, TIPO_CASA='CN'): a
+    contagem-meta de endereços novos por tecnologia (4G 755 + 5G 245 = 1000).
+    Fonte NACIONAL, sem dimensão geográfica — não recebe filtros; serve de
+    contraponto ao número operacional do ROLLOUT_ACESSO (deduplicado por
+    endereço), que responde aos filtros da tela."""
+    rows = execute_query(R2_CASA_NOVA_NEXUS) or []
+    por_tech = [
+        {"tech": r.get("tech"), "qtd": int(r.get("qtd") or 0)}
+        for r in rows if r.get("tech")
+    ]
+    return {"total": sum(t["qtd"] for t in por_tech), "por_tech": por_tech}
+
 
 def get_r2_top_projects(filters):
     params, ano_int = _prepare_params(filters)

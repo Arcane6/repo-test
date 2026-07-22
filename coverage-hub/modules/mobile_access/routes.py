@@ -126,6 +126,11 @@ def api_summary_r2_cities_anf():
 def api_summary_r2_vendors():
     return jsonify(summary.get_r2_vendors_new_sites(parse_filters()))
 
+@mobile_access_bp.route("/api/summary/r2/casa-nova-nexus")
+def api_summary_r2_casa_nova_nexus():
+    """Meta NEXUS de Casa Nova (nacional, sem filtro geográfico)."""
+    return jsonify(summary.get_casa_nova_nexus())
+
 @mobile_access_bp.route("/api/summary/r2/top-projects")
 def api_summary_r2_projects():
     return jsonify(summary.get_r2_top_projects(parse_filters()))

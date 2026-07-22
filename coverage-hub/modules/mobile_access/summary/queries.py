@@ -194,19 +194,17 @@ ORDER BY qtd DESC
 # ===========================================================================
 
 # ---------- Novas cidades por regional (ANF) — plano 26 ----------
-# Fonte: MUNICIPIOS_FECHAMENTO com MES_DIV_5G no ano-plano
-# Foca 5G (que é onde há expansão real de cidades)
+# Fonte: REL_CIDADES_PLANEJADO_26 — lista FECHADA das cidades novas do plano
+# (1 linha por IBGE, sem data/recorte de mês; não é base de realizado). Antes
+# usava MUNICIPIOS_FECHAMENTO com MES_DIV_5G, que é fechamento/realizado —
+# trocado a pedido do usuário porque misturava a raia de Plano com dado real.
 
 R2_NEW_CITIES_BY_ANF = """
 SELECT
     REGIONAL AS agrupador,
-    COUNT(DISTINCT IBGE) AS cidades
-FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-WHERE TRUNC(DT_CARGA) = (
-    SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-)
-AND MES_DIV_5G BETWEEN :plan_start AND :plan_end
-AND REGIONAL IS NOT NULL
+    COUNT(*) AS cidades
+FROM NTW_OP.REL_CIDADES_PLANEJADO_26
+WHERE 1 = 1
 {uf_filter}
 {municipio_filter}
 {regional_filter}
@@ -220,13 +218,20 @@ ORDER BY cidades DESC
 #   - Casa Nova: agrupa como "A Contratar (Casa Nova)" — site ainda não existe
 #   - Casa Existente: usa o vendor dominante do município (best-effort)
 #     Se município sem sites cadastrados, cai em "Sem info (Existente)"
-# Total do donut = total do card "Sites por Tecnologia"
+#
+# DEDUPLICAÇÃO (endereço, não OC): TB_ROLLOUT_ACESSO é no grão de OC — a
+# mesma Casa Nova gera 2+ OCs (uma por tecnologia, 4G e 5G separadas), então
+# COUNT(*) inflava o número (~2171 OCs vs ~1000 endereços reais, conferido
+# contra TB_NEXUS_CN_CE: 755 CN 4G + 245 CN 5G). Contamos endereços únicos
+# por (COD_IBGE, ID_MASTER_PIVOT) — mesma chave que o rateio do Orçamento
+# já usa pra não colapsar OCs do mesmo endereço.
 
 R2_VENDORS_NEW_SITES = """
 WITH ROLLOUT_2026 AS (
     SELECT
         r.ORDEM_COMPLEXA,
         r.COD_IBGE,
+        TO_CHAR(r.COD_IBGE) || '-' || NVL(TO_CHAR(r.ID_MASTER_PIVOT), '0') AS ENDERECO_KEY,
         CASE
             WHEN r.CLASSIFICACAO_CASA IN ('NEW SITE', 'CO SITE CASA NOVA')
             THEN 'NOVA'
@@ -287,7 +292,7 @@ SELECT
             THEN d.VENDOR || ' (Existente)'
         ELSE 'Sem info (Existente)'
     END AS vendor,
-    COUNT(*) AS qtd
+    COUNT(DISTINCT r.ENDERECO_KEY) AS qtd
 FROM ROLLOUT_2026 r
 LEFT JOIN DOMINANT_BY_CITY d ON d.COD_IBGE = r.COD_IBGE
 GROUP BY
@@ -298,6 +303,22 @@ GROUP BY
             THEN d.VENDOR || ' (Existente)'
         ELSE 'Sem info (Existente)'
     END
+ORDER BY qtd DESC
+"""
+
+
+# ---------- Casa Nova — meta NEXUS ----------
+# TB_NEXUS_CN_CE nesta leitura é a META de endereços por tech × tipo de casa
+# (CAC aqui = contagem-meta: CN 4G 755 + CN 5G 245 = 1000 endereços novos).
+# É NACIONAL — não tem UF/regional/município, então NÃO responde aos filtros
+# da tela; o front avisa isso quando essa fonte está selecionada.
+R2_CASA_NOVA_NEXUS = """
+SELECT
+    UPPER(TRIM(TECH)) AS tech,
+    SUM(CAC) AS qtd
+FROM TB_NEXUS_CN_CE
+WHERE UPPER(TRIM(TIPO_CASA)) = 'CN'
+GROUP BY UPPER(TRIM(TECH))
 ORDER BY qtd DESC
 """
 # ---------- Top 10 projetos (plano 26) ----------
