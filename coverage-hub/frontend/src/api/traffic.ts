@@ -46,13 +46,13 @@ export interface RaiaPlano26 {
 
 export interface RaiaFechamento26 {
   ano: number;
+  /** Mês de corte: o mais recente com realizado (ex.: "Jul"). */
   mes_ate: string | null;
-  trafego_ytd_pb: number;
-  planejado_ytd_pb: number;
+  /** Volumetria do MÊS DE CORTE (nunca soma/acumulado — tráfego é mensal). */
+  trafego_mes_pb: number;
+  planejado_mes_pb: number;
   aderencia_pct: number | null;
   crescimento_yoy_pct: number | null;
-  projecao_ano_pb: number;
-  atingimento_plano_pct: number | null;
   por_tecnologia: LabeledValue[];
   mix_5g_pct: number | null;
   ranking_municipios: LabeledValue[];

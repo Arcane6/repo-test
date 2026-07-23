@@ -127,14 +127,14 @@ def _plan_camada_rows(filters, ano=ANO_PLANO):
 
 
 def _plan_top_municipios(filters, ano=ANO_PLANO):
-    """Top 15 municípios do plano (Oracle ordena e corta) — 15 linhas."""
+    """Top 15 municípios do plano no MÊS DE CORTE (dezembro) — 15 linhas."""
     params = {"ano": ano}
     sql = PLANEJADO_TOP_MUNICIPIOS.format(
         uf_filter=_build_uf_clause(_normalize_list(filters.get("ufs")), params),
         municipio_filter=_build_municipio_clause(_normalize_list(filters.get("municipios")), params),
     )
     rows = execute_query(sql, params) or []
-    return [{"label": r.get("municipio_nome") or "N/D", "value": round(_num(r.get("total_ano")), 4)} for r in rows]
+    return [{"label": r.get("municipio_nome") or "N/D", "value": round(_num(r.get("total_dez")), 4)} for r in rows]
 
 
 def _plan_por_uf_rows(filters, ano=ANO_PLANO):
@@ -147,15 +147,32 @@ def _plan_por_uf_rows(filters, ano=ANO_PLANO):
     return execute_query(sql, params) or []
 
 
-def _rz_municipio_rows(filters, ano, mes_max=None):
-    """Realizado agregado por município (Oracle faz o GROUP BY) — soma dos
-    meses do período e de todas as operadoras. Devolve ~5,5k linhas em vez
-    das ~140k cruas."""
+def _rz_municipio_rows(filters, ano, mes=None):
+    """Realizado agregado por município (Oracle faz o GROUP BY) — soma de
+    TODAS as operadoras. Tráfego é métrica MENSAL, não cumulativa: se `mes`
+    for informado, filtra o mês EXATO (o "mês de corte"), nunca um
+    intervalo Jan..mês (isso somaria vários meses, o que o usuário pediu
+    pra nunca fazer). Sem `mes`, cai no ano inteiro cru — hoje nenhum
+    chamador usa esse caso; mantido só por segurança de assinatura."""
     params = {"ano": ano}
     periodo = "AND EXTRACT(YEAR FROM DT_REFERENCIA) = :ano"
-    if mes_max is not None:
-        params["mes_max"] = mes_max
-        periodo += " AND EXTRACT(MONTH FROM DT_REFERENCIA) <= :mes_max"
+    if mes is not None:
+        params["mes"] = mes
+        periodo += " AND EXTRACT(MONTH FROM DT_REFERENCIA) = :mes"
+    sql = REALIZADO_POR_MUNICIPIO.format(
+        periodo_filter=periodo,
+        uf_filter=_build_uf_clause(_normalize_list(filters.get("ufs")), params),
+        municipio_filter=_build_municipio_clause(_normalize_list(filters.get("municipios")), params),
+    )
+    return execute_query(sql, params) or []
+
+
+def _rz_municipio_rows_acumulado(filters, ano, mes_max):
+    """Realizado agregado por município, CUMULATIVO Jan..mes_max. Usado só
+    pela aba "YTD" (visão de acumulado do ano — propositalmente separada do
+    resto do módulo, que agora usa sempre o mês de corte, nunca a soma)."""
+    params = {"ano": ano, "mes_max": mes_max}
+    periodo = "AND EXTRACT(YEAR FROM DT_REFERENCIA) = :ano AND EXTRACT(MONTH FROM DT_REFERENCIA) <= :mes_max"
     sql = REALIZADO_POR_MUNICIPIO.format(
         periodo_filter=periodo,
         uf_filter=_build_uf_clause(_normalize_list(filters.get("ufs")), params),
@@ -203,14 +220,15 @@ CAMADAS_ADITIVAS = {"2G/3G", "4G", "5G"}
 
 
 def _plan_por_camada(camada_rows):
-    """Split aditivo do planejado por tecnologia ({2G/3G, 4G, 5G}, que soma
-    o Consolidado), das linhas agregadas por TIPO_TRAF."""
+    """Split do planejado por tecnologia ({2G/3G, 4G, 5G}, que soma o
+    Consolidado) no MÊS DE CORTE (dezembro — índice 11), das linhas
+    agregadas por TIPO_TRAF. NUNCA soma os 12 meses (tráfego é mensal)."""
     out = []
     for r in camada_rows:
         tt = str(r.get("tipo_traf") or "").strip()
         if tt not in CAMADAS_ADITIVAS:
             continue
-        out.append({"label": tt, "value": round(sum(_mes_cols(r)), 4)})
+        out.append({"label": tt, "value": round(_mes_cols(r)[11], 4)})
     return sorted(out, key=lambda x: x["value"], reverse=True)
 
 
@@ -295,18 +313,26 @@ def _pct_growth(atual, anterior):
 def get_resumo_executivo(filters):
     """3 raias: Fechamento 2025 · Plano 26 · Fechamento 26.
 
+    Regra do usuário: tráfego é métrica MENSAL — todo KPI/ranking/split que
+    antes somava o ano (ou o YTD) agora usa só a volumetria do MÊS DE CORTE:
+    dez/25 pra Fechamento 2025, dez/26 pra Plano 26, e o mês mais recente com
+    realizado (`mes_max`) pra Fechamento 26. NUNCA soma múltiplos meses.
+    Exceção deliberada: a "Curva Mensal" (série ponto-a-ponto por mês) segue
+    mostrando os 12 meses — cada ponto já é a volumetria do próprio mês, não
+    é cumulativo, então já respeita a regra.
+
     Realizado agregado no Oracle: em vez de puxar ~140k linhas cruas por
-    ano, cada `_rz_municipio_rows` volta ~5,5k (uma por município) e cada
-    `_rz_mes_totais` volta 12 (uma por mês)."""
+    ano, cada `_rz_municipio_rows` volta ~5,5k (uma por município, de UM mês)
+    e cada `_rz_mes_totais` volta 12 (uma por mês)."""
     cam26 = _plan_camada_rows(filters, ano=ANO_PLANO)
-    plan_mensal = _plan_meses_consolidado(cam26)   # 12 valores PB (nacional)
-    plano_ano = round(sum(plan_mensal), 4)
-    # Mês corrente (YTD) sai da série mensal de 2026 (12 linhas, barato).
+    plan_mensal = _plan_meses_consolidado(cam26)   # 12 valores PB (série, não soma)
+    plano_dez = plan_mensal[11]                    # mês de corte do plano: sempre dez
+    # Mês corrente (mais recente com dado) sai da série mensal de 2026.
     rz26_mes = _rz_mes_totais(filters, ANO_FECHAMENTO_ATUAL)
     mes_max = max(rz26_mes) if rz26_mes else 0
 
-    # --- Raia 1: Fechamento 2025 (realizado ano cheio, agregado) ---
-    rz25_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ANTERIOR)
+    # --- Raia 1: Fechamento 2025 — mês de corte = dezembro/2025 ---
+    rz25_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ANTERIOR, mes=12)
     tec25 = _rz_por_tecnologia(rz25_mun)
     fechamento_2025 = {
         "ano": ANO_FECHAMENTO_ANTERIOR,
@@ -316,7 +342,8 @@ def get_resumo_executivo(filters):
         "ranking_municipios": _rz_ranking_municipios(rz25_mun),
     }
 
-    # --- Raia 2: Plano 26 — curva mensal planejada + REALIZADO até o YTD ---
+    # --- Raia 2: Plano 26 — curva mensal (série, não cumulativa) + mês de
+    # corte (dezembro) nos KPIs/rankings ---
     serie_mensal = [
         {
             "mes": MESES_LABEL[i],
@@ -329,33 +356,31 @@ def get_resumo_executivo(filters):
     ]
     plano_26 = {
         "ano": ANO_PLANO,
-        "trafego_planejado_pb": plano_ano,
+        "trafego_planejado_pb": round(plano_dez, 4),
         "mes_ate": MESES_LABEL[mes_max - 1] if mes_max else None,
         "serie_mensal": serie_mensal,
         "por_camada": _plan_por_camada(cam26),
         "ranking_municipios": _plan_top_municipios(filters, ANO_PLANO),
     }
 
-    # --- Raia 3: Fechamento 26 (realizado YTD) + aderência, YoY e projeção ---
-    rz26_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ATUAL, mes_max=mes_max) if mes_max else []
-    realizado_ytd = _rz_total(rz26_mun)
-    planejado_ytd = round(sum(plan_mensal[:mes_max]), 4) if mes_max else 0.0
-    # YoY: mesmo período (Jan..mes_max) do ano anterior — soma da série
-    # mensal de 2025 até o mês corrente (reaproveita a query por mês).
+    # --- Raia 3: Fechamento 26 — mês de corte = mês mais recente com
+    # realizado (mes_max). Aderência e YoY comparam o MESMO mês, nunca
+    # acumulado. Sem projeção de fim de ano (era um run-rate anualizado —
+    # a própria ideia de "somar o ano" que o usuário pediu pra tirar). ---
+    rz26_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ATUAL, mes=mes_max) if mes_max else []
+    realizado_mes = _rz_total(rz26_mun)
+    planejado_mes = round(plan_mensal[mes_max - 1], 4) if mes_max else 0.0
+    # YoY: mesmo mês do ano anterior (ex.: jul/26 vs jul/25), não acumulado.
     rz25_mes = _rz_mes_totais(filters, ANO_FECHAMENTO_ANTERIOR) if mes_max else {}
-    realizado_ytd_ano_ant = round(sum(v for m, v in rz25_mes.items() if m <= mes_max), 4)
-    # Projeção linear de fechamento do ano (run-rate) vs plano cheio.
-    projecao_ano = round(realizado_ytd / mes_max * 12, 4) if mes_max else 0.0
+    realizado_mes_ano_ant = round(rz25_mes.get(mes_max, 0.0), 4)
     tec26 = _rz_por_tecnologia(rz26_mun)
     fechamento_26 = {
         "ano": ANO_FECHAMENTO_ATUAL,
         "mes_ate": MESES_LABEL[mes_max - 1] if mes_max else None,
-        "trafego_ytd_pb": realizado_ytd,
-        "planejado_ytd_pb": planejado_ytd,
-        "aderencia_pct": _aderencia(realizado_ytd, planejado_ytd),
-        "crescimento_yoy_pct": _pct_growth(realizado_ytd, realizado_ytd_ano_ant),
-        "projecao_ano_pb": projecao_ano,
-        "atingimento_plano_pct": _aderencia(projecao_ano, plano_ano),
+        "trafego_mes_pb": realizado_mes,
+        "planejado_mes_pb": planejado_mes,
+        "aderencia_pct": _aderencia(realizado_mes, planejado_mes),
+        "crescimento_yoy_pct": _pct_growth(realizado_mes, realizado_mes_ano_ant),
         "por_tecnologia": tec26,
         "mix_5g_pct": _mix_5g_pct(tec26),
         "ranking_municipios": _rz_ranking_municipios(rz26_mun),
@@ -376,7 +401,7 @@ def get_ytd(filters):
     rz_mensal = _rz_mes_totais(filters, ANO_FECHAMENTO_ATUAL)   # {mes: pb}, 12 linhas
     mes_max = max(rz_mensal) if rz_mensal else 0
     # Por UF (YTD): planejado agregado por UF + realizado agregado por município.
-    rz_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ATUAL, mes_max=mes_max) if mes_max else []
+    rz_mun = _rz_municipio_rows_acumulado(filters, ANO_FECHAMENTO_ATUAL, mes_max) if mes_max else []
     plan_uf = _plan_uf_ytd(_plan_por_uf_rows(filters, ANO_PLANO), mes_max)
 
     # Série acumulada mês a mês até o mês corrente.

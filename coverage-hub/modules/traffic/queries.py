@@ -40,14 +40,16 @@ MESES_WIDE = [
 # ---------- Planejado — AGREGADO no Oracle ----------
 # A WIDE também é grande (município × TIPO_TRAF ≈ 28k linhas/ano). Mesma
 # ideia do realizado: deixa o Oracle agregar e volta só o necessário. Os 12
-# meses vêm em colunas, então cada SUM(mês) vira M01..M12; a expressão do
-# total do ano soma os 12 SUMs.
+# meses vêm em colunas, então cada SUM(mês) vira M01..M12 — série usada
+# tal-qual na Curva Mensal (cada ponto já É a volumetria do próprio mês,
+# nunca cumulativa). Os KPIs/rankings usam só o mês de corte (dezembro,
+# sempre — o plano é conhecido pro ano inteiro), nunca a soma dos 12 — ver
+# service.py (`_plan_por_camada` lê o índice de dezembro, não soma).
 _SUM_MESES_COLS = ",\n    ".join(f"SUM({m}) AS M{i:02d}" for i, m in enumerate(MESES_WIDE, start=1))
-_SUM_MESES_TOTAL = " + ".join(f"SUM({m})" for m in MESES_WIDE)
 
 # Por TIPO_TRAF (5 linhas), com os 12 meses somados nacionalmente. A linha
-# 'Consolidado' dá a série mensal/total/YTD; as linhas {2G/3G,4G,5G} dão o
-# split aditivo por camada.
+# 'Consolidado' dá a série mensal; as linhas {2G/3G,4G,5G} dão o split
+# aditivo — mas só o valor de dezembro entra nos KPIs (ver acima).
 PLANEJADO_POR_CAMADA = f"""
 SELECT
     TIPO_TRAF,
@@ -72,19 +74,21 @@ WHERE ANO = :ano AND TIPO_TRAF = 'Consolidado'
 GROUP BY ESTADO
 """
 
-# Top 15 municípios por tráfego planejado do ano (só Consolidado). O Oracle
-# ordena e corta — volta só 15 linhas.
-PLANEJADO_TOP_MUNICIPIOS = f"""
+# Top 15 municípios por tráfego planejado do MÊS DE CORTE (dez, sempre — o
+# plano é conhecido pro ano inteiro, então o corte do "Plano 26" é sempre
+# dezembro). Traço NÃO soma os 12 meses (tráfego é métrica mensal, não
+# cumulativa) — só a coluna de dezembro.
+PLANEJADO_TOP_MUNICIPIOS = """
 SELECT * FROM (
     SELECT
         MUNICIPIO_NOME,
-        {_SUM_MESES_TOTAL} AS TOTAL_ANO
+        SUM(DEZEMBRO) AS TOTAL_DEZ
     FROM REL_TRAFEGO_CIDADES_WIDE
     WHERE ANO = :ano AND TIPO_TRAF = 'Consolidado'
-    {{uf_filter}}
-    {{municipio_filter}}
+    {uf_filter}
+    {municipio_filter}
     GROUP BY MUNICIPIO_NOME
-    ORDER BY TOTAL_ANO DESC
+    ORDER BY TOTAL_DEZ DESC
 ) WHERE ROWNUM <= 15
 """
 
