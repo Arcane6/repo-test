@@ -380,8 +380,7 @@ AND REGIONAL IS NOT NULL
 {municipio_filter}
 {regional_filter}
 GROUP BY REGIONAL
-HAVING SUM(CASE WHEN MES_DIV_5G IS NOT NULL AND MES_DIV_5G <= :plan_end THEN 1 ELSE 0 END) > 0
-ORDER BY total DESC
+ORDER BY base_25 + ganho_26 DESC
 """
 
 
