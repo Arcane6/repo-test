@@ -350,10 +350,14 @@ FETCH FIRST 10 ROWS ONLY
 """
 
 # ---------- Cidades 5G por regional (fechamento 26 = base 25 + ganho 26) ----------
-# Retorna 3 colunas por regional:
+# ganho_26 = cidades do PLANO (REL_CIDADES_PLANEJADO_26), não "quem já
+# ativou no ano" — MES_DIV_5G só tem data REALIZADA (mesmo bug do
+# velocímetro 5G: cidade ainda não ativada não tem linha com data futura,
+# então `MES_DIV_5G BETWEEN plan_start AND plan_end` só pega o YTD e o
+# total colava no YTD, não no alvo do plano). Guard (MES_DIV_5G IS NULL OR
+# > baseline_date) evita contar 2x quem já era 5G antes do plano.
 #   - base_25:  cidades com 5G ANTES do plano (MES_DIV_5G <= 2025-12-31)
-#   - ganho_26: cidades com 5G no ANO do plano (MES_DIV_5G entre plan_start/end)
-#   - total:    base_25 + ganho_26
+#   - ganho_26: cidades do plano ainda não em base_25
 
 R3_TOTAL_CITIES_BY_REGIONAL = """
 SELECT
@@ -363,13 +367,10 @@ SELECT
         THEN 1 ELSE 0
     END) AS base_25,
     SUM(CASE
-        WHEN MES_DIV_5G BETWEEN :plan_start AND :plan_end
+        WHEN IBGE IN (SELECT IBGE FROM NTW_OP.REL_CIDADES_PLANEJADO_26)
+         AND (MES_DIV_5G IS NULL OR MES_DIV_5G > :baseline_date)
         THEN 1 ELSE 0
-    END) AS ganho_26,
-    SUM(CASE
-        WHEN MES_DIV_5G IS NOT NULL AND MES_DIV_5G <= :plan_end
-        THEN 1 ELSE 0
-    END) AS total
+    END) AS ganho_26
 FROM NTW_OP.MUNICIPIOS_FECHAMENTO
 WHERE TRUNC(DT_CARGA) = (
     SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO

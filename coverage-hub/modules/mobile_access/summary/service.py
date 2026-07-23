@@ -475,7 +475,9 @@ def get_r2_endereco_por_tecnologia(filters):
 
 def get_r3_new_cities_by_anf(filters):
     """
-    Fechamento 26 por regional, com breakdown de Base 25 + Ganho 26.
+    Fechamento 26 (projeção) por regional = Base 25 (5G já ativo até
+    31/dez/ano-1) + Ganho 26 (cidades novas do PLANO, REL_CIDADES_PLANEJADO_26
+    — não "quem já ativou no ano", que é YTD e não o alvo do plano).
 
     Retorno:
         {
@@ -491,8 +493,6 @@ def get_r3_new_cities_by_anf(filters):
     """
     params, ano_int = _prepare_params(filters)
     params["baseline_date"] = _dt.date(ano_int - 1, 12, 31)
-    params["plan_start"]    = _dt.date(ano_int, 1, 1)
-    params["plan_end"]      = _dt.date(ano_int, 12, 31)
 
     sql = _apply_geo_all(R3_TOTAL_CITIES_BY_REGIONAL, filters, params)
     rows = execute_query(sql, params) or []
