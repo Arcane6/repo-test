@@ -27,6 +27,7 @@ export default defineConfig(({ command }) => ({
       '/mobile-access/api': 'http://127.0.0.1:5000',
       '/trafego/api': 'http://127.0.0.1:5000',
       '/transport/api': 'http://127.0.0.1:5000',
+      '/controle-fisico-financeiro/api': 'http://127.0.0.1:5000',
       '/api': 'http://127.0.0.1:5000',
     },
   },

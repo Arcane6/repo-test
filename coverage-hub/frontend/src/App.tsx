@@ -45,6 +45,9 @@ const TransporteInfraestrutura = lazy(() =>
 const TransporteReconciliacao = lazy(() =>
   import("./dashboards/TransporteReconciliacao").then((m) => ({ default: m.TransporteReconciliacao })),
 );
+const ControleFisicoFinanceiroPage = lazy(() =>
+  import("./pages/controle-fisico-financeiro/ControleFisicoFinanceiroPage").then((m) => ({ default: m.ControleFisicoFinanceiroPage })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,6 +123,14 @@ export function App() {
               <Route path="infraestrutura" element={<TransporteInfraestrutura />} />
               <Route path="reconciliacao" element={<TransporteReconciliacao />} />
             </Route>
+            <Route
+              path="controle-fisico-financeiro"
+              element={
+                <Suspense fallback={<RouteFallback />}>
+                  <ControleFisicoFinanceiroPage />
+                </Suspense>
+              }
+            />
           </Route>
         </Routes>
       </BrowserRouter>
