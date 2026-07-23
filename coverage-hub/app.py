@@ -2,7 +2,6 @@ import os
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from modules.controle_fisico_financeiro.routes import controle_fisico_financeiro_bp
 from modules.core.routes import core_bp
 from modules.mobile_access.routes import mobile_access_bp
 from modules.traffic.routes import traffic_bp
@@ -18,7 +17,6 @@ app.register_blueprint(core_bp)
 app.register_blueprint(mobile_access_bp)
 app.register_blueprint(traffic_bp)
 app.register_blueprint(transport_bp)
-app.register_blueprint(controle_fisico_financeiro_bp)
 
 DIST_DIR = os.path.join(app.static_folder, "dist")
 
