@@ -35,24 +35,6 @@ MODULES = [
         "color": "#E53935",
         "enabled": False,
     },
-    {
-        "key": "resumo_executivo",
-        "name": "Resumo Executivo",
-        "description": "Visão consolidada de todos os módulos",
-        "url": "/resumo-executivo/",
-        "icon": "bi-graph-up-arrow",
-        "color": "#003399",
-        "enabled": False,
-    },
-    {
-        "key": "base_unica",
-        "name": "Base Única",
-        "description": "Datasets, dicionário de dados e downloads",
-        "url": "/base-unica/",
-        "icon": "bi-database",
-        "color": "#6C757D",
-        "enabled": False,
-    },
 ]
 
 
