@@ -44,7 +44,8 @@ export function GaugeCards() {
   return (
     <div className="mb-4">
       <div className="d-flex justify-content-end mb-2">
-        <SourceBadge table="MUNICIPIOS_FECHAMENTO" />
+        {/* O alvo EOY26 do 5G soma as cidades novas do plano — daí a 2ª fonte. */}
+        <SourceBadge table={["MUNICIPIOS_FECHAMENTO", "REL_CIDADES_PLANEJADO_26"]} />
       </div>
       <div className="row g-3">
         {data.cards.map((card) => (

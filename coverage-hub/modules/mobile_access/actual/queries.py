@@ -143,6 +143,20 @@ GAUGE_METRIC = """
     SUM(CASE WHEN MES_DIV_{tec} IS NOT NULL AND MES_DIV_{tec} <= TRUNC(SYSDATE) THEN 1 ELSE 0 END) AS ytd_{tec},
     SUM(CASE WHEN MES_DIV_{tec} IS NOT NULL AND MES_DIV_{tec} < ADD_MONTHS(TRUNC(SYSDATE, 'YYYY'), 12) THEN 1 ELSE 0 END) AS eoy_curr_{tec}"""
 
+# Alvo EOY26 do 5G: o MES_DIV_5G da base de fechamento só tem data REALIZADA
+# (não existe linha com data futura), então o eoy_curr calculado por data
+# colapsava no YTD (mostrava 1112 quando o alvo é 1089 + 134 do plano).
+# O alvo verdadeiro = EOY25 + cidades novas do plano
+# (NTW_OP.REL_CIDADES_PLANEJADO_26) — o service soma eoy_prev_5g +
+# planejado_5g. O guard de MES_DIV evita dupla contagem de cidade do plano
+# que já era 5G antes do ano (contada no eoy_prev); quem ativou DENTRO do
+# ano (YTD) continua contando — está no plano e no realizado, mas só soma
+# uma vez porque o eoy_prev não a inclui.
+GAUGE_PLANEJADO_5G_METRIC = """
+    SUM(CASE WHEN IBGE IN (SELECT IBGE FROM NTW_OP.REL_CIDADES_PLANEJADO_26)
+              AND (MES_DIV_5G IS NULL OR MES_DIV_5G >= TRUNC(SYSDATE, 'YYYY'))
+             THEN 1 ELSE 0 END) AS planejado_5g"""
+
 
 UFS_QUERY = """
 SELECT DISTINCT UF
@@ -282,6 +296,22 @@ FROM (
     FROM BASE
     WHERE MES_DIV_5G IS NOT NULL
     GROUP BY TRUNC(MES_DIV_5G, 'MM')
+
+    UNION ALL
+
+    -- Cidades novas do PLANO 26 entram na curva 5G em dez/26 (pedido do
+    -- usuário): são as de REL_CIDADES_PLANEJADO_26 ainda não realizadas
+    -- (MES_DIV_5G nulo ou futuro — quem já ativou no ano conta no mês real
+    -- acima, não aqui, senão contaria duas vezes). Join com BASE pra
+    -- respeitar os mesmos filtros de UF/município/tec/venn da aba.
+    SELECT
+        '5G' AS TEC,
+        DATE '2026-12-01' AS PERIODO,
+        COUNT(DISTINCT p.IBGE) AS QTD
+    FROM BASE b
+    JOIN NTW_OP.REL_CIDADES_PLANEJADO_26 p ON p.IBGE = b.IBGE
+    WHERE (b.MES_DIV_5G IS NULL OR b.MES_DIV_5G > TRUNC(SYSDATE))
+    HAVING COUNT(DISTINCT p.IBGE) > 0
 )
 ORDER BY TEC, PERIODO
 """
