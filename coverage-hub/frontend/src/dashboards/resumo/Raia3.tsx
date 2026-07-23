@@ -61,7 +61,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
           <ChartPanel
             title="Cidades 5G por Regional (Projeção EoY)"
             subtitle="Clique num regional pra filtrar toda a aba"
-            sourceTable="MUNICIPIOS_FECHAMENTO"
+            sourceTable={["MUNICIPIOS_FECHAMENTO", "REL_CIDADES_PLANEJADO_26"]}
             height={340}
             option={citiesAnf ? regionalSunburstOption(citiesAnf, focusedRegional) : {}}
             loading={loadingCitiesAnf}
