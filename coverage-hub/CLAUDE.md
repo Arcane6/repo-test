@@ -221,11 +221,12 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     (mesmo dado com mês em linha). `MUNICIPIO_ID` é o IBGE de 6 dígitos.
     Também é **agregado no Oracle** (não puxa as ~28k linhas cruas):
     `PLANEJADO_POR_CAMADA` (`GROUP BY TIPO_TRAF`, 5 linhas com os 12 meses
-    somados → série/total/YTD nacional pela linha Consolidado + split por
-    camada), `PLANEJADO_POR_UF` (`GROUP BY ESTADO`, só Consolidado → YTD por
-    UF) e `PLANEJADO_TOP_MUNICIPIOS` (`ORDER BY ... WHERE ROWNUM <= 15` → só
-    o top 15). Assume que as colunas de mês são `NUMBER` (fazemos `SUM`
-    direto); se vierem `VARCHAR`, envolver em `TO_NUMBER`.
+    somados → série mensal nacional pela linha Consolidado + split por
+    camada), `PLANEJADO_POR_UF` (`GROUP BY ESTADO`, só Consolidado → usado
+    só pelo YTD, ver abaixo) e `PLANEJADO_TOP_MUNICIPIOS` (`SUM(DEZEMBRO)`
+    — só o mês de corte, não os 12 meses — `ORDER BY ... WHERE ROWNUM <=
+    15` → top 15). Assume que as colunas de mês são `NUMBER` (fazemos
+    `SUM` direto); se vierem `VARCHAR`, envolver em `TO_NUMBER`.
   - **`REL_DS013_TRAFEGO_REALIZADO`** (realizado): 1 linha por
     (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz
     **TIM e OI**. Base de usuários rica (não usada ainda). A tabela crua é
@@ -251,13 +252,42 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     **soma de TODAS as operadoras** da fonte (TIM + OI = grupo TIM); todas
     as funções `_rz_*` agregam sobre as linhas inteiras, sem filtrar
     operadora. Não reintroduzir cálculo/visual de market share TIM×OI.
-  - **YTD = acumulado Jan..mês corrente**, onde o mês corrente é o maior
-    `MES` do realizado do ano (`_mes_corrente`). **Aderência = realizado
-    ÷ planejado** no mesmo intervalo. **Crescimento YoY** = realizado YTD
-    deste ano vs mesmo período (Jan..mês corrente) do ano anterior
-    (`_pct_growth`). **Projeção fim de ano** = run-rate linear
-    (`realizado_ytd / mês_corrente × 12`), comparada ao plano cheio
-    (`atingimento_plano_pct`). **Mix 5G** = % do tráfego que já é 5G
+  - **⚠️ REGRA FECHADA (pedido explícito do usuário): tráfego é métrica
+    MENSAL — NUNCA somar múltiplos meses num KPI/ranking/split.** Todo
+    número do **Resumo Executivo** (as 3 raias) usa a volumetria de UM
+    único "mês de corte", nunca uma soma/acumulado:
+    - **R1 Fechamento 2025** → corte = **dezembro/2025** (`mes=12` em
+      `_rz_municipio_rows`). `trafego_pb`, `por_tecnologia` e
+      `ranking_municipios` são TODOS só de dezembro — não do ano inteiro.
+    - **R2 Plano 26** → corte = **dezembro/2026**, sempre (o plano é
+      conhecido pro ano inteiro). `trafego_planejado_pb` lê
+      `plan_mensal[11]` (índice de dezembro), não `sum(plan_mensal)`.
+      `por_camada` idem (`_mes_cols(r)[11]`, não `sum(_mes_cols(r))`).
+      `ranking_municipios` vem de `PLANEJADO_TOP_MUNICIPIOS`, que já
+      seleciona só `SUM(DEZEMBRO)` no Oracle.
+    - **R3 Fechamento 26** → corte = `mes_max` (o mês mais recente com
+      realizado — ainda descoberto via `_rz_mes_totais`/`max()`, isso não
+      mudou). `trafego_mes_pb` e `planejado_mes_pb` são o valor **daquele
+      mês exato** (`_rz_municipio_rows(..., mes=mes_max)`, filtro
+      `EXTRACT(MONTH...) = :mes`, não mais `<= :mes_max`), nunca a soma
+      Jan..mes_max. **Aderência** = realizado ÷ planejado do MESMO mês.
+      **Crescimento YoY** = mesmo mês em 2026 vs o mesmo mês em 2025
+      (`rz25_mes.get(mes_max)`), não YTD-vs-YTD acumulado.
+    - **Removido**: "Projeção Fim de Ano" (`projecao_ano_pb`) e
+      "Atingimento do Plano" (`atingimento_plano_pct`) — eram um run-rate
+      anualizado (`realizado_ytd / mes_max × 12`), ou seja, a própria
+      "soma do ano" que o usuário pediu pra eliminar. Não reintroduzir sem
+      pedido explícito.
+    - **Exceção deliberada — a "Curva Mensal" continua com os 12 meses**:
+      cada ponto da série (`serie_mensal`/`_plan_meses_consolidado`) JÁ é a
+      volumetria do próprio mês (não é cumulativo), então já respeita a
+      regra — só o corte dos KPIs/rankings/donuts é que mudou.
+    - **A aba separada "Tráfego YTD" (`get_ytd`/`TrafegoYtd.tsx`) NÃO foi
+      alterada** — continua uma visão de acumulado Jan..mês corrente
+      (`_rz_municipio_rows_acumulado`, `PLANEJADO_POR_UF`), propositalmente
+      diferente do Resumo Executivo. Se o usuário pedir a mesma regra lá,
+      é decisão nova — não assumir.
+  - **Mix 5G** = % do tráfego (do mês de corte) que já é 5G
     (`_mix_5g_pct`) — leitura de modernização.
 - **Visual (Resumo Executivo)**: 3 raias com o MESMO destaque de cor do
   Resumo do Acesso Móvel — **R1 Fechamento 2025 = `#003399` (azul)**,
@@ -265,7 +295,10 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
   (verde)** — via as classes `.summary-raia`/`.raia-badge`. A curva mensal
   do Plano 26 traz **duas linhas** (planejado tracejado + realizado sólido
   acompanhando **até o mês corrente**, depois `null` pra a linha parar —
-  `trafficPlanVsRealOption`, `connectNulls:false`).
+  `trafficPlanVsRealOption`, `connectNulls:false`) e ocupa a linha **inteira**
+  (`col-12`) — o card "Tráfego Planejado 2026" ao lado dela foi removido
+  (era uma soma anual, redundante com o corte de dezembro já visível na
+  curva).
 - **Dois endpoints** (`routes.py`, prefixo `/trafego`):
   `/api/resumo-executivo` (as 3 raias numa chamada) e `/api/ytd`. Todo
   cálculo é feito em Python a partir das linhas (testável com stub sem
