@@ -45,29 +45,3 @@ def execute_query(sql, params=None):
                 dict(zip(columns, row))
                 for row in rows
             ]
-
-
-def execute_write(sql, params=None):
-    """INSERT/UPDATE/DELETE de uma linha só, com commit. Retorna o número
-    de linhas afetadas."""
-    params = params or {}
-
-    with pool.acquire() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            rowcount = cursor.rowcount
-            connection.commit()
-            return rowcount
-
-
-def execute_write_many(sql, params_list):
-    """INSERT em lote (executemany) com um único commit — usado para colar/
-    aplicar muitas linhas de uma vez na grid. Retorna o número de linhas."""
-    if not params_list:
-        return 0
-
-    with pool.acquire() as connection:
-        with connection.cursor() as cursor:
-            cursor.executemany(sql, params_list)
-            connection.commit()
-            return len(params_list)

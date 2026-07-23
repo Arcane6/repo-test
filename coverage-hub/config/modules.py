@@ -27,15 +27,6 @@ MODULES = [
         "enabled": True,
     },
     {
-        "key": "controle_fisico_financeiro",
-        "name": "Controle Físico-Financeiro",
-        "description": "Planejamento e execução de projetos de Acesso e Transporte, físico e financeiro",
-        "url": "/controle-fisico-financeiro/",
-        "icon": "bi-table",
-        "color": "#5E35B1",
-        "enabled": True,
-    },
-    {
         "key": "orcamento",
         "name": "Orçamento",
         "description": "CAPEX / OPEX e alocação de investimento",
