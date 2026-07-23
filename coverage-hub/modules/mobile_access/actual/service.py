@@ -22,6 +22,7 @@ from modules.mobile_access.actual.queries import (
     GAUGES_TEMPLATE,
     GAUGE_METRIC,
     GAUGE_TIM_METRIC,
+    GAUGE_PLANEJADO_5G_METRIC,
 )
 
 
@@ -234,10 +235,17 @@ def get_gauges(ufs=None, municipios=None, tecs=None, venn_region=None):
     corrente (alvo, inclui planejados)."""
     ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
     metrics = ",".join(
-        [GAUGE_TIM_METRIC] + [GAUGE_METRIC.format(tec=t) for t in TECH_ORDER]
+        [GAUGE_TIM_METRIC]
+        + [GAUGE_METRIC.format(tec=t) for t in TECH_ORDER]
+        + [GAUGE_PLANEJADO_5G_METRIC]
     )
     sql, params = _build_query(GAUGES_TEMPLATE.format(metrics=metrics), ufs, municipios, tecs, venn_region)
     row = (execute_query(sql, params) or [{}])[0]
+
+    # Alvo 5G = fechamento anterior + cidades novas do plano. O eoy_curr
+    # por data colapsava no YTD porque MES_DIV_5G só tem realizado (não há
+    # linha com data futura) — ver GAUGE_PLANEJADO_5G_METRIC em queries.py.
+    row["eoy_curr_5g"] = (row.get("eoy_prev_5g", 0) or 0) + (row.get("planejado_5g", 0) or 0)
 
     prev_label, curr_label = _year_labels()
 

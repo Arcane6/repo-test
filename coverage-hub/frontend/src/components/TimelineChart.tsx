@@ -40,8 +40,8 @@ export function TimelineChart() {
   return (
     <ChartPanel
       title="Linha do Tempo"
-      subtitle="Municípios acumulados por tecnologia — últimos 10 anos"
-      sourceTable="MUNICIPIOS_FECHAMENTO"
+      subtitle="Municípios acumulados por tecnologia — últimos 10 anos · 5G inclui o plano 26 em dez/26"
+      sourceTable={["MUNICIPIOS_FECHAMENTO", "REL_CIDADES_PLANEJADO_26"]}
       option={option}
       loading={isFetching}
       height={420}
