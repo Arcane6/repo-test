@@ -77,7 +77,10 @@ function RouteFallback() {
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      {/* basename espelha o `base` do vite.config.ts (VITE_BASE_PATH) — é o
+        que faz o Link to="/" da Navbar/Footer resolver pra "/integration/"
+        em vez de "/" quando o app roda atrás do proxy nginx num subpath. */}
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
