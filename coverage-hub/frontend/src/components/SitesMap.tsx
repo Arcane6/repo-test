@@ -87,6 +87,10 @@ export function SitesMap({ filters }: { filters: SitesFilters }) {
     for (const tec of TECH_ORDER) overlays[tec] = clusterGroups[tec];
     layersControlRef.current = L.control.layers(layers, overlays, { collapsed: false }).addTo(map);
 
+    // Barra de escala (km) — referência de distância junto do zoom, item
+    // padrão de mapa profissional que faltava.
+    L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
+
     setMapInitialized(true);
 
     return () => {
@@ -127,6 +131,14 @@ export function SitesMap({ filters }: { filters: SitesFilters }) {
   function flyToWorld() {
     mapRef.current?.setView([10, 0], 2);
   }
+  /** Zoom "sob medida": enquadra exatamente os pontos hoje visíveis no
+   * mapa (já refletindo o filtro ativo) — em vez do usuário ter que
+   * rolar/arrastar manualmente até achar onde a seleção caiu. */
+  function fitToPoints() {
+    if (!mapRef.current || points.length === 0) return;
+    const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon] as [number, number]));
+    mapRef.current.fitBounds(bounds, { padding: [48, 48], maxZoom: 13 });
+  }
 
   const loading = isFetching && points.length === 0;
 
@@ -151,6 +163,15 @@ export function SitesMap({ filters }: { filters: SitesFilters }) {
               </button>
               <button type="button" className="btn btn-outline-secondary" onClick={flyToWorld}>
                 Múndi
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={fitToPoints}
+                disabled={points.length === 0}
+                title="Enquadra o zoom exatamente nos pontos filtrados"
+              >
+                <i className="bi bi-arrows-angle-contract me-1" /> Ajustar
               </button>
             </div>
             <ChartToolbar

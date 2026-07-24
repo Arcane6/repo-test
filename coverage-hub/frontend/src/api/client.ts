@@ -23,12 +23,14 @@ export function filtersToQuery(filters: ActiveFilters): string {
  * num subpath (ex.: nginx expondo em "/integration/", com outro app na
  * raiz "/") — o `fetch("/api/...")` do navegador ignora completamente o
  * subpath e vai direto pra raiz do domínio, batendo no app errado atrás
- * do proxy. Prefixando aqui, num único lugar, com o mesmo `base` que o
- * Vite usa pra servir os assets (`import.meta.env.BASE_URL`), toda
- * chamada de API já nasce corrigida sem precisar tocar em cada arquivo
- * de api/*.ts. */
+ * do proxy. Prefixando aqui, num único lugar, com `VITE_ROUTER_BASENAME`
+ * (sob qual prefixo a APLICAÇÃO vive — não confundir com o `base`/
+ * `import.meta.env.BASE_URL` do Vite, que é só onde os arquivos JS/CSS
+ * moram e diverge disso no deploy padrão: assets em "/static/dist/", mas
+ * app/API na raiz "/"), toda chamada de API já nasce corrigida sem
+ * precisar tocar em cada arquivo de api/*.ts. */
 function withBasePath(path: string): string {
-  const base = import.meta.env.BASE_URL;
+  const base = import.meta.env.VITE_ROUTER_BASENAME;
   if (!base || base === "/") return path;
   return base.replace(/\/$/, "") + path;
 }

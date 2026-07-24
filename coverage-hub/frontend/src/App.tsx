@@ -77,10 +77,18 @@ function RouteFallback() {
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      {/* basename espelha o `base` do vite.config.ts (VITE_BASE_PATH) — é o
-        que faz o Link to="/" da Navbar/Footer resolver pra "/integration/"
-        em vez de "/" quando o app roda atrás do proxy nginx num subpath. */}
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      {/* VITE_ROUTER_BASENAME (não é o `base`/VITE_BASE_PATH do Vite!) —
+        são coisas diferentes: `base` é só onde os arquivos JS/CSS moram
+        (no deploy padrão, "/static/dist/", porque é lá que o Flask serve
+        o build); basename é sob qual prefixo a APLICAÇÃO/rotas vivem (no
+        deploy padrão, "/", raiz do domínio, já que o Flask serve tudo
+        direto). Usar o mesmo valor pros dois só por acaso funciona no
+        cenário do proxy nginx num subpath (onde os dois coincidem) — no
+        deploy padrão eles divergem, e usar `base` aqui deixava QUALQUER
+        rota fora da Home em branco (Router não casava a URL com
+        basename="/static/dist/"). Só defina VITE_ROUTER_BASENAME quando
+        o app roda atrás de um proxy num subpath (ex.: "/integration"). */}
+      <BrowserRouter basename={import.meta.env.VITE_ROUTER_BASENAME || "/"}>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />

@@ -3,7 +3,7 @@ import { FilterBar } from "../components/FilterBar";
 import { ChartPanel } from "../components/ChartPanel";
 import { SitesPivotTable } from "../components/SitesPivotTable";
 import { SitesMap } from "../components/SitesMap";
-import { barsByTechOption, donutOption, vendorDonutSideOption } from "../charts/optionBuilders";
+import { barsByTechOption, vendorDonutSideOption } from "../charts/optionBuilders";
 import { sitesApi } from "../api/sites";
 import { useFilterStore } from "../store/filters";
 
@@ -121,7 +121,7 @@ export function SitesDashboard() {
             subtitle="Site móvel × perfil de transmissão configurado (TX Profile) — inclui site não-móvel, universo diferente das outras visões desta aba"
             sourceTable="TB_FT_BASE_UNICA_SITES"
             height={280}
-            option={donutOption(tipoItems)}
+            option={vendorDonutSideOption(tipoItems)}
             loading={loadingTipo}
             imageFilename="sites-tipo-de-site.png"
             exportSheet={{
