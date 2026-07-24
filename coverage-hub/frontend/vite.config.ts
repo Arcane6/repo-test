@@ -20,6 +20,22 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
+  // Nginx (quando roda atrás de um reverse proxy num subpath) repassa o
+  // path INTEIRO pro Vite, ex.: "/integration/api/modules" — não faz
+  // strip do prefixo. Então o proxy de dev do Vite (abaixo) precisa
+  // casar com esse prefixo também, e reescrever o path removendo-o antes
+  // de mandar pro Flask (que não conhece "/integration", só "/api/...").
+  // Sem VITE_BASE_PATH (deploy padrão, direto na raiz), apiPrefix fica
+  // "" e o replace vira um no-op — comportamento idêntico ao de antes.
+  const apiPrefix = (env.VITE_BASE_PATH || '/').replace(/\/$/, '')
+
+  function apiProxy() {
+    return {
+      target: 'http://127.0.0.1:5000',
+      rewrite: (path: string) => path.replace(apiPrefix, ''),
+    }
+  }
+
   return {
     plugins: [react()],
     // O prefixo /static/dist/ só faz sentido no build de produção padrão (é
@@ -42,16 +58,16 @@ export default defineConfig(({ command, mode }) => {
       // Durante o dev (npm run dev), proxeia as chamadas de API para o Flask
       // rodando em paralelo, evitando CORS e mantendo as mesmas URLs de prod.
       // IMPORTANTE: cada módulo com prefixo próprio precisa entrar aqui. O
-      // Core usa /core/api/* — sem esta linha, em dev as chamadas do Core
+      // Core usa /api/* — sem esta linha, em dev as chamadas do Core
       // caíam no index.html do próprio Vite (HTML 200) e o front estourava
       // "Unexpected token '<', <!doctype". Proxeamos só /core/api (a rota de
       // dados), nunca /core sozinho — esse é a página da SPA, servida pelo
       // Vite no cliente.
       proxy: {
-        '/mobile-access/api': 'http://127.0.0.1:5000',
-        '/trafego/api': 'http://127.0.0.1:5000',
-        '/transport/api': 'http://127.0.0.1:5000',
-        '/api': 'http://127.0.0.1:5000',
+        [`${apiPrefix}/mobile-access/api`]: apiProxy(),
+        [`${apiPrefix}/trafego/api`]: apiProxy(),
+        [`${apiPrefix}/transport/api`]: apiProxy(),
+        [`${apiPrefix}/api`]: apiProxy(),
       },
     },
   }
