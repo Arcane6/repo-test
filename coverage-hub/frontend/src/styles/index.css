@@ -716,6 +716,38 @@ h1, h2, h3, h4, h5, h6, .card-title {
   color: #7d9cff;
 }
 
+/* Controle de zoom (+/-) com a cara do design system em vez do visual cru
+ * padrão do Leaflet — mesma elevação/raio dos outros controles flutuantes
+ * do portal (`--shadow-md`/`--radius-sm`), com transição suave no hover. */
+.leaflet-control-zoom.leaflet-bar {
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.leaflet-control-zoom.leaflet-bar a {
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 18px;
+  transition: background var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+
+.leaflet-control-zoom.leaflet-bar a:hover {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+/* Barra de escala — discreta, mas legível nos dois temas. */
+.leaflet-control-scale-line {
+  background: var(--tim-card-bg);
+  border-color: var(--tim-text-muted) !important;
+  color: var(--tim-text);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
 /* =============================================================================
  * Core — KPI cards com badges de variação (MoM/YoY) e destaques de
  * crescimento/queda

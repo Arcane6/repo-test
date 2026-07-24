@@ -25,9 +25,12 @@ export default defineConfig(({ command, mode }) => {
   // strip do prefixo. Então o proxy de dev do Vite (abaixo) precisa
   // casar com esse prefixo também, e reescrever o path removendo-o antes
   // de mandar pro Flask (que não conhece "/integration", só "/api/...").
-  // Sem VITE_BASE_PATH (deploy padrão, direto na raiz), apiPrefix fica
+  // Usa VITE_ROUTER_BASENAME (sob qual prefixo a APP/API vivem) — NÃO
+  // VITE_BASE_PATH (esse é só onde os assets JS/CSS moram; App.tsx e
+  // api/client.ts leem VITE_ROUTER_BASENAME pelo mesmo motivo, ver
+  // comentário lá). Sem essa variável (deploy padrão), apiPrefix fica
   // "" e o replace vira um no-op — comportamento idêntico ao de antes.
-  const apiPrefix = (env.VITE_BASE_PATH || '/').replace(/\/$/, '')
+  const apiPrefix = (env.VITE_ROUTER_BASENAME || '/').replace(/\/$/, '')
 
   function apiProxy() {
     return {
