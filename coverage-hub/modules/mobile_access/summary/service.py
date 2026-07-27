@@ -18,6 +18,7 @@ from modules.mobile_access.shared.constants import (
 from modules.mobile_access.summary.queries import (
     R1_SITES_VENN,
     R1_SITES_VENN_REGION_CLAUSES,
+    R1_SITES_HIERARCHY,
     R1_CITIES_BY_TECH,
     R1_VENDORS,
     R2_NEW_CITIES_BY_ANF,
@@ -248,6 +249,58 @@ def get_r1_sites_venn(filters):
     return {
         "regions": {key: row.get(key, 0) or 0 for key in VENN_REGION_KEYS},
         "total_sites": row.get("total_sites", 0) or 0,
+    }
+
+
+def get_r1_sites_hierarchy(filters):
+    """Árvore de composição de sites (Total de Sites Ativos), mesmo
+    universo/baseline de get_r1_sites_venn — só quebrado nas categorias
+    de STATUS_END_ID/TIPO_SITE/MOBILE_SITE em vez de tecnologia. As
+    categorias intermediárias são somadas aqui em Python a partir das 5
+    folhas que vêm do banco (nunca recalculadas em SQL) — assim o total
+    do topo SEMPRE fecha por construção, nunca por acaso:
+
+        total_ativos = total_tim_rf_tx + roaming_vivo
+          total_tim_rf_tx = sem_rf + mobile_sites
+            mobile_sites = tim + ran_sharing
+              tim = macro + small_cell_movel_sls
+    """
+    params, ano_int = _prepare_params(filters)
+    params["baseline_date"] = _dt.date(ano_int - 1, 12, 31)
+
+    mun_clause = _build_municipio_ibge_clause(
+        "IBGE", _normalize_list(filters.get("municipios")), "mun", params
+    )
+    template = R1_SITES_HIERARCHY.replace("{municipio_filter_site}", mun_clause)
+
+    sql = _apply_geo_all(
+        template, filters, params,
+        uf_key="uf_filter_site",
+        regional_field="g.REGIONAL", regional_key="regional_filter_site",
+    )
+    row = (execute_query(sql, params) or [{}])[0]
+
+    macro = row.get("macro", 0) or 0
+    small_cell_movel_sls = row.get("small_cell_movel_sls", 0) or 0
+    ran_sharing = row.get("ran_sharing", 0) or 0
+    sem_rf = row.get("sem_rf", 0) or 0
+    roaming_vivo = row.get("roaming_vivo", 0) or 0
+
+    tim = macro + small_cell_movel_sls
+    mobile_sites = tim + ran_sharing
+    total_tim_rf_tx = sem_rf + mobile_sites
+    total_ativos = total_tim_rf_tx + roaming_vivo
+
+    return {
+        "total_ativos": total_ativos,
+        "total_tim_rf_tx": total_tim_rf_tx,
+        "sem_rf": sem_rf,
+        "mobile_sites": mobile_sites,
+        "tim": tim,
+        "macro": macro,
+        "small_cell_movel_sls": small_cell_movel_sls,
+        "ran_sharing": ran_sharing,
+        "roaming_vivo": roaming_vivo,
     }
 
 

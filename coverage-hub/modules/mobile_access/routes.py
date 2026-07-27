@@ -116,6 +116,10 @@ def api_summary_r1_cities():
 def api_summary_r1_vendors():
     return jsonify(summary.get_r1_vendors(parse_filters()))
 
+@mobile_access_bp.route("/api/summary/r1/sites-hierarchy")
+def api_summary_r1_sites_hierarchy():
+    return jsonify(summary.get_r1_sites_hierarchy(parse_filters()))
+
 
 # Raia 2 — Plano 26
 @mobile_access_bp.route("/api/summary/r2/new-cities-by-anf")

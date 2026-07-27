@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
-import { barsByTechOption, vendorDonutSideOption } from "../../charts/optionBuilders";
+import { barsByTechOption, siteHierarchyTreeOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { SitesComboChart } from "../../components/SitesComboChart";
 import { useResumoFocusStore } from "../../store/resumoFocus";
@@ -20,6 +20,11 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
     queryFn: () => summaryApi.r1Vendors(filters),
   });
 
+  const { data: hierarchy, isFetching: loadingHierarchy } = useQuery({
+    queryKey: ["summary-r1-sites-hierarchy", uf, municipio, ano, regionais],
+    queryFn: () => summaryApi.r1SitesHierarchy(filters),
+  });
+
   return (
     <div className="summary-raia mb-4" style={{ "--raia-color": "#003399" } as CSSProperties}>
       <div className="d-flex align-items-center mb-3">
@@ -29,7 +34,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
       </div>
 
       <div className="row g-3">
-        <div className="col-lg-4">
+        <div className="col-lg-3">
           <ChartPanel
             title="Cidades Cobertas por Tecnologia"
             subtitle="Clique numa barra pra destacar a tecnologia nas outras raias"
@@ -48,10 +53,41 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
             }}
           />
         </div>
-        <div className="col-lg-4">
+        <div className="col-lg-3">
           <SitesComboChart filters={filters} />
         </div>
-        <div className="col-lg-4">
+        <div className="col-lg-3">
+          <ChartPanel
+            title="Composição de Sites"
+            subtitle="Da base bruta (Total de Sites Ativos) até o universo Mobile Sites usado nos gráficos ao lado"
+            sourceTable="TB_FT_BASE_UNICA_SITES"
+            height={340}
+            option={siteHierarchyTreeOption(hierarchy)}
+            loading={loadingHierarchy}
+            imageFilename="r1-composicao-de-sites.png"
+            exportSheet={{
+              name: "R1 Composição de Sites",
+              columns: [
+                { header: "Categoria", key: "label" },
+                { header: "Sites", key: "value" },
+              ],
+              rows: hierarchy
+                ? [
+                    { label: "Total de Sites Ativos", value: hierarchy.total_ativos },
+                    { label: "Total Sites TIM (RF + TX)", value: hierarchy.total_tim_rf_tx },
+                    { label: "Sites TX/DC/PI", value: hierarchy.sem_rf },
+                    { label: "Mobile Sites", value: hierarchy.mobile_sites },
+                    { label: "TIM", value: hierarchy.tim },
+                    { label: "Macro", value: hierarchy.macro },
+                    { label: "Small Cell + Móvel + SLS", value: hierarchy.small_cell_movel_sls },
+                    { label: "Ran Sharing", value: hierarchy.ran_sharing },
+                    { label: "Roaming Vivo", value: hierarchy.roaming_vivo },
+                  ]
+                : [],
+            }}
+          />
+        </div>
+        <div className="col-lg-3">
           <ChartPanel
             title="Fornecedor por Site"
             sourceTable="BASE_TB_END_ID_NEW"

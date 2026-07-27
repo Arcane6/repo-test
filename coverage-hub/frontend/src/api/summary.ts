@@ -87,6 +87,20 @@ export interface SitesVennResponse {
   total_sites: number;
 }
 
+/** Árvore de composição de sites (Total de Sites Ativos), mesmo universo
+ * de r1SitesVenn/r1Vendors — ver shared/site_universe.py no backend. */
+export interface SitesHierarchyResponse {
+  total_ativos: number;
+  total_tim_rf_tx: number;
+  sem_rf: number;
+  mobile_sites: number;
+  tim: number;
+  macro: number;
+  small_cell_movel_sls: number;
+  ran_sharing: number;
+  roaming_vivo: number;
+}
+
 export const summaryApi = {
   years: () => fetchJson<number[]>(`${BASE}/years`),
 
@@ -100,6 +114,8 @@ export const summaryApi = {
     fetchJson<TechBarsResponse>(`${BASE}/r1/cities-by-tech?${query(f)}`),
   r1Vendors: (f: SummaryFilters) =>
     fetchJson<LabeledValue[]>(`${BASE}/r1/vendors?${query(f)}`),
+  r1SitesHierarchy: (f: SummaryFilters) =>
+    fetchJson<SitesHierarchyResponse>(`${BASE}/r1/sites-hierarchy?${query(f)}`),
 
   r2NewCitiesByAnf: (f: SummaryFilters) =>
     fetchJson<SlicesResponse>(`${BASE}/r2/new-cities-by-anf?${query(f)}`),
