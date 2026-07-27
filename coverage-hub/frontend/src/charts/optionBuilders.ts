@@ -1,5 +1,5 @@
 import type { EChartsCoreOption } from "echarts/core";
-import type { LabeledValue, RegionalSeriesResponse, TechBar, TechSeries } from "../api/summary";
+import type { LabeledValue, RegionalSeriesResponse, SitesHierarchyResponse, TechBar, TechSeries } from "../api/summary";
 
 /**
  * Catálogo de "templates" de gráfico — funções puras que recebem dados
@@ -16,6 +16,7 @@ import type { LabeledValue, RegionalSeriesResponse, TechBar, TechSeries } from "
  *   regionalSunburstOption donut com total no centro + legenda rica (2 séries empilhadas por categoria)
  *   vendorDonutSideOption  donut com total no centro, legenda lateral simples
  *   timeSeriesOption       linhas acumuladas ao longo do tempo, com Δ no tooltip
+ *   siteHierarchyTreeOption árvore de composição (caixas + conectores em ângulo reto)
  *
  * Todos aceitam um parâmetro de destaque opcional (`focusedX`) que
  * reduz a opacidade de tudo que não bate com o valor focado — é o que
@@ -809,6 +810,99 @@ export function trafficPlanVsRealOption(
             p.dataIndex === lastRealIdx && p.value != null ? `${fmt(p.value)} PB` : "",
         },
         data: realizado,
+      },
+    ],
+  };
+}
+
+interface TreeNode {
+  name: string;
+  value: number;
+  itemStyle?: { color: string };
+  label?: { color: string };
+  children?: TreeNode[];
+}
+
+/**
+ * Árvore de composição de sites (Total de Sites Ativos) — caixas + linhas
+ * em ângulo reto, mesmo espírito da imagem de referência do usuário.
+ * Estrutura fixa (não genérica) porque é uma hierarquia de negócio
+ * específica, não um formato reutilizável por outro gráfico — ver
+ * shared/site_universe.py no backend pra regra de cada categoria.
+ */
+export function siteHierarchyTreeOption(data?: SitesHierarchyResponse): EChartsCoreOption {
+  if (!data) return {};
+
+  const node = (name: string, value: number, children?: TreeNode[], highlight = false): TreeNode => ({
+    name,
+    value,
+    itemStyle: { color: highlight ? "#C2185B" : "#003399" },
+    // Cor-base de fallback pro rich text do label (value/name abaixo não
+    // fixam "color" própria, então herdam esta) — precisa funcionar nos
+    // dois temas, por isso brand blue em vez de um navy quase preto (que
+    // fica ilegível no fundo escuro do tema dark), mesmo princípio do
+    // texto central de vendorDonutSideOption.
+    label: { color: highlight ? "#C2185B" : "#003399" },
+    children,
+  });
+
+  const tree: TreeNode = node("Total de Sites Ativos", data.total_ativos, [
+    node("TIM (RF + TX)", data.total_tim_rf_tx, [
+      node("Sites TX / DC / PI", data.sem_rf),
+      node("Mobile Sites", data.mobile_sites, [
+        node("TIM", data.tim, [
+          node("Macro", data.macro),
+          node("Small Cell + Móvel + SLS", data.small_cell_movel_sls),
+        ]),
+        node("Ran Sharing", data.ran_sharing),
+      ]),
+    ]),
+    node("Roaming Vivo", data.roaming_vivo, undefined, true),
+  ]);
+
+  return {
+    tooltip: {
+      trigger: "item",
+      formatter: (p: unknown) => {
+        const d = p as { name: string; value: number };
+        return `<b>${d.name}</b><br/>${fmt(d.value)} sites`;
+      },
+    },
+    series: [
+      {
+        type: "tree",
+        data: [tree],
+        orient: "LR",
+        layout: "orthogonal",
+        edgeShape: "polyline",
+        roam: false,
+        left: 8,
+        right: 90,
+        top: 12,
+        bottom: 12,
+        symbol: "roundRect",
+        symbolSize: [10, 10],
+        lineStyle: { color: "#adb5bd", width: 1.5, curveness: 0 },
+        itemStyle: { borderColor: "#003399", borderWidth: 1.5 },
+        label: {
+          show: true,
+          position: "right",
+          verticalAlign: "middle",
+          align: "left",
+          fontSize: 11,
+          fontWeight: "bold",
+          formatter: (p: unknown) => {
+            const d = p as { name: string; value: number };
+            return `{value|${fmt(d.value)}}\n{name|${d.name}}`;
+          },
+          rich: {
+            value: { fontSize: 13, fontWeight: "bold", lineHeight: 16 },
+            name: { fontSize: 10, fontWeight: "normal", color: "#6c757d", lineHeight: 13 },
+          },
+        },
+        leaves: { label: { position: "right" } },
+        expandAndCollapse: false,
+        animationDuration: 400,
       },
     ],
   };

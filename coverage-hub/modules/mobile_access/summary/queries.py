@@ -12,26 +12,36 @@ Filtros globais compartilhados (aplicados via placeholders):
     - UF/Município via {uf_filter} e {municipio_filter}
 """
 
+from modules.mobile_access.shared.site_universe import (
+    MOBILE_SITES_WHERE,
+    MACRO_WHERE,
+    SMALL_CELL_MOVEL_SLS_WHERE,
+    RAN_SHARING_WHERE,
+    SEM_RF_WHERE,
+    ROAMING_VIVO_WHERE,
+)
+
 
 # ===========================================================================
 # RAIA 1 — FECHAMENTO 25 (baseline até 31/dez do ano-1)
 # ===========================================================================
 
 # ---------- Sites por tecnologia — diagrama de Venn de 4 conjuntos ----------
-# Mesma fonte/filtro do M-query do Power BI que alimentava essa visão antes
-# da migração: TB_FT_BASE_UNICA_SITES, excluindo roaming (TIPO_SITE <>
-# 'ROAMING VIVO'), só site móvel (MOBILE_SITE = 'SIM') e com tecnologia
-# informada (TECNOLOGIA <> '-'). Esta é a raia FECHAMENTO 25, então o
-# recorte de mês é o FECHAMENTO de dezembro do ano anterior ao plano
-# (MES_REF = dez/2025 quando o plano é 2026), NÃO o MES_REF mais recente —
-# esse (MAX) é o comportamento correto só da aba Sites, que mostra o
-# inventário atual. Aqui usamos TRUNC(MES_REF,'MM') = TRUNC(:baseline_date)
-# pra pegar exatamente o snapshot de dezembro do fechamento. Cada site cai
-# em exatamente
-# UMA das 15 combinações não vazias de {2G,3G,4G,5G} — como as regiões do
-# Venn são disjuntas por construção, a soma das 15 é o total de sites, sem
-# contar o mesmo site mais de uma vez (diferente de somar por tecnologia
-# independentemente, que conta o mesmo site em cada tec que ele tiver).
+# Universo = "Mobile Sites" (ver shared/site_universe.py, hierarquia
+# confirmada pelo usuário: Total Sites Ativos → TIM+TX/DC/PI → Mobile
+# Sites → TIM (Macro + Small Cell/Móvel/SLS) + Ran Sharing). Esta é a raia
+# FECHAMENTO 25, então o recorte de mês é o FECHAMENTO de dezembro do ano
+# anterior ao plano (MES_REF = dez/2025 quando o plano é 2026), NÃO o
+# MES_REF mais recente — esse (MAX) é o comportamento correto só da aba
+# Sites, que mostra o inventário atual. Aqui usamos
+# TRUNC(MES_REF,'MM') = TRUNC(:baseline_date) pra pegar exatamente o
+# snapshot de dezembro do fechamento. TECNOLOGIA <> '-' continua à parte
+# (dimensão do PRÓPRIO Venn — sem rádio informado não cai em nenhuma das
+# 15 fatias). Cada site cai em exatamente UMA das 15 combinações não
+# vazias de {2G,3G,4G,5G} — como as regiões do Venn são disjuntas por
+# construção, a soma das 15 é o total de sites, sem contar o mesmo site
+# mais de uma vez (diferente de somar por tecnologia independentemente,
+# que conta o mesmo site em cada tec que ele tiver).
 R1_SITES_VENN = """
 WITH BASE AS (
     SELECT
@@ -42,8 +52,7 @@ WITH BASE AS (
         CASE WHEN TECNOLOGIA LIKE '%5G%' THEN 1 ELSE 0 END AS HAS_5G
     FROM NTW_OP.TB_FT_BASE_UNICA_SITES
     WHERE TRUNC(MES_REF, 'MM') = TRUNC(:baseline_date, 'MM')
-    AND TIPO_SITE <> 'ROAMING VIVO'
-    AND MOBILE_SITE = 'SIM'
+    AND """ + MOBILE_SITES_WHERE + """
     AND TECNOLOGIA <> '-'
     {uf_filter_site}
     {municipio_filter_site}
@@ -102,6 +111,47 @@ R1_SITES_VENN_REGION_CLAUSES = {
 }
 
 
+# ---------- Árvore de composição de sites (Total de Sites Ativos) ----------
+# Quebra o mesmo universo de TB_FT_BASE_UNICA_SITES nas 5 categorias-folha
+# da hierarquia confirmada pelo usuário (ver shared/site_universe.py) — as
+# categorias intermediárias (Mobile Sites, TIM, Total TIM RF+TX, Total
+# Ativos) são somadas em Python no service, nunca recalculadas aqui, pra
+# não ter como o total "não fechar" por uma soma feita duas vezes. Mesmo
+# baseline_date/geo filter de R1_SITES_VENN — é a mesma raia Fechamento 25.
+R1_SITES_HIERARCHY = """
+WITH BASE AS (
+    SELECT
+        END_ID, UF, MUNICIPIO,
+        CASE WHEN """ + MACRO_WHERE + """ THEN 1 ELSE 0 END AS IS_MACRO,
+        CASE WHEN """ + SMALL_CELL_MOVEL_SLS_WHERE + """ THEN 1 ELSE 0 END AS IS_SMALL_CELL_MOVEL_SLS,
+        CASE WHEN """ + RAN_SHARING_WHERE + """ THEN 1 ELSE 0 END AS IS_RAN_SHARING,
+        CASE WHEN """ + SEM_RF_WHERE + """ THEN 1 ELSE 0 END AS IS_SEM_RF,
+        CASE WHEN """ + ROAMING_VIVO_WHERE + """ THEN 1 ELSE 0 END AS IS_ROAMING_VIVO
+    FROM NTW_OP.TB_FT_BASE_UNICA_SITES
+    WHERE TRUNC(MES_REF, 'MM') = TRUNC(:baseline_date, 'MM')
+    {uf_filter_site}
+    {municipio_filter_site}
+),
+GEO AS (
+    SELECT UF, MUNICIPIO, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
+)
+SELECT
+    SUM(IS_MACRO) AS macro,
+    SUM(IS_SMALL_CELL_MOVEL_SLS) AS small_cell_movel_sls,
+    SUM(IS_RAN_SHARING) AS ran_sharing,
+    SUM(IS_SEM_RF) AS sem_rf,
+    SUM(IS_ROAMING_VIVO) AS roaming_vivo
+FROM BASE b
+LEFT JOIN GEO g ON g.UF = b.UF AND UPPER(g.MUNICIPIO) = UPPER(b.MUNICIPIO)
+WHERE 1=1
+{regional_filter_site}
+"""
+
+
 # ---------- Cidades cobertas por tecnologia (fechamento 25) ----------
 # Fonte: MUNICIPIOS_FECHAMENTO com MES_DIV_XG <= baseline_date
 
@@ -125,9 +175,25 @@ WHERE TRUNC(DT_CARGA) = (
 # ---------- Vendor por site (fechamento 25) ----------
 # Cascata: 5G > 4G > 3G > 2G, e maior banda dentro da mesma tec
 # Base: BASE_TB_END_ID_NEW no último REF disponível ≤ baseline_date
+#
+# Universo = "Mobile Sites" (mesmo de R1_SITES_VENN — ver
+# shared/site_universe.py), pra bater com "Total de Sites por
+# Tecnologia": BASE_TB_END_ID_NEW não tem TIPO_SITE/STATUS_END_ID/
+# MOBILE_SITE (é uma tabela só de fornecedor por rádio), então o
+# universo é aplicado via JOIN com TB_FT_BASE_UNICA_SITES (SITE_UNIVERSE
+# abaixo), no MESMO baseline_date (fechamento de dezembro) — sem esse
+# join, um site fora do universo (ex.: Ran Sharing sem MOBILE_SITE,
+# roaming) ainda contaria fornecedor, inflando o total sobre o de
+# "Total de Sites por Tecnologia".
 
 R1_VENDORS = """
-WITH BASE AS (
+WITH SITE_UNIVERSE AS (
+    SELECT END_ID
+    FROM NTW_OP.TB_FT_BASE_UNICA_SITES
+    WHERE TRUNC(MES_REF, 'MM') = TRUNC(:baseline_date, 'MM')
+    AND """ + MOBILE_SITES_WHERE + """
+),
+BASE AS (
     SELECT
         END_ID, UF, MUNICIPIO, ANF,
         -- Cascata 5G (maior banda primeiro): 3500 > 26000 > 2600 > 2300 > 2100 > 1800 > 700
@@ -181,6 +247,7 @@ SELECT
     UPPER(v.VENDOR) AS vendor,
     COUNT(*) AS qtd
 FROM VENDOR_FINAL v
+JOIN SITE_UNIVERSE su ON su.END_ID = v.END_ID
 LEFT JOIN GEO g ON g.UF = v.UF AND UPPER(g.MUNICIPIO) = UPPER(v.MUNICIPIO)
 WHERE 1=1
 {regional_filter}

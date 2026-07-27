@@ -1,14 +1,19 @@
 """
 Queries SQL para a aba "Sites" (fonte: NTW_OP.TB_FT_BASE_UNICA_SITES).
 
-Mesma base e mesmas regras de negócio do combo de Sites já usado no Resumo
-(R1_SITES_VENN): último MES_REF, exclui roaming (TIPO_SITE <> 'ROAMING
-VIVO'), só site móvel (MOBILE_SITE = 'SIM'), tecnologia informada
-(TECNOLOGIA <> '-'). Diferente do Resumo, aqui o join com
-MUNICIPIOS_FECHAMENTO (pra pegar REGIONAL) é feito por IBGE — a tabela
-de sites tem essa coluna — em vez de UF+MUNICIPIO por string, que é mais
-frágil (acentuação, abreviação, etc.).
+Mesmo universo "Mobile Sites" usado no Resumo (R1_SITES_VENN) — ver
+modules/mobile_access/shared/site_universe.py pra a hierarquia completa
+e a regra de cada categoria. Diferente do Resumo, aqui o recorte de mês é
+o MES_REF mais recente (inventário atual, não um fechamento histórico), e
+o join com MUNICIPIOS_FECHAMENTO (pra pegar REGIONAL) é feito por IBGE —
+a tabela de sites tem essa coluna — em vez de UF+MUNICIPIO por string,
+que é mais frágil (acentuação, abreviação, etc.).
+
+Exceção: SITES_TIPO (abaixo) é DELIBERADAMENTE outro universo — ver
+comentário lá.
 """
+
+from modules.mobile_access.shared.site_universe import MOBILE_SITES_WHERE
 
 # ---------- Base compartilhada por todas as queries desta aba ----------
 # HAS_2G..HAS_5G são flags de presença; SITES_BASE_CTE é reaproveitado
@@ -26,8 +31,7 @@ WITH BASE AS (
     WHERE MES_REF = (
         SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES
     )
-    AND TIPO_SITE <> 'ROAMING VIVO'
-    AND MOBILE_SITE = 'SIM'
+    AND """ + MOBILE_SITES_WHERE + """
     AND TECNOLOGIA <> '-'
     {uf_filter_site}
     {municipio_filter_site}
@@ -167,8 +171,7 @@ FROM NTW_OP.TB_FT_BASE_UNICA_SITES
 WHERE MES_REF = (
     SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES
 )
-AND TIPO_SITE <> 'ROAMING VIVO'
-AND MOBILE_SITE = 'SIM'
+AND """ + MOBILE_SITES_WHERE + """
 AND TECNOLOGIA <> '-'
 AND LATITUDE IS NOT NULL
 AND LONGITUDE IS NOT NULL
