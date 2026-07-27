@@ -34,7 +34,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
       </div>
 
       <div className="row g-3">
-        <div className="col-lg-3">
+        <div className="col-lg-4">
           <ChartPanel
             title="Cidades Cobertas por Tecnologia"
             subtitle="Clique numa barra pra destacar a tecnologia nas outras raias"
@@ -53,15 +53,33 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
             }}
           />
         </div>
-        <div className="col-lg-3">
+        <div className="col-lg-4">
           <SitesComboChart filters={filters} />
         </div>
-        <div className="col-lg-3">
+        <div className="col-lg-4">
+          <ChartPanel
+            title="Fornecedor por Site"
+            sourceTable="BASE_TB_END_ID_NEW"
+            height={340}
+            option={vendorDonutSideOption(vendors ?? [])}
+            loading={loadingVendors}
+            imageFilename="r1-fornecedor-por-site.png"
+            exportSheet={{
+              name: "R1 Fornecedores",
+              columns: [
+                { header: "Fornecedor", key: "label" },
+                { header: "Sites", key: "value" },
+              ],
+              rows: vendors ?? [],
+            }}
+          />
+        </div>
+        <div className="col-12">
           <ChartPanel
             title="Composição de Sites"
-            subtitle="Da base bruta (Total de Sites Ativos) até o universo Mobile Sites usado nos gráficos ao lado"
+            subtitle="Da base bruta (Total de Sites Ativos) até o universo Mobile Sites usado nos gráficos acima"
             sourceTable="TB_FT_BASE_UNICA_SITES"
-            height={340}
+            height={280}
             option={siteHierarchyTreeOption(hierarchy)}
             loading={loadingHierarchy}
             imageFilename="r1-composicao-de-sites.png"
@@ -84,24 +102,6 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
                     { label: "Roaming Vivo", value: hierarchy.roaming_vivo },
                   ]
                 : [],
-            }}
-          />
-        </div>
-        <div className="col-lg-3">
-          <ChartPanel
-            title="Fornecedor por Site"
-            sourceTable="BASE_TB_END_ID_NEW"
-            height={340}
-            option={vendorDonutSideOption(vendors ?? [])}
-            loading={loadingVendors}
-            imageFilename="r1-fornecedor-por-site.png"
-            exportSheet={{
-              name: "R1 Fornecedores",
-              columns: [
-                { header: "Fornecedor", key: "label" },
-                { header: "Sites", key: "value" },
-              ],
-              rows: vendors ?? [],
             }}
           />
         </div>
