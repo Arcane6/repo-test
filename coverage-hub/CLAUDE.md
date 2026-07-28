@@ -144,18 +144,28 @@ reabrir essa porta aqui sem uma coluna de dedup confiável).
   query independente — garante que o total do donut de fornecedor bate
   com o total das outras visões da mesma tela (confirmado: 45.230 nos
   dois, testado com stub). Sem `FillDown` (a lógica frágil do Power
-  Query original não foi replicada) — site sem match vira "A DEFINIR".
+  Query original não foi replicada) — site sem match vira "NÃO INFORMADO".
   **`R1_VENDORS` (Resumo) segue o MESMO princípio** — corrigido depois
   de o usuário achar 29.228 (Venn) × 29.195 (fornecedor): a query
   antiga montava o fornecedor primeiro (`BASE_TB_END_ID_NEW`) e só
   então fazia `JOIN` (inner) com o universo de sites — um site do
   universo sem fornecedor identificado em NENHUMA cascata (5G/4G/3G/2G
-  todas NULL) sumia do resultado inteiro em vez de virar "A DEFINIR".
+  todas NULL) sumia do resultado inteiro em vez de virar "NÃO INFORMADO".
   Corrigido invertendo a direção: `SITE_UNIVERSE` (de
   `TB_FT_BASE_UNICA_SITES`) **LEFT JOIN** pro fornecedor, nunca o
   contrário — mesma regra vale pra qualquer query nova de fornecedor
   por site: sempre dirigir pelo universo de sites, nunca pela tabela
   de fornecedor.
+  **Achado adicional confirmado via query no DBeaver**: algumas colunas
+  `VENDOR_*` guardam string vazia/só espaço (`' '`) em vez de `NULL` —
+  isso "vencia" a cascata `COALESCE` e escondia o fornecedor real de uma
+  banda menor, além de criar uma fatia de rótulo em branco separada de
+  "NÃO INFORMADO" no donut. Toda coluna `VENDOR_*` usada em cascata
+  (`R1_VENDORS` e `SITES_VENDORS`) agora passa por
+  `NULLIF(TRIM(col), '')` antes do `COALESCE` — trata vazio/espaço como
+  "sem valor" em pé de igualdade com `NULL`. Não reintroduzir um
+  `COALESCE` "cru" (sem `NULLIF(TRIM(...))`) numa cascata de fornecedor
+  nova.
 
 - **Sites no Mapa**: `SITES_GEO_POINTS` (`sites/queries.py`) +
   `get_sites_geo_points` (`sites/service.py`) + rota

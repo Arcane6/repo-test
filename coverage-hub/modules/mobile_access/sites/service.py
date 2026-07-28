@@ -29,7 +29,7 @@ VENDOR_COLORS = {
     "ERICSSON":  "#0082F0",
     "HUAWEI":    "#E60012",
     "ZTE":       "#3A67C1",
-    "A DEFINIR": "#6c757d",
+    "NÃO INFORMADO": "#6c757d",
 }
 
 
@@ -153,7 +153,7 @@ def get_sites_vendors(filters):
     rows = execute_query(sql, params) or []
     result = []
     for r in rows:
-        name = r.get("vendor", "A DEFINIR") or "A DEFINIR"
+        name = r.get("vendor", "NÃO INFORMADO") or "NÃO INFORMADO"
         value = r.get("qtd", 0) or 0
         result.append({
             "label": name,
