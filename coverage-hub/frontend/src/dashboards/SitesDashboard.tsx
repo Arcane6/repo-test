@@ -3,7 +3,7 @@ import { FilterBar } from "../components/FilterBar";
 import { ChartPanel } from "../components/ChartPanel";
 import { SitesPivotTable } from "../components/SitesPivotTable";
 import { SitesMap } from "../components/SitesMap";
-import { barsByTechOption, vendorDonutSideOption } from "../charts/optionBuilders";
+import { barsByTechOption, siteHierarchyTreeOption, vendorDonutSideOption } from "../charts/optionBuilders";
 import { sitesApi } from "../api/sites";
 import { useFilterStore } from "../store/filters";
 
@@ -29,6 +29,11 @@ export function SitesDashboard() {
   const { data: tipo, isFetching: loadingTipo } = useQuery({
     queryKey: ["sites-tipo", uf, municipio],
     queryFn: () => sitesApi.tipo(filters),
+  });
+
+  const { data: hierarchy, isFetching: loadingHierarchy } = useQuery({
+    queryKey: ["sites-hierarchy", uf, municipio],
+    queryFn: () => sitesApi.hierarchy(filters),
   });
 
   const tipoItems = tipo
@@ -83,6 +88,40 @@ export function SitesDashboard() {
                 { header: "Sites", key: "value" },
               ],
               rows: byTec?.bars ?? [],
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="row g-3 mt-1">
+        <div className="col-12">
+          <ChartPanel
+            title="Composição de Sites"
+            subtitle="Da base bruta (Total de Sites Ativos) até o universo Mobile Sites usado nos gráficos acima — inventário mais recente, não o fechamento congelado da Raia 1 do Resumo"
+            sourceTable="TB_FT_BASE_UNICA_SITES"
+            height={280}
+            option={siteHierarchyTreeOption(hierarchy)}
+            loading={loadingHierarchy}
+            imageFilename="sites-composicao-de-sites.png"
+            exportSheet={{
+              name: "Sites Composição",
+              columns: [
+                { header: "Categoria", key: "label" },
+                { header: "Sites", key: "value" },
+              ],
+              rows: hierarchy
+                ? [
+                    { label: "Total de Sites Ativos", value: hierarchy.total_ativos },
+                    { label: "Total Sites TIM (RF + TX)", value: hierarchy.total_tim_rf_tx },
+                    { label: "Sites TX/DC/PI", value: hierarchy.sem_rf },
+                    { label: "Mobile Sites", value: hierarchy.mobile_sites },
+                    { label: "TIM", value: hierarchy.tim },
+                    { label: "Macro", value: hierarchy.macro },
+                    { label: "Small Cell + Móvel + SLS", value: hierarchy.small_cell_movel_sls },
+                    { label: "Ran Sharing", value: hierarchy.ran_sharing },
+                    { label: "Roaming Vivo", value: hierarchy.roaming_vivo },
+                  ]
+                : [],
             }}
           />
         </div>

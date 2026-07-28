@@ -1,4 +1,7 @@
 import { fetchJson } from "./client";
+import type { SitesHierarchyResponse } from "./summary";
+
+export type { SitesHierarchyResponse };
 
 const BASE = "/mobile-access/api/sites";
 
@@ -90,4 +93,6 @@ export const sitesApi = {
     fetchJson<SitesTipoResponse>(`${BASE}/tipo?${query(f)}`),
   geoPoints: (f: SitesFilters) =>
     fetchJson<SitesGeoPointsResponse>(`${BASE}/geo-points?${query(f)}`),
+  hierarchy: (f: SitesFilters) =>
+    fetchJson<SitesHierarchyResponse>(`${BASE}/hierarchy?${query(f)}`),
 };

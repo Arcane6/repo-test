@@ -139,13 +139,23 @@ reabrir essa porta aqui sem uma coluna de dedup confiável).
   1:1 com a query real do usuário (GSM_900/1800, UMTS_850/2100,
   LTE_700/850/1800/2100/2300/2600/2600RS/2600P,
   NR_700DSS/1800DSS/2100DSS/2600DSS/2300/3500/26000), maior banda
-  primeiro dentro de cada tec. Diferente de `R1_VENDORS`, aqui o join é
-  feito **dentro do universo de sites já filtrado** desta aba (`BASE`
-  da `SITES_BASE_CTE`), não como query independente — garante que o
-  total do donut de fornecedor bate com o total das outras visões da
-  mesma tela (confirmado: 45.230 nos dois, testado com stub). Sem
-  `FillDown` (a lógica frágil do Power Query original não foi
-  replicada) — site sem match vira "A DEFINIR".
+  primeiro dentro de cada tec. O join é feito **dentro do universo de
+  sites já filtrado** desta aba (`BASE` da `SITES_BASE_CTE`), não como
+  query independente — garante que o total do donut de fornecedor bate
+  com o total das outras visões da mesma tela (confirmado: 45.230 nos
+  dois, testado com stub). Sem `FillDown` (a lógica frágil do Power
+  Query original não foi replicada) — site sem match vira "A DEFINIR".
+  **`R1_VENDORS` (Resumo) segue o MESMO princípio** — corrigido depois
+  de o usuário achar 29.228 (Venn) × 29.195 (fornecedor): a query
+  antiga montava o fornecedor primeiro (`BASE_TB_END_ID_NEW`) e só
+  então fazia `JOIN` (inner) com o universo de sites — um site do
+  universo sem fornecedor identificado em NENHUMA cascata (5G/4G/3G/2G
+  todas NULL) sumia do resultado inteiro em vez de virar "A DEFINIR".
+  Corrigido invertendo a direção: `SITE_UNIVERSE` (de
+  `TB_FT_BASE_UNICA_SITES`) **LEFT JOIN** pro fornecedor, nunca o
+  contrário — mesma regra vale pra qualquer query nova de fornecedor
+  por site: sempre dirigir pelo universo de sites, nunca pela tabela
+  de fornecedor.
 
 - **Sites no Mapa**: `SITES_GEO_POINTS` (`sites/queries.py`) +
   `get_sites_geo_points` (`sites/service.py`) + rota
@@ -201,9 +211,21 @@ verdade rodando aqui, só a estrutura (controles, clusters, popups,
 troca de camada) sem erro de JS. Isso não afeta o ambiente real de
 produção do usuário, que não tem essa mesma restrição de rede.
 
-"Sites" hoje tem as 6 visões completas: max-tech, por-tecnologia,
-fornecedor dominante, tipo de site, mapa (Brasil/Múndi, tiles Leaflet) e
-pivot.
+"Sites" hoje tem as 7 visões completas: max-tech, por-tecnologia,
+composição de sites (árvore), fornecedor dominante, tipo de site, mapa
+(Brasil/Múndi, tiles Leaflet) e pivot.
+
+- **Composição de Sites** (`SITES_HIERARCHY` em `sites/queries.py` +
+  `get_sites_hierarchy` em `sites/service.py` + rota
+  `/api/sites/hierarchy`): mesma árvore/hierarquia da Raia 1 do Resumo
+  (`R1_SITES_HIERARCHY`/`get_r1_sites_hierarchy`, `summary/`) e mesmo
+  builder de frontend (`siteHierarchyTreeOption`), mas no recorte **desta
+  aba** — `MES_REF = MAX(MES_REF)` (inventário mais recente), não o
+  fechamento congelado de dezembro do ano anterior. Por isso o total
+  dessa árvore normalmente **não bate** com o da Raia 1 — é esperado
+  (rede cresce entre o fechamento e hoje), não é bug. As 5 categorias-
+  folha vêm do SQL, as intermediárias são somadas em Python no service
+  (nunca em SQL), garantindo que a árvore sempre fecha por construção.
 
 ## Módulo Tráfego (`modules/traffic/`) — planejado × realizado + market share
 

@@ -13,7 +13,14 @@ Exceção: SITES_TIPO (abaixo) é DELIBERADAMENTE outro universo — ver
 comentário lá.
 """
 
-from modules.mobile_access.shared.site_universe import MOBILE_SITES_WHERE
+from modules.mobile_access.shared.site_universe import (
+    MOBILE_SITES_WHERE,
+    MACRO_WHERE,
+    SMALL_CELL_MOVEL_SLS_WHERE,
+    RAN_SHARING_WHERE,
+    SEM_RF_WHERE,
+    ROAMING_VIVO_WHERE,
+)
 
 # ---------- Base compartilhada por todas as queries desta aba ----------
 # HAS_2G..HAS_5G são flags de presença; SITES_BASE_CTE é reaproveitado
@@ -205,4 +212,48 @@ SELECT
     SUM(CASE WHEN (MOBILE_SITE IS NULL OR MOBILE_SITE <> 'SIM') AND (FLAG_TX_PROFILE_ENG IS NULL OR FLAG_TX_PROFILE_ENG <> 'SIM') THEN 1 ELSE 0 END) AS nonmobile_no_tx,
     COUNT(*) AS total_sites
 FROM BASE_TIPO
+"""
+
+# ---------- Árvore de composição de sites (Total de Sites Ativos) ----------
+# Mesmo princípio de R1_SITES_HIERARCHY (summary/queries.py) — quebra o
+# universo bruto de TB_FT_BASE_UNICA_SITES nas 5 categorias-folha da
+# hierarquia (ver shared/site_universe.py), com as categorias
+# intermediárias somadas em Python no service (nunca recalculadas em SQL,
+# pra árvore sempre fechar por construção). Diferente do Resumo, aqui o
+# recorte é o MES_REF mais recente (inventário atual desta aba), não o
+# fechamento de dezembro — por isso o total normalmente NÃO bate com o da
+# Raia 1 (ver CLAUDE.md: recorte de data depende da tela, não é bug).
+SITES_HIERARCHY = """
+WITH BASE AS (
+    SELECT
+        END_ID, IBGE,
+        CASE WHEN """ + MACRO_WHERE + """ THEN 1 ELSE 0 END AS IS_MACRO,
+        CASE WHEN """ + SMALL_CELL_MOVEL_SLS_WHERE + """ THEN 1 ELSE 0 END AS IS_SMALL_CELL_MOVEL_SLS,
+        CASE WHEN """ + RAN_SHARING_WHERE + """ THEN 1 ELSE 0 END AS IS_RAN_SHARING,
+        CASE WHEN """ + SEM_RF_WHERE + """ THEN 1 ELSE 0 END AS IS_SEM_RF,
+        CASE WHEN """ + ROAMING_VIVO_WHERE + """ THEN 1 ELSE 0 END AS IS_ROAMING_VIVO
+    FROM NTW_OP.TB_FT_BASE_UNICA_SITES
+    WHERE MES_REF = (
+        SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES
+    )
+    {uf_filter_site}
+    {municipio_filter_site}
+),
+GEO AS (
+    SELECT IBGE, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
+)
+SELECT
+    SUM(IS_MACRO) AS macro,
+    SUM(IS_SMALL_CELL_MOVEL_SLS) AS small_cell_movel_sls,
+    SUM(IS_RAN_SHARING) AS ran_sharing,
+    SUM(IS_SEM_RF) AS sem_rf,
+    SUM(IS_ROAMING_VIVO) AS roaming_vivo
+FROM BASE b
+LEFT JOIN GEO g ON g.IBGE = b.IBGE
+WHERE 1=1
+{regional_filter_site}
 """
