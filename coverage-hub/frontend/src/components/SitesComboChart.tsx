@@ -50,7 +50,7 @@ const fmt = (v: number) => v.toLocaleString("pt-BR");
  * barra por cada uma das 15 combinações não vazias de 2G/3G/4G/5G — cada
  * site conta uma única vez, na combinação exata que possui). Clicar numa
  * barra filtra o próprio gráfico por aquela combinação; clicar de novo
- * limpa. Substitui "Total de Sites por Tecnologia".
+ * limpa.
  */
 export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais, projetos } = filters;
@@ -90,7 +90,7 @@ export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
         <div className="d-flex justify-content-between align-items-start mb-1">
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
-              <h6 className="fw-bold mb-0">Total de Sites por Tecnologia</h6>
+              <h6 className="fw-bold mb-0">Mobile Sites por Tecnologia</h6>
               <SourceBadge table="TB_FT_BASE_UNICA_SITES" />
             </div>
             <small className="text-muted d-block mb-2">

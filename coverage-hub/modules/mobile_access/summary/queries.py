@@ -185,7 +185,7 @@ WHERE TRUNC(DT_CARGA) = (
 # INNER JOIN com o universo: qualquer site do universo sem fornecedor
 # identificado em NENHUMA cascata (5G/4G/3G/2G todas NULL) sumia do
 # resultado inteiro, em vez de cair em "A DEFINIR" — o total do donut
-# ficava menor que o de "Total de Sites por Tecnologia" (29.195 vs
+# ficava menor que o de "Mobile Sites por Tecnologia" (29.195 vs
 # 29.228, achado pelo usuário). Mesmo princípio já usado em
 # SITES_VENDORS (sites/queries.py): LEFT JOIN a partir do universo,
 # nunca um JOIN a partir da tabela de fornecedor.

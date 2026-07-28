@@ -20,7 +20,7 @@ o site é"). Regras confirmadas explicitamente pelo usuário:
     ambiguidade de precedência AND/OR aqui, resolvida com o usuário).
 
 "Mobile Sites" é o universo usado pelos gráficos de site do portal
-(Total de Sites por Tecnologia, Fornecedor por Site, Sites por
+(Mobile Sites por Tecnologia, Fornecedor por Site, Sites por
 Tecnologia, Pivot, mapa) — a única exceção documentada é "Tipo de Site"
 (aba Sites), que é DELIBERADAMENTE outro universo (mostra a própria
 dimensão MOBILE_SITE, não filtra por ela — ver sites/queries.py).

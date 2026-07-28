@@ -711,7 +711,7 @@ com denominador filtrado por engano), então mais vale perguntar de novo.
   `TB_FT_BASE_UNICA_SITES`/`NTW_MABE.BASE_TB_END_ID_NEW`, em vez de
   resolver o nome via `MUNICIPIOS_FECHAMENTO` (que é de onde vem a busca
   do autocomplete do filtro). Corrigido em toda a aba Sites e em
-  "Total de Sites por Tecnologia"/"Fornecedor por Site" (Resumo Raia 1)
+  "Mobile Sites por Tecnologia"/"Fornecedor por Site" (Resumo Raia 1)
   resolvendo o(s) nome(s) de município pro `IBGE` via
   `MUNICIPIOS_FECHAMENTO` antes de filtrar (`_build_municipio_ibge_clause`
   em `sites/service.py` e `summary/service.py`); pra
