@@ -181,11 +181,11 @@ WHERE TRUNC(DT_CARGA) = (
 # Tecnologia". IMPORTANTE: quem "dirige" a query é o universo de sites
 # (SITE_UNIVERSE, de TB_FT_BASE_UNICA_SITES) via LEFT JOIN pro fornecedor
 # — nunca o contrário. Uma versão anterior desta query montava o
-# fornecedor primeiro (a partir de BASE_TB_END_ID_NEW) e só then fazia
+# fornecedor primeiro (a partir de BASE_TB_END_ID_NEW) e só depois fazia
 # INNER JOIN com o universo: qualquer site do universo sem fornecedor
 # identificado em NENHUMA cascata (5G/4G/3G/2G todas NULL) sumia do
-# resultado inteiro, em vez de cair em "A DEFINIR" — o total do donut
-# ficava menor que o de "Mobile Sites por Tecnologia" (29.195 vs
+# resultado inteiro, em vez de cair em "NÃO INFORMADO" — o total do
+# donut ficava menor que o de "Mobile Sites por Tecnologia" (29.195 vs
 # 29.228, achado pelo usuário). Mesmo princípio já usado em
 # SITES_VENDORS (sites/queries.py): LEFT JOIN a partir do universo,
 # nunca um JOIN a partir da tabela de fornecedor.
@@ -202,20 +202,25 @@ VENDOR_BASE AS (
     SELECT
         END_ID,
         -- Cascata 5G (maior banda primeiro): 3500 > 26000 > 2600 > 2300 > 2100 > 1800 > 700
+        -- NULLIF(TRIM(...), '') normaliza string vazia/só espaço pra NULL em
+        -- CADA coluna antes do COALESCE — sem isso, uma banda maior com ''
+        -- "vencia" a cascata e escondia o fornecedor real de uma banda menor
+        -- (achado pelo usuário: 4 sites caindo num rótulo em branco, à parte
+        -- de "NÃO INFORMADO"/NULL de verdade).
         COALESCE(
-            VENDOR_NR_3500, VENDOR_NR_26000, VENDOR_NR_2600DSS,
-            VENDOR_NR_2300, VENDOR_NR_2100DSS, VENDOR_NR_1800DSS, VENDOR_NR_700DSS
+            NULLIF(TRIM(VENDOR_NR_3500), ''), NULLIF(TRIM(VENDOR_NR_26000), ''), NULLIF(TRIM(VENDOR_NR_2600DSS), ''),
+            NULLIF(TRIM(VENDOR_NR_2300), ''), NULLIF(TRIM(VENDOR_NR_2100DSS), ''), NULLIF(TRIM(VENDOR_NR_1800DSS), ''), NULLIF(TRIM(VENDOR_NR_700DSS), '')
         ) AS VENDOR_5G,
         -- Cascata 4G: 2600P > 2600 > 2300 > 2100 > 1800 > 850 > 700
         COALESCE(
-            VENDOR_LTE_2600P, VENDOR_LTE_2600, VENDOR_LTE_2600RS,
-            VENDOR_LTE_2300, VENDOR_LTE_2100, VENDOR_LTE_1800,
-            VENDOR_LTE_850, VENDOR_LTE_700
+            NULLIF(TRIM(VENDOR_LTE_2600P), ''), NULLIF(TRIM(VENDOR_LTE_2600), ''), NULLIF(TRIM(VENDOR_LTE_2600RS), ''),
+            NULLIF(TRIM(VENDOR_LTE_2300), ''), NULLIF(TRIM(VENDOR_LTE_2100), ''), NULLIF(TRIM(VENDOR_LTE_1800), ''),
+            NULLIF(TRIM(VENDOR_LTE_850), ''), NULLIF(TRIM(VENDOR_LTE_700), '')
         ) AS VENDOR_4G,
         -- Cascata 3G: 2100 > 850
-        COALESCE(VENDOR_UMTS_2100, VENDOR_UMTS_850) AS VENDOR_3G,
+        COALESCE(NULLIF(TRIM(VENDOR_UMTS_2100), ''), NULLIF(TRIM(VENDOR_UMTS_850), '')) AS VENDOR_3G,
         -- Cascata 2G: 1800 > 900
-        COALESCE(VENDOR_GSM_1800, VENDOR_GSM_900) AS VENDOR_2G
+        COALESCE(NULLIF(TRIM(VENDOR_GSM_1800), ''), NULLIF(TRIM(VENDOR_GSM_900), '')) AS VENDOR_2G
     FROM NTW_MABE.BASE_TB_END_ID_NEW
     WHERE REF = (
         SELECT REF
@@ -237,14 +242,14 @@ GEO AS (
     )
 )
 SELECT
-    UPPER(COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'A DEFINIR')) AS vendor,
+    UPPER(COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'NÃO INFORMADO')) AS vendor,
     COUNT(*) AS qtd
 FROM SITE_UNIVERSE su
 LEFT JOIN VENDOR_BASE vb ON vb.END_ID = su.END_ID
 LEFT JOIN GEO g ON g.UF = su.UF AND UPPER(g.MUNICIPIO) = UPPER(su.MUNICIPIO)
 WHERE 1=1
 {regional_filter}
-GROUP BY UPPER(COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'A DEFINIR'))
+GROUP BY UPPER(COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'NÃO INFORMADO'))
 ORDER BY qtd DESC
 """
 

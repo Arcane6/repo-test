@@ -38,7 +38,7 @@ VENDOR_COLORS = {
     "ERICSSON":  "#0082F0",
     "HUAWEI":    "#E60012",
     "ZTE":       "#3A67C1",
-    "A DEFINIR": "#6c757d",
+    "NÃO INFORMADO": "#6c757d",
 }
 
 
@@ -177,7 +177,7 @@ def _vendor_payload(rows):
     """Formata rows do vendor em pizza."""
     result = []
     for r in rows:
-        name = r.get("vendor", "A DEFINIR") or "A DEFINIR"
+        name = r.get("vendor", "NÃO INFORMADO") or "NÃO INFORMADO"
         value = r.get("qtd", 0) or 0
         result.append({
             "label": name,
@@ -594,7 +594,7 @@ def get_r3_vendors(filters):
         "ERICSSON (Base 25)":   "#005DC0",
         "NOKIA (Base 25)":      "#0D2F70",
         "ZTE (Base 25)":        "#2A4E9E",
-        "A DEFINIR (Base 25)":  "#6c757d",
+        "NÃO INFORMADO (Base 25)": "#6c757d",
         "A Contratar (Plano 26)": "#26C281",
     }
 
