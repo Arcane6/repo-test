@@ -1069,3 +1069,122 @@ h1, h2, h3, h4, h5, h6, .card-title {
 
 /* ---- raia-badge: leve sombra pra "descolar" do fundo. ---- */
 .raia-badge { box-shadow: var(--shadow-sm); }
+
+/* ---- Assistente (chat de IA, aba "Assistente" do Acesso Móvel) ---- */
+.tim-assistant-card {
+  height: calc(100vh - 280px);
+  min-height: 480px;
+  display: flex;
+}
+
+.tim-assistant-header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--tim-card-border);
+}
+
+.tim-assistant-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tim-assistant-empty {
+  margin: auto 0;
+  max-width: 420px;
+}
+
+.tim-assistant-bubble-row {
+  display: flex;
+  justify-content: flex-start;
+}
+.tim-assistant-bubble-row--user {
+  justify-content: flex-end;
+}
+
+.tim-assistant-bubble {
+  max-width: 78%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--tim-hover-bg);
+  color: var(--tim-text);
+  box-shadow: var(--shadow-sm);
+  animation: tim-assistant-pop var(--motion-base) var(--ease-out);
+}
+.tim-assistant-bubble--user {
+  background: var(--brand-primary);
+  color: #fff;
+}
+.tim-assistant-bubble--erro {
+  background: color-mix(in srgb, #c62828 14%, var(--tim-hover-bg));
+  color: var(--tim-text);
+}
+
+.tim-assistant-bubble p:last-child { margin-bottom: 0; }
+.tim-assistant-bubble table {
+  width: 100%;
+  font-size: 0.85rem;
+  border-collapse: collapse;
+  margin: var(--space-2) 0;
+}
+.tim-assistant-bubble th, .tim-assistant-bubble td {
+  border: 1px solid var(--tim-card-border);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+}
+.tim-assistant-bubble pre {
+  background: var(--tim-card-bg);
+  border: 1px solid var(--tim-card-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  font-size: 0.8rem;
+}
+.tim-assistant-bubble code { font-size: 0.85em; }
+
+@keyframes tim-assistant-pop {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tim-assistant-bubble { animation: none; }
+}
+
+.tim-assistant-bubble--typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+}
+.tim-assistant-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tim-text-muted);
+  animation: tim-assistant-dot-bounce 1.2s ease-in-out infinite;
+}
+.tim-assistant-dot:nth-child(2) { animation-delay: 0.15s; }
+.tim-assistant-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes tim-assistant-dot-bounce {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tim-assistant-dot { animation: none; opacity: 0.7; }
+}
+
+.tim-assistant-input {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--tim-card-border);
+}
+.tim-assistant-input textarea {
+  resize: none;
+  max-height: 120px;
+}
+.tim-assistant-input button {
+  align-self: flex-end;
+}

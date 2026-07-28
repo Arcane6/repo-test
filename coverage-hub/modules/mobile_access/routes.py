@@ -13,6 +13,7 @@ from modules.mobile_access.shared.refs import get_refs
 from modules.mobile_access.actual import service as actual
 from modules.mobile_access.summary import service as summary
 from modules.mobile_access.sites import service as sites
+from modules.mobile_access.assistant import service as assistant
 
 
 mobile_access_bp = Blueprint(
@@ -207,3 +208,20 @@ def api_sites_tipo():
 @mobile_access_bp.route("/api/sites/hierarchy")
 def api_sites_hierarchy():
     return jsonify(sites.get_sites_hierarchy(_sites_filters()))
+
+
+# ---------------------------------------------------------------------------
+# API — Assistente (chat de IA efêmero sobre municípios/cobertura/5G/mercado)
+# ---------------------------------------------------------------------------
+
+@mobile_access_bp.route("/api/assistant/chat", methods=["POST"])
+def api_assistant_chat():
+    # Sempre 200: o corpo já se autodescreve (chave "erro" ou "resposta") —
+    # o front (AssistantChat.tsx) lê esse campo pra decidir a bolha, e
+    # fetchJson() lança em qualquer status não-2xx antes mesmo de ler o
+    # corpo, o que apagaria a mensagem de erro específica do backend
+    # (ex. "Fonte externa indisponível no momento.") e mostraria só o
+    # fallback genérico do catch.
+    data = request.get_json(silent=True) or {}
+    resultado = assistant.responder(data.get("session_id"), data.get("pergunta"))
+    return jsonify(resultado)

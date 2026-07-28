@@ -38,6 +38,15 @@ export function MobileAccessLayout() {
             <i className="bi bi-broadcast-pin me-1" /> Sites
           </NavLink>
         </li>
+        <li className="nav-item" role="presentation">
+          <NavLink
+            className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
+            to="assistente"
+            role="tab"
+          >
+            <i className="bi bi-robot me-1" /> Assistente
+          </NavLink>
+        </li>
       </ul>
 
       <Outlet />

@@ -93,6 +93,8 @@ modules/
     summary/       — aba "Resumo" (raias R1/R2/R3)
     sites/         — aba "Sites" (inventário de sites físicos,
                      TB_FT_BASE_UNICA_SITES — ver seção própria abaixo)
+    assistant/     — aba "Assistente" (chat de IA efêmero sobre o agente
+                     google-adk/Vertex AI em `agent/` — ver seção própria)
     shared/        — filtros, constantes, refs (fonte + data mais recente)
   budget/, executive/, transport/  — módulos placeholder, __init__.py
     vazio, listados em config/modules.py com enabled=False (aparecem
@@ -101,7 +103,7 @@ modules/
 
 Frontend espelha isso em `frontend/src/dashboards/` (`CidadesDashboard`,
 `ResumoDashboard` com `resumo/Raia1.tsx`, `Raia2.tsx`, `Raia3.tsx`,
-`SitesDashboard`, `TrafegoResumoExecutivo`, `TrafegoYtd`).
+`SitesDashboard`, `AssistantDashboard`, `TrafegoResumoExecutivo`, `TrafegoYtd`).
 
 ## Aba Sites (`modules/mobile_access/sites/`)
 
@@ -236,6 +238,92 @@ composição de sites (árvore), fornecedor dominante, tipo de site, mapa
   (rede cresce entre o fechamento e hoje), não é bug. As 5 categorias-
   folha vêm do SQL, as intermediárias são somadas em Python no service
   (nunca em SQL), garantindo que a árvore sempre fecha por construção.
+
+## Aba Assistente (`modules/mobile_access/assistant/`) — chat de IA efêmero
+
+Chat estilo ChatGPT/Claude dentro de Acesso Móvel, sobre o agente de IA
+`agent/` (pacote na raiz do projeto, não dentro de `modules/`) — feito
+originalmente por um colega, usando **google-adk** (Agent Development
+Kit) contra **Vertex AI** (não a API Gemini direta). As credenciais
+(`GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`,
+`GOOGLE_CLOUD_LOCATION`) são lidas direto pelo SDK a partir do `.env`,
+mesmo padrão do `GOOGLE_APPLICATION_CREDENTIALS` do BigQuery — não
+passam por `config/settings.py`.
+
+- **Efêmero de propósito** (pedido explícito do usuário): `session_id`
+  é gerado no `AssistantChat.tsx` via `crypto.randomUUID()` num
+  `useState` inicial — **sem `localStorage`** — e casado com um
+  `google.adk.sessions.InMemorySessionService` no backend
+  (`assistant/service.py`). Sem tabela nova, sem persistência: recarregar
+  a página ou reiniciar o processo Flask zera o histórico dos dois
+  lados. Trade-off conhecido e aceito (baixo tráfego/uso interno): um
+  deploy com múltiplos workers gunicorn não compartilha essa memória
+  entre processos — sem sticky sessions, uma pergunta pode cair num
+  worker que não tem a sessão do turno anterior.
+- **Sem streaming (decisão de v1)**: a resposta chega inteira de uma vez.
+  `service.responder()` roda o turno inteiro do
+  `google.adk.runners.Runner` (`run_async`, iterando os `Event` até
+  achar `is_final_response()`) dentro de um `asyncio.run()` chamado por
+  uma **view Flask síncrona comum** — decisão deliberada pra não
+  introduzir views assíncronas/SSE em um projeto que hoje é 100%
+  síncrono. Endpoint único: `POST /mobile-access/api/assistant/chat`
+  (`{session_id, pergunta}` → `{resposta}` ou `{erro}`).
+  ⚠️ **A rota sempre responde HTTP 200** mesmo quando o corpo é
+  `{"erro": ...}` — o corpo já se autodescreve pela chave presente, e
+  `fetchJson()` (`api/client.ts`) lança em qualquer status não-2xx antes
+  de conseguir ler o corpo. Devolver 400 aqui faz a mensagem específica
+  do backend nunca chegar à bolha de erro (o componente cai sempre no
+  fallback genérico do `catch`). Não reintroduzir status de erro HTTP
+  nessa rota sem também ajustar o consumo no frontend.
+- **Base de municípios do agente migrada de Excel pro Oracle**
+  (`agent/excel_municipios.py` — nome do arquivo mantido por histórico,
+  não lê mais Excel): a versão original do colega lia duas planilhas
+  (`Municípios TIM Brasil_Fechamento.xlsx` e a de plano nominal 5G 2027)
+  de um caminho OneDrive do Windows, inviável no servidor Linux de
+  produção. Confirmado pelo usuário que as mesmas informações vêm de
+  **`NTW_OP.MUNICIPIOS_FECHAMENTO`** (fechamento — a planilha era
+  carregada a partir dela) e **`NTW_OP.REL_CIDADES_PLANEJADO_26`**
+  (plano de lançamento 5G — ver tabela de fontes Oracle abaixo). A
+  ferramenta do agente que roda SQL sobre os municípios
+  (`executar_sql_municipios`) continua funcionando sobre um `DataFrame`
+  cacheado em memória (não bate no Oracle a cada pergunta), só a origem
+  do carregamento mudou.
+  - **Presença por tecnologia recalculada nas 4 techs** (2G/3G/4G/5G),
+    reaproveitando a MESMA regra já validada em `actual/queries.py`
+    (`MES_DIV_XG <= TRUNC(SYSDATE)`, nunca a flag `PRESENCA_XG` crua, que
+    vira `true` no rollout, antes da divulgação pública real) — a
+    versão original do colega só aplicava esse ajuste em 5G (via o
+    overlay do plano), deixando 2G/3G/4G expostos ao mesmo problema que
+    já tínhamos corrigido em Cidades/Resumo.
+  - `DEFAULT_PLAN_YEAR` (`shared/constants.py`) é reusado como o "ano do
+    plano" em vez de literal solto — mesma fonte de verdade que o resto
+    do módulo já usa.
+- **Sandbox de SQL do agente endurecido**: `executar_sql_municipios` roda
+  a query gerada pela LLM contra uma tabela DuckDB (`municipios`) criada
+  a partir do DataFrame — nunca contra a conexão Oracle real. Além do
+  blocklist de palavras já existente (INSERT/UPDATE/DELETE/DROP/ALTER/
+  CREATE/TRUNCATE/MERGE/GRANT/REVOKE/REPLACE), a conexão agora abre com
+  `duckdb.connect(":memory:", config={"enable_external_access": False})`
+  — sem isso, funções table-valued do próprio DuckDB (`read_csv_auto`,
+  `httpfs` etc.) conseguiam ler arquivo/rede arbitrários do servidor
+  (`read_csv_auto('/etc/passwd')` funcionava antes da correção,
+  verificado com um teste isolado), driblando o blocklist por não serem
+  um comando SQL de escrita.
+- **Frontend** (`AssistantChat.tsx`, montado por `AssistantDashboard.tsx`
+  na rota `assistente`): bolhas usuário (direita, azul da marca) ×
+  assistente (esquerda), sugestões de pergunta no estado vazio,
+  indicador de "digitando" (3 pontos), botão "Nova conversa" (gera outro
+  `session_id` e limpa as mensagens). Resposta do assistente é renderizada
+  via `react-markdown` + `remark-gfm` (única dupla de libs de markdown do
+  projeto até agora) — cobre as tabelas e blocos de SQL que o agente
+  devolve. `api/assistant.ts` segue o mesmo `fetchJson` de todo módulo.
+- **Dependências novas** (`requirements.txt`): `google-adk`, `duckdb`,
+  `requests` + `lxml` (scraping de Teleco/notícias, ferramentas do
+  agente que buscam contexto de mercado/concorrência — bloqueado neste
+  sandbox de dev por política de rede, mesma classe de bloqueio de
+  `tile.openstreetmap.org`; funciona na rede real de produção) e
+  `tabulate` (usado por `DataFrame.to_markdown()` na formatação de
+  resultado do agente).
 
 ## Módulo Tráfego (`modules/traffic/`) — planejado × realizado + market share
 

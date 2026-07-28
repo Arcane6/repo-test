@@ -35,8 +35,8 @@ function withBasePath(path: string): string {
   return base.replace(/\/$/, "") + path;
 }
 
-export async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(withBasePath(path));
+export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(withBasePath(path), init);
   if (!response.ok) {
     throw new Error(`Falha ao buscar ${path}: HTTP ${response.status}`);
   }
