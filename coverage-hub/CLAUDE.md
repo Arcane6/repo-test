@@ -93,8 +93,9 @@ modules/
     summary/       — aba "Resumo" (raias R1/R2/R3)
     sites/         — aba "Sites" (inventário de sites físicos,
                      TB_FT_BASE_UNICA_SITES — ver seção própria abaixo)
-    assistant/     — aba "Assistente" (chat de IA efêmero sobre o agente
-                     google-adk/Vertex AI em `agent/` — ver seção própria)
+    assistant/     — aba "Assistente" (chat de IA efêmero com streaming
+                     SSE sobre o agente google-adk/Vertex AI em `agent/`
+                     — ver seção própria)
     shared/        — filtros, constantes, refs (fonte + data mais recente)
   budget/, executive/, transport/  — módulos placeholder, __init__.py
     vazio, listados em config/modules.py com enabled=False (aparecem
@@ -260,21 +261,35 @@ passam por `config/settings.py`.
   deploy com múltiplos workers gunicorn não compartilha essa memória
   entre processos — sem sticky sessions, uma pergunta pode cair num
   worker que não tem a sessão do turno anterior.
-- **Sem streaming (decisão de v1)**: a resposta chega inteira de uma vez.
-  `service.responder()` roda o turno inteiro do
-  `google.adk.runners.Runner` (`run_async`, iterando os `Event` até
-  achar `is_final_response()`) dentro de um `asyncio.run()` chamado por
-  uma **view Flask síncrona comum** — decisão deliberada pra não
-  introduzir views assíncronas/SSE em um projeto que hoje é 100%
-  síncrono. Endpoint único: `POST /mobile-access/api/assistant/chat`
-  (`{session_id, pergunta}` → `{resposta}` ou `{erro}`).
-  ⚠️ **A rota sempre responde HTTP 200** mesmo quando o corpo é
-  `{"erro": ...}` — o corpo já se autodescreve pela chave presente, e
-  `fetchJson()` (`api/client.ts`) lança em qualquer status não-2xx antes
-  de conseguir ler o corpo. Devolver 400 aqui faz a mensagem específica
-  do backend nunca chegar à bolha de erro (o componente cai sempre no
-  fallback genérico do `catch`). Não reintroduzir status de erro HTTP
-  nessa rota sem também ajustar o consumo no frontend.
+- **Streaming via SSE (v2)**: `POST /mobile-access/api/assistant/chat`
+  responde `text/event-stream` — um `data: {"delta": "..."}` por pedaço
+  de texto gerado, `{"erro": "..."}` em falha, e `{"fim": true}`
+  fechando o turno. `service.responder_stream()` é um gerador
+  **síncrono** que roda o `Runner` (async, com
+  `RunConfig(streaming_mode=StreamingMode.SSE)`) num event loop próprio
+  por request — o resto do projeto continua 100% síncrono, sem view
+  assíncrona nem worker especial no gunicorn.
+  - **Evento parcial × final**: com SSE o Runner emite os parciais
+    (`evento.partial`) com os deltas E, no fim, um evento final com o
+    texto **agregado** do trecho. Emitir os dois duplica a resposta
+    inteira — por isso `_deltas_async` só manda, no final, o que ainda
+    não saiu como delta (e o texto todo quando não houve streaming
+    nenhum, que é o que acontece logo depois de uma chamada de
+    ferramenta). Não simplificar isso pra "yield de tudo".
+  - **Degrada sozinho**: se por qualquer motivo não houver streaming de
+    verdade (proxy bufferizando, resposta fechada de uma vez), vira um
+    único delta com o texto inteiro e a UI funciona igual — o front só
+    concatena deltas.
+  - `X-Accel-Buffering: no` no header porque o nginx bufferiza resposta
+    de proxy por padrão e seguraria o stream até o fim, matando o efeito.
+  - ⚠️ **A rota sempre responde HTTP 200**, mesmo em erro — o corpo já se
+    autodescreve pela chave presente, e num stream o status já foi
+    resolvido antes do primeiro delta, então status de erro não chega
+    de forma útil no front. Não reintroduzir 4xx aqui sem ajustar o
+    consumo no frontend.
+  - O `streamPergunta()` (`api/assistant.ts`) **não** usa `fetchJson`
+    (que faria `response.json()` do corpo inteiro): lê o corpo
+    incrementalmente com `getReader()`, senão não existe streaming.
 - **Base de municípios do agente migrada de Excel pro Oracle**
   (`agent/excel_municipios.py` — nome do arquivo mantido por histórico,
   não lê mais Excel): a versão original do colega lia duas planilhas
@@ -309,14 +324,60 @@ passam por `config/settings.py`.
   (`read_csv_auto('/etc/passwd')` funcionava antes da correção,
   verificado com um teste isolado), driblando o blocklist por não serem
   um comando SQL de escrita.
-- **Frontend** (`AssistantChat.tsx`, montado por `AssistantDashboard.tsx`
-  na rota `assistente`): bolhas usuário (direita, azul da marca) ×
-  assistente (esquerda), sugestões de pergunta no estado vazio,
-  indicador de "digitando" (3 pontos), botão "Nova conversa" (gera outro
-  `session_id` e limpa as mensagens). Resposta do assistente é renderizada
-  via `react-markdown` + `remark-gfm` (única dupla de libs de markdown do
-  projeto até agora) — cobre as tabelas e blocos de SQL que o agente
-  devolve. `api/assistant.ts` segue o mesmo `fetchJson` de todo módulo.
+- **Frontend** — `components/assistant/` (`AssistantChat` monta o layout,
+  `ChatMessage`, `ChatComposer`, `ChatEmptyState`, `ChatMarkdown`) +
+  `hooks/useAssistantChat.ts` (estado da conversa e streaming, separado
+  da UI). Resposta renderizada com `react-markdown` + `remark-gfm`
+  (tabelas e blocos de SQL que o agente devolve); textarea que cresce
+  com `react-textarea-autosize`.
+  **Três regras de layout que sustentam a tela — não quebrar** (as três
+  são o conserto do "chat estourando a tela / UI espalhada" da v1):
+  1. **Card de altura fixa, só a lista rola.** Toda a cadeia flex
+     (`.tim-assistant` > `.tim-assistant-messages`) precisa de
+     `min-height: 0`: em flex column o padrão é `min-height: auto`, que
+     impede o item de encolher abaixo do conteúdo — aí o
+     `overflow-y: auto` **nunca ativa** e a lista vaza pra fora do card,
+     empurrando o composer pra fora da tela. Esse era o bug.
+  2. **Coluna de leitura de ~50rem centralizada** (`.tim-assistant-thread`
+     e `.tim-assistant-composer-inner`). Sem isso, em monitor wide a
+     linha de texto passa de 1000px e a leitura sofre.
+  3. **Assimetria proposital**: pergunta = bolha compacta à direita;
+     resposta = bloco de documento **sem bolha**, com avatar à esquerda
+     (mesmo idioma de ChatGPT/Claude). Tabela de 20 linhas dentro de um
+     balão cinza arredondado é o que deixava a tela "esquisita".
+     Tabela sempre dentro de `.tim-assistant-tablewrap`
+     (`overflow-x: auto`), pra não empurrar a página.
+- **Parar/abortar**: enquanto gera, o botão de enviar vira "parar"
+  (`AbortController`). Abort é ação do usuário, não erro — mantém o
+  texto que já chegou em vez de trocar por mensagem de falha.
+- **Auto-scroll só se o usuário está no fim da lista** (`grudadoNoFimRef`,
+  margem de 80px): se ele rolou pra cima pra reler algo, o texto
+  chegando não pode arrastar a tela de volta.
+- **Autenticação (pegadinha que já custou uma tarde)**: as três variáveis
+  do `.env` (`GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`,
+  `GOOGLE_CLOUD_LOCATION`) só dizem "fale com o Vertex AI, nesse
+  projeto/região" — **não autenticam nada**. Autenticação é ADC
+  (Application Default Credentials), via `GOOGLE_APPLICATION_CREDENTIALS`
+  apontando pro JSON (service account ou `gcloud auth
+  application-default login`), guardado **fora do repo** (ex.:
+  `/etc/secrets/…`, `chmod 600`). Sintomas e causas já mapeados:
+  - `DefaultCredentialsError: Your default credentials were not found`
+    → `GOOGLE_APPLICATION_CREDENTIALS` vazia/errada. Lembrar que
+    variável de ambiente só é lida **na subida do processo** — editar o
+    `.env` com o Flask no ar não tem efeito até reiniciar (F5 no
+    navegador não reinicia nada).
+  - `UserWarning: authenticated using end user credentials … without a
+    quota project` → o JSON é de login de usuário (`gcloud auth …`), não
+    de service account. Funciona, mas pode dar "quota exceeded"/"API not
+    enabled"; o certo pra servidor é service account com o papel
+    **Vertex AI User** (`roles/aiplatform.user`).
+  - `TransportError: … oauth2.googleapis.com … Read timed out` → **rede,
+    não credencial**. O servidor sai por proxy corporativo
+    (`HTTP_PROXY`/`HTTPS_PROXY`) e o proxy precisa liberar
+    **`oauth2.googleapis.com`** além de `aiplatform.googleapis.com` —
+    toda chamada autenticada ao GCP troca a credencial por token nesse
+    domínio. Sem saída direta pra internet, não há contorno pelo lado da
+    aplicação; é liberação de allowlist no proxy.
 - **Dependências novas** (`requirements.txt`): `google-adk`, `duckdb`,
   `requests` + `lxml` (scraping de Teleco/notícias, ferramentas do
   agente que buscam contexto de mercado/concorrência — bloqueado neste
