@@ -202,3 +202,8 @@ def api_sites_geo_points():
 @mobile_access_bp.route("/api/sites/tipo")
 def api_sites_tipo():
     return jsonify(sites.get_sites_tipo(_sites_filters()))
+
+
+@mobile_access_bp.route("/api/sites/hierarchy")
+def api_sites_hierarchy():
+    return jsonify(sites.get_sites_hierarchy(_sites_filters()))

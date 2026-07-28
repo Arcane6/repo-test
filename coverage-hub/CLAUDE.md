@@ -201,9 +201,21 @@ verdade rodando aqui, só a estrutura (controles, clusters, popups,
 troca de camada) sem erro de JS. Isso não afeta o ambiente real de
 produção do usuário, que não tem essa mesma restrição de rede.
 
-"Sites" hoje tem as 6 visões completas: max-tech, por-tecnologia,
-fornecedor dominante, tipo de site, mapa (Brasil/Múndi, tiles Leaflet) e
-pivot.
+"Sites" hoje tem as 7 visões completas: max-tech, por-tecnologia,
+composição de sites (árvore), fornecedor dominante, tipo de site, mapa
+(Brasil/Múndi, tiles Leaflet) e pivot.
+
+- **Composição de Sites** (`SITES_HIERARCHY` em `sites/queries.py` +
+  `get_sites_hierarchy` em `sites/service.py` + rota
+  `/api/sites/hierarchy`): mesma árvore/hierarquia da Raia 1 do Resumo
+  (`R1_SITES_HIERARCHY`/`get_r1_sites_hierarchy`, `summary/`) e mesmo
+  builder de frontend (`siteHierarchyTreeOption`), mas no recorte **desta
+  aba** — `MES_REF = MAX(MES_REF)` (inventário mais recente), não o
+  fechamento congelado de dezembro do ano anterior. Por isso o total
+  dessa árvore normalmente **não bate** com o da Raia 1 — é esperado
+  (rede cresce entre o fechamento e hoje), não é bug. As 5 categorias-
+  folha vêm do SQL, as intermediárias são somadas em Python no service
+  (nunca em SQL), garantindo que a árvore sempre fecha por construção.
 
 ## Módulo Tráfego (`modules/traffic/`) — planejado × realizado + market share
 

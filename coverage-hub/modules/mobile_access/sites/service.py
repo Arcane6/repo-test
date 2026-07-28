@@ -18,6 +18,7 @@ from modules.mobile_access.sites.queries import (
     SITES_VENDORS,
     SITES_GEO_POINTS,
     SITES_TIPO,
+    SITES_HIERARCHY,
 )
 
 
@@ -226,4 +227,44 @@ def get_sites_tipo(filters):
         "nonmobile_tx": row.get("nonmobile_tx", 0) or 0,
         "nonmobile_no_tx": row.get("nonmobile_no_tx", 0) or 0,
         "total_sites": row.get("total_sites", 0) or 0,
+    }
+
+
+def get_sites_hierarchy(filters):
+    """Árvore de composição de sites (Total de Sites Ativos) no recorte
+    desta aba (MES_REF mais recente) — mesmo princípio de
+    get_r1_sites_hierarchy (summary/service.py): as 5 folhas vêm do banco,
+    as categorias intermediárias são somadas aqui em Python, nunca
+    recalculadas em SQL, pra árvore sempre fechar por construção.
+
+        total_ativos = total_tim_rf_tx + roaming_vivo
+          total_tim_rf_tx = sem_rf + mobile_sites
+            mobile_sites = tim + ran_sharing
+              tim = macro + small_cell_movel_sls
+    """
+    params = {}
+    sql = _apply_geo(SITES_HIERARCHY, filters, params)
+    row = (execute_query(sql, params) or [{}])[0]
+
+    macro = row.get("macro", 0) or 0
+    small_cell_movel_sls = row.get("small_cell_movel_sls", 0) or 0
+    ran_sharing = row.get("ran_sharing", 0) or 0
+    sem_rf = row.get("sem_rf", 0) or 0
+    roaming_vivo = row.get("roaming_vivo", 0) or 0
+
+    tim = macro + small_cell_movel_sls
+    mobile_sites = tim + ran_sharing
+    total_tim_rf_tx = sem_rf + mobile_sites
+    total_ativos = total_tim_rf_tx + roaming_vivo
+
+    return {
+        "total_ativos": total_ativos,
+        "total_tim_rf_tx": total_tim_rf_tx,
+        "sem_rf": sem_rf,
+        "mobile_sites": mobile_sites,
+        "tim": tim,
+        "macro": macro,
+        "small_cell_movel_sls": small_cell_movel_sls,
+        "ran_sharing": ran_sharing,
+        "roaming_vivo": roaming_vivo,
     }
