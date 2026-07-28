@@ -21,15 +21,11 @@ export function HomePage() {
           </span>
           <h1 className="fw-bold mb-2 text-white">TIM Technical Planning</h1>
           <p className="lead mb-0 tim-hero-lead" style={{ maxWidth: "52ch" }}>
-            Cobertura, rollout, tráfego e projeções num só portal — dados
-            direto da rede, sem planilha.
+            Acompanhe a evolução da rede do EOY25 ao EOY26 planejado com visão integrada de cobertura, tráfego e expansão.
           </p>
           <div className="tim-hero-stats">
             <span className="tim-hero-stat">
               <strong>{modules ? enabledCount : "—"}</strong> módulos ativos
-            </span>
-            <span className="tim-hero-stat">
-              <i className="bi bi-geo-alt" /> 5.570 municípios
             </span>
             <span className="tim-hero-stat">
               <i className="bi bi-lightning-charge" /> Dados ao vivo do Oracle
