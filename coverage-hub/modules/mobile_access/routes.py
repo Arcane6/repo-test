@@ -4,7 +4,10 @@ O front-end (React) mora em /frontend e consome essas rotas; a UI é
 inteiramente renderizada no cliente, o Flask só serve dados.
 """
 
+import json
+
 from flask import Blueprint
+from flask import Response
 from flask import jsonify
 from flask import request
 
@@ -216,12 +219,33 @@ def api_sites_hierarchy():
 
 @mobile_access_bp.route("/api/assistant/chat", methods=["POST"])
 def api_assistant_chat():
-    # Sempre 200: o corpo já se autodescreve (chave "erro" ou "resposta") —
-    # o front (AssistantChat.tsx) lê esse campo pra decidir a bolha, e
-    # fetchJson() lança em qualquer status não-2xx antes mesmo de ler o
-    # corpo, o que apagaria a mensagem de erro específica do backend
-    # (ex. "Fonte externa indisponível no momento.") e mostraria só o
-    # fallback genérico do catch.
+    """
+    Responde em SSE (text/event-stream): um `data: {"delta": "..."}` por
+    pedaço de texto gerado, `{"erro": "..."}` se algo falhar, e um
+    `{"fim": true}` fechando o turno.
+
+    Sempre 200, mesmo em erro: o corpo já se autodescreve pela chave, e
+    status de erro no meio de um stream não chega no front de forma útil
+    (o fetch já resolveu os headers antes do primeiro delta).
+    """
+    # Lê o corpo AQUI, fora do gerador: quando o Flask começa a consumir o
+    # stream o request context já não está mais disponível.
     data = request.get_json(silent=True) or {}
-    resultado = assistant.responder(data.get("session_id"), data.get("pergunta"))
-    return jsonify(resultado)
+    session_id = data.get("session_id")
+    pergunta = data.get("pergunta")
+
+    def eventos():
+        for payload in assistant.responder_stream(session_id, pergunta):
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        yield 'data: {"fim": true}\n\n'
+
+    return Response(
+        eventos(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            # nginx bufferiza resposta de proxy por padrão e seguraria o
+            # stream inteiro até o fim, matando o efeito de streaming.
+            "X-Accel-Buffering": "no",
+        },
+    )

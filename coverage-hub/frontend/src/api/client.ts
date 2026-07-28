@@ -29,7 +29,7 @@ export function filtersToQuery(filters: ActiveFilters): string {
  * moram e diverge disso no deploy padrão: assets em "/static/dist/", mas
  * app/API na raiz "/"), toda chamada de API já nasce corrigida sem
  * precisar tocar em cada arquivo de api/*.ts. */
-function withBasePath(path: string): string {
+export function withBasePath(path: string): string {
   const base = import.meta.env.VITE_ROUTER_BASENAME;
   if (!base || base === "/") return path;
   return base.replace(/\/$/, "") + path;
