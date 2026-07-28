@@ -21,6 +21,9 @@ const CidadesDashboard = lazy(() =>
 const SitesDashboard = lazy(() =>
   import("./dashboards/SitesDashboard").then((m) => ({ default: m.SitesDashboard })),
 );
+const AssistantDashboard = lazy(() =>
+  import("./dashboards/AssistantDashboard").then((m) => ({ default: m.AssistantDashboard })),
+);
 const TrafficLayout = lazy(() =>
   import("./pages/traffic/TrafficLayout").then((m) => ({ default: m.TrafficLayout })),
 );
@@ -104,6 +107,7 @@ export function App() {
               <Route path="resumo" element={<ResumoDashboard />} />
               <Route path="cidades" element={<CidadesDashboard />} />
               <Route path="sites" element={<SitesDashboard />} />
+              <Route path="assistente" element={<AssistantDashboard />} />
             </Route>
             <Route
               path="trafego"
