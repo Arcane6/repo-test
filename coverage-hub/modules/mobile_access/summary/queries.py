@@ -178,24 +178,29 @@ WHERE TRUNC(DT_CARGA) = (
 #
 # Universo = "Mobile Sites" (mesmo de R1_SITES_VENN — ver
 # shared/site_universe.py), pra bater com "Total de Sites por
-# Tecnologia": BASE_TB_END_ID_NEW não tem TIPO_SITE/STATUS_END_ID/
-# MOBILE_SITE (é uma tabela só de fornecedor por rádio), então o
-# universo é aplicado via JOIN com TB_FT_BASE_UNICA_SITES (SITE_UNIVERSE
-# abaixo), no MESMO baseline_date (fechamento de dezembro) — sem esse
-# join, um site fora do universo (ex.: Ran Sharing sem MOBILE_SITE,
-# roaming) ainda contaria fornecedor, inflando o total sobre o de
-# "Total de Sites por Tecnologia".
-
+# Tecnologia". IMPORTANTE: quem "dirige" a query é o universo de sites
+# (SITE_UNIVERSE, de TB_FT_BASE_UNICA_SITES) via LEFT JOIN pro fornecedor
+# — nunca o contrário. Uma versão anterior desta query montava o
+# fornecedor primeiro (a partir de BASE_TB_END_ID_NEW) e só then fazia
+# INNER JOIN com o universo: qualquer site do universo sem fornecedor
+# identificado em NENHUMA cascata (5G/4G/3G/2G todas NULL) sumia do
+# resultado inteiro, em vez de cair em "A DEFINIR" — o total do donut
+# ficava menor que o de "Total de Sites por Tecnologia" (29.195 vs
+# 29.228, achado pelo usuário). Mesmo princípio já usado em
+# SITES_VENDORS (sites/queries.py): LEFT JOIN a partir do universo,
+# nunca um JOIN a partir da tabela de fornecedor.
 R1_VENDORS = """
 WITH SITE_UNIVERSE AS (
-    SELECT END_ID
+    SELECT END_ID, UF, MUNICIPIO
     FROM NTW_OP.TB_FT_BASE_UNICA_SITES
     WHERE TRUNC(MES_REF, 'MM') = TRUNC(:baseline_date, 'MM')
     AND """ + MOBILE_SITES_WHERE + """
+    {uf_filter}
+    {municipio_filter}
 ),
-BASE AS (
+VENDOR_BASE AS (
     SELECT
-        END_ID, UF, MUNICIPIO, ANF,
+        END_ID,
         -- Cascata 5G (maior banda primeiro): 3500 > 26000 > 2600 > 2300 > 2100 > 1800 > 700
         COALESCE(
             VENDOR_NR_3500, VENDOR_NR_26000, VENDOR_NR_2600DSS,
@@ -223,18 +228,6 @@ BASE AS (
         )
         WHERE ROWNUM = 1
     )
-    {uf_filter}
-    {municipio_filter}
-),
-VENDOR_FINAL AS (
-    SELECT
-        END_ID, UF, MUNICIPIO,
-        COALESCE(VENDOR_5G, VENDOR_4G, VENDOR_3G, VENDOR_2G) AS VENDOR
-    FROM BASE
-    WHERE VENDOR_5G IS NOT NULL
-       OR VENDOR_4G IS NOT NULL
-       OR VENDOR_3G IS NOT NULL
-       OR VENDOR_2G IS NOT NULL
 ),
 GEO AS (
     SELECT UF, MUNICIPIO, REGIONAL
@@ -244,14 +237,14 @@ GEO AS (
     )
 )
 SELECT
-    UPPER(v.VENDOR) AS vendor,
+    UPPER(COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'A DEFINIR')) AS vendor,
     COUNT(*) AS qtd
-FROM VENDOR_FINAL v
-JOIN SITE_UNIVERSE su ON su.END_ID = v.END_ID
-LEFT JOIN GEO g ON g.UF = v.UF AND UPPER(g.MUNICIPIO) = UPPER(v.MUNICIPIO)
+FROM SITE_UNIVERSE su
+LEFT JOIN VENDOR_BASE vb ON vb.END_ID = su.END_ID
+LEFT JOIN GEO g ON g.UF = su.UF AND UPPER(g.MUNICIPIO) = UPPER(su.MUNICIPIO)
 WHERE 1=1
 {regional_filter}
-GROUP BY UPPER(v.VENDOR)
+GROUP BY UPPER(COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'A DEFINIR'))
 ORDER BY qtd DESC
 """
 
