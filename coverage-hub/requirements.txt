@@ -7,13 +7,13 @@ gunicorn==23.0.0
 
 # Agente de IA (aba "Assistente" do Acesso Móvel) — modules/mobile_access
 # usa google-adk (Agent Development Kit) contra Vertex AI (GOOGLE_GENAI_USE_VERTEXAI
-# no .env), executando SQL somente-leitura sobre um DataFrame via duckdb,
-# lendo a base de municípios de Excel (openpyxl) e formatando resultado em
-# markdown (tabulate). requests + lxml alimentam as ferramentas de
-# Teleco/notícias (scraping de HTML/RSS público).
+# no .env), executando SQL somente-leitura sobre um DataFrame via duckdb
+# (dados vindos direto do Oracle — MUNICIPIOS_FECHAMENTO e
+# REL_CIDADES_PLANEJADO_26, ver agent/excel_municipios.py) e formatando
+# resultado em markdown (tabulate). requests + lxml alimentam as
+# ferramentas de Teleco/notícias (scraping de HTML/RSS público).
 google-adk==2.5.0
 duckdb==1.5.5
 requests==2.34.2
 lxml==6.1.1
-openpyxl==3.1.5
 tabulate==0.10.0
