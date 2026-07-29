@@ -13,7 +13,8 @@ import math as _math
 from database.oracle import execute_query
 
 from modules.mobile_access.shared.constants import (
-    TECH_COLORS, TECH_ORDER, DEFAULT_PLAN_YEAR,
+    TECH_COLORS, TECH_ORDER, DEFAULT_PLAN_YEAR, DEFAULT_CAPEX_SCENARIO,
+    CASA_COLORS,
 )
 from modules.mobile_access.summary.queries import (
     R1_SITES_VENN,
@@ -477,49 +478,60 @@ def get_r2_orcamento_por_tecnologia(filters):
     }
 
 
-def get_r2_endereco_por_tecnologia(filters):
-    """CAC (custo de aquisição) rateado por OC entre Casa Nova e Casa
-    Existente, por tecnologia — fonte TB_NEXUS_CN_CE."""
-    params, ano_int = _prepare_params(filters)
-    params["ano"] = ano_int
-
-    sql = _apply_geo_all(
-        R2_ENDERECO_POR_TECNOLOGIA, filters, params,
-        uf_field="g.UF", mun_field="g.MUNICIPIO",
-        uf_key="uf_filter_g", mun_key="municipio_filter_g",
-        regional_field="g.REGIONAL", regional_key="regional_filter_g",
-        projeto_field="RR.PRIORIDADE",
-    )
-    rows = execute_query(sql, params) or []
+def get_r2_endereco_por_tecnologia():
+    """CAC por Casa Nova (CN) x Casa Existente (CE), por tecnologia e por
+    cenário — fonte VW_CAPEX_MASTER_FULL@NEXUS_LINK. Sem filtro
+    geográfico (a view não tem essa dimensão — nacional, como o card de
+    Meta NEXUS) e sem filtro de ano: o dataset inteiro (todos os
+    cenários) cabe numa resposta só, e o front escolhe o cenário num
+    combo sem request novo."""
+    rows = execute_query(R2_ENDERECO_POR_TECNOLOGIA) or []
 
     techs = ["4G", "5G"]
     classificacoes = ["CN", "CE"]
-    by_key = {(r["tech"], r["classificacao"]): r.get("valor", 0) or 0 for r in rows}
 
-    # Arredonda pra cima (não pra 2 casas): o rateio proporcional dá valor
-    # fracionário (ex.: 0.47 endereço), mas quando filtramos um recorte
-    # pequeno (um município) isso não faz sentido de exibir — "0,47
-    # endereço" não é uma métrica que bate. O total soma os mesmos valores
-    # já arredondados exibidos nas barras, não o bruto, senão total e
-    # barras não batem entre si.
-    data_by_cell = {
-        (t, c): _math.ceil(by_key.get((t, c), 0))
-        for t in techs
-        for c in classificacoes
-    }
+    valores_por_cenario = {}
+    ordem_cenarios = []
+    for r in rows:
+        cenario = r["scenario"]
+        if cenario not in valores_por_cenario:
+            valores_por_cenario[cenario] = {}
+            ordem_cenarios.append(cenario)
+        valores_por_cenario[cenario][(r["tech"], r["tipo_casa"])] = r.get("cac", 0) or 0
 
-    return {
-        "categories": classificacoes,
-        "series": [
-            {
-                "name": t,
-                "color": TECH_COLORS[t],
-                "data": [data_by_cell[(t, c)] for c in classificacoes],
-            }
+    cenarios = []
+    for cenario in ordem_cenarios:
+        by_key = valores_por_cenario[cenario]
+        # Arredonda pra cima (não pra 2 casas): endereço fracionário
+        # (ex.: 0,47) não é uma métrica que bate pra quem lê o card. O
+        # total soma os mesmos valores já arredondados das barras, não o
+        # bruto, senão total e barras não batem entre si.
+        data_by_cell = {
+            (t, c): _math.ceil(by_key.get((t, c), 0))
             for t in techs
-        ],
-        "total": sum(data_by_cell.values()),
-    }
+            for c in classificacoes
+        }
+        cenarios.append({
+            "cenario": cenario,
+            "categories": techs,
+            "series": [
+                {
+                    "name": c,
+                    "color": CASA_COLORS[c],
+                    "data": [data_by_cell[(t, c)] for t in techs],
+                }
+                for c in classificacoes
+            ],
+            "total": sum(data_by_cell.values()),
+        })
+
+    nomes_cenarios = [c["cenario"] for c in cenarios]
+    cenario_default = (
+        DEFAULT_CAPEX_SCENARIO if DEFAULT_CAPEX_SCENARIO in nomes_cenarios
+        else (nomes_cenarios[0] if nomes_cenarios else None)
+    )
+
+    return {"cenarios": cenarios, "cenario_default": cenario_default}
 
 
 # ---------------------------------------------------------------------------

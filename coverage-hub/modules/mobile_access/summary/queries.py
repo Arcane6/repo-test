@@ -536,112 +536,90 @@ ORDER BY R.TECNOLOGIA, F.TIPO
 
 
 # ---------- Endereço por Tecnologia ----------
-# CAC (custo de aquisição) rateado por OC entre Casa Nova (CN) e Casa
-# Existente (CE), por tecnologia — fonte TB_NEXUS_CN_CE.
+# CAC (custo de aquisição) por Casa Nova (CN) x Casa Existente (CE), por
+# tecnologia e por CENÁRIO — fonte VW_CAPEX_MASTER_FULL@NEXUS_LINK (ver
+# CLAUDE.md, seção da view: query de referência já confirmada pelo
+# usuário). Troca a versão anterior (TB_ROLLOUT_ACESSO + TB_NEXUS_CN_CE
+# rateado por OC/geografia) — esta view não tem coluna geográfica
+# (DLV_LEVEL_2/projeto não é join-ável com TB_ROLLOUT_ACESSO, confirmado
+# no CLAUDE.md), então o card passa a ser NACIONAL, sem responder a
+# UF/município/regional — como o card de "Meta NEXUS" já é.
+# SCENARIO vira uma dimensão de seleção no front (combo), não um filtro
+# de servidor: o dataset inteiro (todos os cenários) cabe numa resposta
+# só, então a troca de cenário no combo não dispara request novo.
 R2_ENDERECO_POR_TECNOLOGIA = """
-WITH ROLLOUT_REFERENCIA_ALL AS (
-    -- Sem filtro geográfico: universo completo, denominador do rateio.
+WITH BASE AS (
     SELECT
-        R.COD_IBGE,
+        SCENARIO,
+        DELIVERABLE,
+        NVL(KPI, 0) AS KPI,
         CASE
-            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
-            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
-            ELSE '4G'
-        END AS TECH,
-        CASE
-            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
-            ELSE 'CE'
+            WHEN INSTR(LOWER(DELIVERABLE), 'casa nova') > 0
+             AND INSTR(LOWER(DELIVERABLE), '4g em 5g') = 0
+             AND INSTR(LOWER(DELIVERABLE), 'indoor') = 0
+                THEN 'CN'
+
+            WHEN INSTR(LOWER(DELIVERABLE), 'casa existente') > 0
+                THEN 'CE'
+
+            ELSE NULL
         END AS TIPO_CASA,
-        R.PRIORIDADE,
-        R.ID_MASTER_PIVOT,
-        COUNT(1) AS NUM_OCS
-    FROM NTW_OP.TB_ROLLOUT_ACESSO R
-    WHERE R.PLANO = :ano
-      AND R.TECNOLOGIA IN ('4G', '5G')
-    GROUP BY
-        R.COD_IBGE,
+
         CASE
-            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
-            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
-            ELSE '4G'
-        END,
-        CASE
-            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
-            ELSE 'CE'
-        END,
-        R.PRIORIDADE,
-        R.ID_MASTER_PIVOT
-),
-GEO AS (
-    SELECT IBGE, UF, MUNICIPIO, REGIONAL
-    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    WHERE TRUNC(DT_CARGA) = (
-        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    )
-),
-ROLLOUT_REFERENCIA AS (
-    SELECT RR.*
-    FROM ROLLOUT_REFERENCIA_ALL RR
-    LEFT JOIN GEO g ON g.IBGE = RR.COD_IBGE
-    WHERE 1=1
-    {uf_filter_g}
-    {municipio_filter_g}
-    {regional_filter_g}
-    {projeto_filter}
-),
-NEXUS_CN_CE AS (
-    SELECT
-        UPPER(TRIM(TECH)) AS TECH,
-        UPPER(TRIM(TIPO_CASA)) AS TIPO_CASA,
-        SUM(CAC) AS CAC_TOTAL
-    FROM TB_NEXUS_CN_CE
-    GROUP BY
-        UPPER(TRIM(TECH)),
-        UPPER(TRIM(TIPO_CASA))
-),
-TOTAL_OCS_GRUPO_ALL AS (
-    -- Denominador do rateio: sempre o universo completo (sem filtro
-    -- geográfico) — senão filtrar por UF faria aquele recorte "herdar"
-    -- 100% do orçamento nacional do grupo.
-    SELECT TECH, TIPO_CASA, SUM(NUM_OCS) AS TOTAL_OCS_GRUPO
-    FROM ROLLOUT_REFERENCIA_ALL
-    GROUP BY TECH, TIPO_CASA
-),
-BASE_RATEIO AS (
-    SELECT
-        RR.COD_IBGE,
-        RR.TECH,
-        RR.TIPO_CASA,
-        RR.ID_MASTER_PIVOT,
-        RR.NUM_OCS,
-        N.CAC_TOTAL,
-        G.TOTAL_OCS_GRUPO
-    FROM ROLLOUT_REFERENCIA RR
-    INNER JOIN NEXUS_CN_CE N
-        ON N.TECH = RR.TECH
-       AND N.TIPO_CASA = RR.TIPO_CASA
-    INNER JOIN TOTAL_OCS_GRUPO_ALL G
-        ON G.TECH = RR.TECH
-       AND G.TIPO_CASA = RR.TIPO_CASA
-),
-ROLLOUT_CE_CN AS (
-    SELECT
-        COD_IBGE,
-        TECH,
-        TIPO_CASA AS CLASSIFICACAO,
-        ID_MASTER_PIVOT,
-        CASE
-            WHEN TOTAL_OCS_GRUPO = 0 THEN 0
-            ELSE CAC_TOTAL * (NUM_OCS / TOTAL_OCS_GRUPO)
-        END AS VALOR
-    FROM BASE_RATEIO
+            WHEN UPPER(SUBSTR(DELIVERABLE, 1, 4)) LIKE '4G E%'
+                THEN '5G'
+
+            WHEN INSTR(UPPER(SUBSTR(DELIVERABLE, 1, 4)), '4G') > 0
+                THEN '4G'
+
+            WHEN INSTR(UPPER(SUBSTR(DELIVERABLE, 1, 4)), '5G') > 0
+                THEN '5G'
+
+            ELSE NULL
+        END AS TECH
+
+    FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
+    WHERE PRIORIDADE = 'IMPRESCINDÍVEL'
+
+      AND (
+            AREA_CTIO IS NULL
+            OR UPPER(TRIM(AREA_CTIO)) NOT IN (
+                'INFLAÇÃO',
+                'PROJETO ESTRUTURAL - OPER',
+                'VARIAÇÃO CAMBIAL',
+                'VARIAÇÃO CAMBIAL - B2B ICT',
+                'VARIAÇÃO CAMBIAL - TIM',
+                'VARIAÇÃO CAMBIAL - ULTRA FIBRA'
+            )
+          )
+
+      AND (
+            LAYER_SUBAREA IS NULL
+            OR UPPER(TRIM(LAYER_SUBAREA)) NOT IN (
+                'OPERATIONS',
+                'PLANNING & CONTROL'
+            )
+          )
+
+      AND DELIVERABLE IS NOT NULL
+      AND TRIM(DELIVERABLE) IS NOT NULL
+      AND UPPER(TRIM(DELIVERABLE)) <> 'N/A'
 )
 SELECT
+    SCENARIO,
     TECH,
-    CLASSIFICACAO,
-    SUM(VALOR) AS VALOR
-FROM ROLLOUT_CE_CN
-GROUP BY TECH, CLASSIFICACAO
-ORDER BY TECH, CLASSIFICACAO
+    TIPO_CASA,
+    SUM(KPI) AS CAC
+FROM BASE
+WHERE TECH IS NOT NULL
+  AND TIPO_CASA IS NOT NULL
+GROUP BY
+    SCENARIO,
+    TECH,
+    TIPO_CASA
+ORDER BY
+    SCENARIO,
+    TECH,
+    TIPO_CASA
 """
 
