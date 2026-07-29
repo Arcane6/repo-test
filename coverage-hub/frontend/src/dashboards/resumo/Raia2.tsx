@@ -19,11 +19,11 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
     queryFn: () => summaryApi.r2OrcamentoPorTecnologia(filters),
   });
 
-  // Nacional (sem geo/ano) — não entra na queryKey de filtro, e o combo de
-  // cenário troca só o recorte já baixado, sem request novo.
+  // Responde a geo/ano (rateio por OC, igual Orçamento por Tecnologia) —
+  // o combo de cenário só troca o recorte já baixado, sem request novo.
   const { data: endereco, isFetching: loadingEndereco } = useQuery({
-    queryKey: ["summary-r2-endereco"],
-    queryFn: () => summaryApi.r2EnderecoPorTecnologia(),
+    queryKey: ["summary-r2-endereco", uf, municipio, ano, regionais, projetos],
+    queryFn: () => summaryApi.r2EnderecoPorTecnologia(filters),
   });
   const [cenarioEscolhido, setCenarioEscolhido] = useState<string | null>(null);
   const cenarioAtual = cenarioEscolhido ?? endereco?.cenario_default ?? endereco?.cenarios[0]?.cenario ?? null;
@@ -93,8 +93,8 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-4">
           <ChartPanel
             title="Endereço por Tecnologia"
-            subtitle="CAC por tecnologia — Casa Nova (CN) x Casa Existente (CE) · nacional, não filtra"
-            sourceTable="VW_CAPEX_MASTER_FULL"
+            subtitle="CAC rateado por OC — Casa Nova (CN) x Casa Existente (CE)"
+            sourceTable={["TB_ROLLOUT_ACESSO", "VW_CAPEX_MASTER_FULL"]}
             height={340}
             headerExtra={
               <select

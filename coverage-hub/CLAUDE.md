@@ -638,10 +638,10 @@ SAT=roxo...), também fonte única.
   geográfico** (`..._ALL`). Só o numerador/linhas exibidas usam o
   filtro. Filtrar o denominador infla artificialmente a fatia do
   filtro sobre um orçamento total fixo — bug sutil, já caímos nele.
-  Vale pra "Orçamento por Tecnologia" (ainda é rateio geográfico de
-  verdade). **"Endereço por Tecnologia" não é mais rateio nenhum** —
-  virou soma direta por cenário via `VW_CAPEX_MASTER_FULL` (ver seção
-  própria) — não reintroduzir rateio geográfico nesse card.
+  Vale pra "Orçamento por Tecnologia" **e** "Endereço por Tecnologia"
+  (rateio geográfico de verdade nos dois — o CAC total do segundo hoje
+  vem de `VW_CAPEX_MASTER_FULL`, mas o rateio por OC continua igual, ver
+  seção própria da view).
 - **Dedup de sites**: um site físico pode ter várias tecnologias ativas
   ao mesmo tempo. Contar "por tecnologia" com `SUM(CASE WHEN LIKE
   '%2G%'...)` independente por tec conta o mesmo site várias vezes.
@@ -799,7 +799,7 @@ consome token; se o token não existe, cria-se o token primeiro.
 | `NTW_OP.REL_CIDADES_PLANEJADO_26` | Novas Cidades por Regional (Raia 2 — "Novas Cidades por Regional") | Lista **fechada** das cidades novas do plano 26: 1 linha por `IBGE` (`REGIONAL, UF, ANF, MUNICIPIO, IBGE`), sem `MES_REF`/`DT_CARGA` — `GROUP BY REGIONAL, COUNT(*)` direto, sem recorte de data. Município filtra via ponte IBGE (`_build_municipio_ibge_clause`), não por nome direto — evita mismatch de acentuação com o autocomplete (que busca em `MUNICIPIOS_FECHAMENTO`). Antes esse gráfico usava `MUNICIPIOS_FECHAMENTO` com `MES_DIV_5G` (fechamento/realizado) — trocado porque misturava a raia de Plano com dado já realizado. |
 | `TB_NEXUS_FINANCEIRO` | CAPEX/OPEX/LEASE por tipo | Usada só no rateio "Orçamento por Tecnologia" — sem schema/join direto, rateada por nº de OCs |
 | `TB_NEXUS_CN_CE` | Meta de Casa Nova | `CAC` com `TIPO_CASA='CN'` é a **contagem-meta de endereços novos** (4G 755 + 5G 245 = 1000) — fonte do toggle "Meta NEXUS" no donut Fornecedores EoY 26 (`/api/summary/r2/casa-nova-nexus`). É **nacional** (sem UF/regional) — não responde aos filtros, e o subtítulo do card avisa. **Não é mais** a fonte de "Endereço por Tecnologia" (ver `VW_CAPEX_MASTER_FULL` abaixo) — esse uso foi substituído. |
-| `VW_CAPEX_MASTER_FULL@NEXUS_LINK` | CAC por Casa Nova (CN) x Casa Existente (CE), por tecnologia e cenário — "Endereço por Tecnologia" (Raia 2) | Acesso via DB link `NEXUS_LINK`, sem schema prefix. Ver seção própria abaixo. |
+| `VW_CAPEX_MASTER_FULL@NEXUS_LINK` | CAC total por tecnologia/tipo de casa/cenário — insumo do rateio geográfico de "Endereço por Tecnologia" (Raia 2, junto com `TB_ROLLOUT_ACESSO`) | Acesso via DB link `NEXUS_LINK`, sem schema prefix. Ver seção própria abaixo. |
 | `REL_TRAFEGO_CIDADES_WIDE` | Tráfego **planejado** (módulo Tráfego) | 1 linha por (município, `TIPO_TRAF`), 12 meses em COLUNAS (`JANEIRO`..`DEZEMBRO`), `ANO`. `TIPO_TRAF='Consolidado'` é o total (NÃO somar as camadas). Valores em **PB**. `MUNICIPIO_ID`=IBGE 6 díg. Versão `REL_TRAFEGO_CIDADES_LONG` tem os meses em linha |
 | `REL_DS013_TRAFEGO_REALIZADO` | Tráfego **realizado** + base de usuários (módulo Tráfego) | 1 linha por (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz TIM e OI → market share. `S_MEGABYTE_TOTAL` em MB (÷1e9 = PB); colunas por tec aditivas |
 | ~~`NTW_MABE.ALTAIA_PM_MES_4G/5G`~~ | ~~Volumetria RAN (módulo Core)~~ | **Descontinuada** — o módulo Core foi removido e substituído pelo módulo Tráfego quando a fonte mudou |
@@ -808,75 +808,78 @@ consome token; se o token não existe, cria-se o token primeiro.
 
 View de CAPEX/orçamento consolidado do NEXUS, acessada via database link
 (não é uma tabela local — não precisa de schema prefix tipo `NTW_OP.`).
-Alimenta o card **"Endereço por Tecnologia"** (Raia 2,
-`R2_ENDERECO_POR_TECNOLOGIA` em `summary/queries.py`) com CAC por Casa
-Nova (CN) x Casa Existente (CE), por tecnologia (4G/5G) e por
-**cenário** (`SCENARIO`).
+Alimenta o **CAC total por (tecnologia, tipo de casa, cenário)** que o
+card **"Endereço por Tecnologia"** (Raia 2, `R2_ENDERECO_POR_TECNOLOGIA`
+em `summary/queries.py`) distribui geograficamente — o rateio em si
+(numerador/denominador por OC) continua vindo de `TB_ROLLOUT_ACESSO`,
+igual sempre foi (ver "Rateio financeiro" em Convenções de backend).
 
-**A primeira exploração desta view** (`DLV_LEVEL_1`/`DLV_LEVEL_2`/
-`DLV_LEVEL_3`/`SOURCE_AJUSTADO`, rateio TIM×B2B Mobile por projeto) foi
-**abandonada** — o usuário trouxe uma query pronta e mais simples, que
-deriva tecnologia e tipo de casa direto do texto de `DELIVERABLE` (via
-`CASE`/`INSTR`), sem tocar em `DLV_LEVEL_*`/`SOURCE_AJUSTADO`/projeto
-algum. Se um dia surgir a necessidade de abrir por segmento (TIM x B2B
-Mobile) ou por projeto, aquela investigação IBGE-livre continua válida
-como ponto de partida, mas não é o que está em produção.
+**Duas versões de query já ficaram pra trás aqui** — histórico, não
+reabrir sem motivo novo:
+1. A exploração original (`DLV_LEVEL_1`/`DLV_LEVEL_2`/`DLV_LEVEL_3`/
+   `SOURCE_AJUSTADO`, rateio TIM×B2B Mobile por projeto) — abandonada.
+2. Uma versão intermediária, sem rateio geográfico nenhum (achava CN/CE
+   e tech por `INSTR` em cima do texto de `DELIVERABLE`, resultado
+   nacional) — também abandonada: o usuário confirmou que este card
+   **precisa** do mesmo rateio geográfico que sempre teve.
 
-Query real (sem bind — sem filtro geográfico nem de ano, ver por quê
-abaixo):
+A versão atual deriva `TECH`/`TIPO_CASA` de colunas estruturadas
+(`DLV_LEVEL_1`, `DLV_LEVEL_3`, `TAG_2`, `SOURCE_AJUSTADO`), não mais de
+texto livre:
 
 ```sql
-WITH BASE AS (
+WITH CAPEX_BASE AS (
     SELECT
         SCENARIO,
-        DELIVERABLE,
-        NVL(KPI, 0) AS KPI,
+        KPI,
         CASE
-            WHEN INSTR(LOWER(DELIVERABLE), 'casa nova') > 0
-             AND INSTR(LOWER(DELIVERABLE), '4g em 5g') = 0
-             AND INSTR(LOWER(DELIVERABLE), 'indoor') = 0
-                THEN 'CN'
-            WHEN INSTR(LOWER(DELIVERABLE), 'casa existente') > 0
-                THEN 'CE'
-            ELSE NULL
+            WHEN DLV_LEVEL_3 = 'CASA NOVA' THEN 'CN'
+            WHEN DLV_LEVEL_3 = 'CASA EXISTENTE' THEN 'CE'
         END AS TIPO_CASA,
         CASE
-            WHEN UPPER(SUBSTR(DELIVERABLE, 1, 4)) LIKE '4G E%' THEN '5G'
-            WHEN INSTR(UPPER(SUBSTR(DELIVERABLE, 1, 4)), '4G') > 0 THEN '4G'
-            WHEN INSTR(UPPER(SUBSTR(DELIVERABLE, 1, 4)), '5G') > 0 THEN '5G'
-            ELSE NULL
+            WHEN DLV_LEVEL_1 IN ('4G LAYERS', '4G/5G LAYERS') THEN '4G'
+            WHEN TAG_2 IN (
+                'ROLLOUT - RQUAL', 'ROLLOUT - EVENTOS SAZONAIS',
+                'ROLLOUT - OBLIGATION 2.3GHZ', 'PLATAFORMA IPSEC',
+                'ROLLOUT ACESSO - RQUAL', 'OBRIGAÇÃO 2.3GHZ',
+                'EVENTOS SAZONAIS'
+            ) THEN '4G'
+            WHEN SOURCE_AJUSTADO = 'B2B MOBILE IOT' THEN '4G'
+            ELSE '5G'
         END AS TECH
     FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
     WHERE PRIORIDADE = 'IMPRESCINDÍVEL'
-      AND (AREA_CTIO IS NULL OR UPPER(TRIM(AREA_CTIO)) NOT IN (
-              'INFLAÇÃO', 'PROJETO ESTRUTURAL - OPER', 'VARIAÇÃO CAMBIAL',
-              'VARIAÇÃO CAMBIAL - B2B ICT', 'VARIAÇÃO CAMBIAL - TIM',
-              'VARIAÇÃO CAMBIAL - ULTRA FIBRA'))
-      AND (LAYER_SUBAREA IS NULL OR UPPER(TRIM(LAYER_SUBAREA)) NOT IN (
-              'OPERATIONS', 'PLANNING & CONTROL'))
-      AND DELIVERABLE IS NOT NULL
-      AND TRIM(DELIVERABLE) IS NOT NULL
-      AND UPPER(TRIM(DELIVERABLE)) <> 'N/A'
 )
-SELECT SCENARIO, TECH, TIPO_CASA, SUM(KPI) AS CAC
-FROM BASE
-WHERE TECH IS NOT NULL AND TIPO_CASA IS NOT NULL
+SELECT SCENARIO, TECH, TIPO_CASA, SUM(NVL(KPI, 0)) AS CAC
+FROM CAPEX_BASE
+WHERE TIPO_CASA IS NOT NULL
 GROUP BY SCENARIO, TECH, TIPO_CASA
 ORDER BY SCENARIO, TECH, TIPO_CASA
 ```
 
+**Como o rateio geográfico com múltiplos cenários funciona junto**
+(`R2_ENDERECO_POR_TECNOLOGIA` completo): `TB_ROLLOUT_ACESSO` não tem
+dimensão de cenário — é sempre "o plano do `:ano` selecionado". Então o
+mesmo peso geográfico (`NUM_OCS / TOTAL_OCS_GRUPO`, por `TECH`/
+`TIPO_CASA`) é aplicado a **cada** cenário: o `INNER JOIN` entre o
+rollout (uma linha por OC/geografia) e `CAPEX_CAC` (uma linha por
+cenário) faz esse "fan-out" naturalmente — cada linha de rollout vira N
+linhas (uma por cenário), cada uma multiplicada pelo `CAC_TOTAL` daquele
+cenário específico. Resultado agrupado por `SCENARIO, TECH,
+CLASSIFICACAO` no final.
+
 **Decisões de arquitetura** (não reabrir sem motivo):
 
-- **Sem filtro geográfico nem de ano** — a view não tem `IBGE`/UF nem
-  join confiável com `TB_ROLLOUT_ACESSO` (nomes de projeto nunca batem,
-  já investigado antes). O card é **nacional**, como o de Meta NEXUS —
-  `get_r2_endereco_por_tecnologia()` não recebe `filters` nem monta
-  WHERE geográfico.
-- **`SCENARIO` vira combo no front, não filtro de servidor**: a resposta
-  já traz todos os cenários (dataset pequeno, algumas dezenas de linhas)
-  agrupados em `cenarios: [...]`; o front escolhe qual mostrar sem
-  request novo. `cenario_default` é `DEFAULT_CAPEX_SCENARIO`
-  (`shared/constants.py`, hoje `"2026 CAC (26-28) V02"`) se existir na
+- **Responde a UF/município/regional/projeto/ano**, igual "Orçamento por
+  Tecnologia" — `get_r2_endereco_por_tecnologia(filters)` recebe
+  `filters` e usa `_apply_geo_all()` (mesmo padrão de sempre). Trocar o
+  filtro geográfico **refaz** a query — o combo de cenário é a única
+  coisa que não dispara request novo.
+- **`SCENARIO` vira combo no front, não filtro de servidor**: cada
+  resposta já traz todos os cenários (dataset pequeno) agrupados em
+  `cenarios: [...]`; o front escolhe qual mostrar sem request novo.
+  `cenario_default` é `DEFAULT_CAPEX_SCENARIO` (`shared/constants.py`,
+  hoje `"2026 FCST 6+6 V0"`, pedido explícito do usuário) se existir na
   resposta, senão o primeiro cenário retornado — nome de cenário muda
   por ciclo de planejamento, não assumir que esse valor sempre existirá.
 - **Transposto**: `categories` = tecnologia (4G/5G), série = tipo de casa

@@ -149,10 +149,7 @@ def api_summary_r2_orcamento():
 
 @mobile_access_bp.route("/api/summary/r2/endereco-por-tecnologia")
 def api_summary_r2_endereco():
-    # Sem parse_filters(): fonte (VW_CAPEX_MASTER_FULL@NEXUS_LINK) não
-    # tem dimensão geográfica nem de ano — nacional, por cenário (ver
-    # service e CLAUDE.md).
-    return jsonify(summary.get_r2_endereco_por_tecnologia())
+    return jsonify(summary.get_r2_endereco_por_tecnologia(parse_filters()))
 
 # Raia 3 — Fechamento 26
 @mobile_access_bp.route("/api/summary/r3/new-cities-by-anf")
