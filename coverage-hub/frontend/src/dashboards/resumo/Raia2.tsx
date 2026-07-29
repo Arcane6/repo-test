@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { regionalDonutOption, stackedBarsOption } from "../../charts/optionBuilders";
@@ -19,10 +19,15 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
     queryFn: () => summaryApi.r2OrcamentoPorTecnologia(filters),
   });
 
+  // Nacional (sem geo/ano) — não entra na queryKey de filtro, e o combo de
+  // cenário troca só o recorte já baixado, sem request novo.
   const { data: endereco, isFetching: loadingEndereco } = useQuery({
-    queryKey: ["summary-r2-endereco", uf, municipio, ano, regionais, projetos],
-    queryFn: () => summaryApi.r2EnderecoPorTecnologia(filters),
+    queryKey: ["summary-r2-endereco"],
+    queryFn: () => summaryApi.r2EnderecoPorTecnologia(),
   });
+  const [cenarioEscolhido, setCenarioEscolhido] = useState<string | null>(null);
+  const cenarioAtual = cenarioEscolhido ?? endereco?.cenario_default ?? endereco?.cenarios[0]?.cenario ?? null;
+  const enderecoCenario = endereco?.cenarios.find((c) => c.cenario === cenarioAtual);
 
   const valorFmt = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
@@ -88,12 +93,28 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-4">
           <ChartPanel
             title="Endereço por Tecnologia"
-            subtitle="CAC rateado por OC — Casa Nova (CN) x Casa Existente (CE)"
-            sourceTable={["TB_ROLLOUT_ACESSO", "TB_NEXUS_CN_CE"]}
+            subtitle="CAC por tecnologia — Casa Nova (CN) x Casa Existente (CE) · nacional, não filtra"
+            sourceTable="VW_CAPEX_MASTER_FULL"
             height={340}
+            headerExtra={
+              <select
+                className="form-select form-select-sm mb-1"
+                style={{ maxWidth: 220 }}
+                value={cenarioAtual ?? ""}
+                onChange={(e) => setCenarioEscolhido(e.target.value)}
+                aria-label="Cenário do CAC"
+                disabled={!endereco?.cenarios.length}
+              >
+                {(endereco?.cenarios ?? []).map((c) => (
+                  <option key={c.cenario} value={c.cenario}>
+                    {c.cenario}
+                  </option>
+                ))}
+              </select>
+            }
             option={stackedBarsOption(
-              endereco?.categories ?? [],
-              endereco?.series ?? [],
+              enderecoCenario?.categories ?? [],
+              enderecoCenario?.series ?? [],
               { valueFormatter: valorFmt, showValueLabels: true, showTotalLabel: true },
             )}
             loading={loadingEndereco}
@@ -101,14 +122,14 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
             exportSheet={{
               name: "R2 Endereço por Tecnologia",
               columns: [
-                { header: "Classificação", key: "classificacao" },
-                { header: "4G (R$ mi)", key: "g4" },
-                { header: "5G (R$ mi)", key: "g5" },
+                { header: "Tecnologia", key: "tech" },
+                { header: "Casa Nova — CN (R$ mi)", key: "cn" },
+                { header: "Casa Existente — CE (R$ mi)", key: "ce" },
               ],
-              rows: (endereco?.categories ?? []).map((classificacao, i) => ({
-                classificacao,
-                g4: endereco?.series[0]?.data[i] ?? 0,
-                g5: endereco?.series[1]?.data[i] ?? 0,
+              rows: (enderecoCenario?.categories ?? []).map((tech, i) => ({
+                tech,
+                cn: enderecoCenario?.series[0]?.data[i] ?? 0,
+                ce: enderecoCenario?.series[1]?.data[i] ?? 0,
               })),
             }}
           />

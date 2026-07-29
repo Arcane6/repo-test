@@ -105,6 +105,8 @@ modules/
                      ver seção própria abaixo) — substituiu o antigo
                      `network_core` (volumetria ALTAIA), descontinuado
                      quando a fonte de tráfego mudou. Prefixo /trafego.
+  transport/       — módulo de negócio "Transporte" (backhaul/fibra, ver
+                     seção própria abaixo). Prefixo /transport.
   mobile_access/   — módulo "Acesso Móvel"
     actual/        — aba "Cidades" (rede hoje, MUNICIPIOS_FECHAMENTO)
     summary/       — aba "Resumo" (raias R1/R2/R3)
@@ -114,14 +116,18 @@ modules/
                      SSE sobre o agente google-adk/Vertex AI em `agent/`
                      — ver seção própria)
     shared/        — filtros, constantes, refs (fonte + data mais recente)
-  budget/, executive/, transport/  — módulos placeholder, __init__.py
-    vazio, listados em config/modules.py com enabled=False (aparecem
-    como "Em breve" na Home). Não é código morto — é intencional.
 ```
+
+`orcamento` (chave em `config/modules.py`, `enabled=False`) é o único
+módulo placeholder que resta hoje — aparece só como "Em breve" na Home,
+sem diretório próprio em `modules/` ainda. Não é código morto — é
+intencional.
 
 Frontend espelha isso em `frontend/src/dashboards/` (`CidadesDashboard`,
 `ResumoDashboard` com `resumo/Raia1.tsx`, `Raia2.tsx`, `Raia3.tsx`,
-`SitesDashboard`, `AssistantDashboard`, `TrafegoResumoExecutivo`, `TrafegoYtd`).
+`SitesDashboard`, `AssistantDashboard`, `TrafegoResumoExecutivo`,
+`TrafegoYtd`, `TransporteResumoExecutivo`, `TransporteComposicao`,
+`TransporteInfraestrutura`, `TransporteReconciliacao`).
 
 ## Aba Sites (`modules/mobile_access/sites/`)
 
@@ -632,6 +638,10 @@ SAT=roxo...), também fonte única.
   geográfico** (`..._ALL`). Só o numerador/linhas exibidas usam o
   filtro. Filtrar o denominador infla artificialmente a fatia do
   filtro sobre um orçamento total fixo — bug sutil, já caímos nele.
+  Vale pra "Orçamento por Tecnologia" (ainda é rateio geográfico de
+  verdade). **"Endereço por Tecnologia" não é mais rateio nenhum** —
+  virou soma direta por cenário via `VW_CAPEX_MASTER_FULL` (ver seção
+  própria) — não reintroduzir rateio geográfico nesse card.
 - **Dedup de sites**: um site físico pode ter várias tecnologias ativas
   ao mesmo tempo. Contar "por tecnologia" com `SUM(CASE WHEN LIKE
   '%2G%'...)` independente por tec conta o mesmo site várias vezes.
@@ -785,116 +795,94 @@ consome token; se o token não existe, cria-se o token primeiro.
 | `NTW_OP.MUNICIPIOS_FECHAMENTO` | Presença 2G/3G/4G/5G por município (aba Cidades), Cidades por Regional | Sempre filtrar `TRUNC(DT_CARGA) = MAX(DT_CARGA)` — carga histórica, não só o último dia. **Velocímetros (Cidades) e Linha do Tempo — alvo EOY26 do 5G**: `MES_DIV_5G` só tem data **realizada** (não existe linha com data futura para cidade ainda não ativada), então calcular o `eoy_curr` só por `MES_DIV_5G < próximo ano` colapsa no mesmo valor do YTD (ex.: mostrava 1.112 quando o alvo real é 1.089 + 134 do plano = 1.223). Corrigido: `eoy_curr_5g = eoy_prev_5g + planejado_5g`, onde `planejado_5g` conta `IBGE IN (SELECT IBGE FROM REL_CIDADES_PLANEJADO_26)` com guard `MES_DIV_5G IS NULL OR MES_DIV_5G >= início do ano` (evita contar 2× quem já era 5G antes do ano-plano). Só o **5G** tem esse ajuste — é o único card do velocímetro alimentado por um plano de cidades novas dedicado; os outros (2G/3G/4G/TIM) seguem só por data. A **Linha do Tempo** (`TIMESERIES_TEMPLATE`) espelha isso: a curva 5G ganha um ponto em **dez/26** somando as cidades do plano ainda não realizadas (mesmo guard, `JOIN REL_CIDADES_PLANEJADO_26`) — sem isso a curva "morria" no mês corrente, sem refletir o alvo do ano. |
 | `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | **Recorte de `MES_REF` depende da tela**: a **aba Sites** usa `MES_REF = MAX(MES_REF)` (inventário atual, sempre o mais recente); a **raia Fechamento 25 do Resumo** usa o **fechamento de dezembro do ano anterior ao plano** (`TRUNC(MES_REF,'MM') = TRUNC(:baseline_date,'MM')`, com `baseline_date = 31/dez/ano-1`) — é um fechamento histórico, não o load mais novo. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado), `LATITUDE`/`LONGITUDE` (coordenada do site, confirmadas — usadas em `SITES_GEO_POINTS`) e, segundo o usuário, coluna(s) de fornecedor por tecnologia (nome exato ainda não confirmado) |
 | `NTW_MABE.BASE_TB_END_ID_NEW` | Fornecedor (vendor) dominante por site | Cascata de colunas `VENDOR_NR_*`/`VENDOR_LTE_*`/`VENDOR_UMTS_*`/`VENDOR_GSM_*` via `COALESCE`, maior banda primeiro dentro de cada tec |
-| `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente. **Grão = OC, não endereço**: a mesma Casa Nova gera 2+ OCs (4G e 5G separadas) — contagens de "sites/endereços" devem deduplicar por `(COD_IBGE, ID_MASTER_PIVOT)` (`COUNT(DISTINCT ...)` em `R2_VENDORS_NEW_SITES`; era `COUNT(*)` e inflava 2171 vs ~1000 reais, pego cruzando com a meta do `TB_NEXUS_CN_CE`) |
+| `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente. **Grão = OC, não endereço**: a mesma Casa Nova gera 2+ OCs (4G e 5G separadas) — contagens de "sites/endereços" devem deduplicar por `(COD_IBGE, ID_MASTER_PIVOT)` (`COUNT(DISTINCT ...)` em `R2_VENDORS_NEW_SITES`; era `COUNT(*)` e inflava 2171 vs ~1000 reais, pego cruzando com a meta do `TB_NEXUS_CN_CE`). **`PRIORIDADE` é sobrecarregada**: pra maioria das linhas é o nome do projeto (alimenta "Top 10 Projetos"), mas linhas de B2B Mobile carregam o valor fixo `'B2B MOBILE'` no lugar de um nome — `R2_TOP_PROJECTS` filtra `PRIORIDADE <> 'B2B MOBILE'` por isso, senão o ranking de projetos mistura esse marcador de segmento como se fosse projeto |
 | `NTW_OP.REL_CIDADES_PLANEJADO_26` | Novas Cidades por Regional (Raia 2 — "Novas Cidades por Regional") | Lista **fechada** das cidades novas do plano 26: 1 linha por `IBGE` (`REGIONAL, UF, ANF, MUNICIPIO, IBGE`), sem `MES_REF`/`DT_CARGA` — `GROUP BY REGIONAL, COUNT(*)` direto, sem recorte de data. Município filtra via ponte IBGE (`_build_municipio_ibge_clause`), não por nome direto — evita mismatch de acentuação com o autocomplete (que busca em `MUNICIPIOS_FECHAMENTO`). Antes esse gráfico usava `MUNICIPIOS_FECHAMENTO` com `MES_DIV_5G` (fechamento/realizado) — trocado porque misturava a raia de Plano com dado já realizado. |
 | `TB_NEXUS_FINANCEIRO` | CAPEX/OPEX/LEASE por tipo | Usada só no rateio "Orçamento por Tecnologia" — sem schema/join direto, rateada por nº de OCs |
-| `TB_NEXUS_CN_CE` | CAC por tech/tipo de casa; também é a **meta de Casa Nova** | Rateio "Endereço por Tecnologia" (CN x CE). Na leitura de meta, `CAC` com `TIPO_CASA='CN'` é a **contagem-meta de endereços novos** (4G 755 + 5G 245 = 1000) — fonte do toggle "Meta NEXUS" no donut Fornecedores EoY 26 (`/api/summary/r2/casa-nova-nexus`). É **nacional** (sem UF/regional) — não responde aos filtros, e o subtítulo do card avisa. |
-| `VW_CAPEX_MASTER_FULL@NEXUS_LINK` | **Mapeada, ainda não integrada** — ver abaixo | Acesso via DB link `NEXUS_LINK` |
+| `TB_NEXUS_CN_CE` | Meta de Casa Nova | `CAC` com `TIPO_CASA='CN'` é a **contagem-meta de endereços novos** (4G 755 + 5G 245 = 1000) — fonte do toggle "Meta NEXUS" no donut Fornecedores EoY 26 (`/api/summary/r2/casa-nova-nexus`). É **nacional** (sem UF/regional) — não responde aos filtros, e o subtítulo do card avisa. **Não é mais** a fonte de "Endereço por Tecnologia" (ver `VW_CAPEX_MASTER_FULL` abaixo) — esse uso foi substituído. |
+| `VW_CAPEX_MASTER_FULL@NEXUS_LINK` | CAC por Casa Nova (CN) x Casa Existente (CE), por tecnologia e cenário — "Endereço por Tecnologia" (Raia 2) | Acesso via DB link `NEXUS_LINK`, sem schema prefix. Ver seção própria abaixo. |
 | `REL_TRAFEGO_CIDADES_WIDE` | Tráfego **planejado** (módulo Tráfego) | 1 linha por (município, `TIPO_TRAF`), 12 meses em COLUNAS (`JANEIRO`..`DEZEMBRO`), `ANO`. `TIPO_TRAF='Consolidado'` é o total (NÃO somar as camadas). Valores em **PB**. `MUNICIPIO_ID`=IBGE 6 díg. Versão `REL_TRAFEGO_CIDADES_LONG` tem os meses em linha |
 | `REL_DS013_TRAFEGO_REALIZADO` | Tráfego **realizado** + base de usuários (módulo Tráfego) | 1 linha por (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz TIM e OI → market share. `S_MEGABYTE_TOTAL` em MB (÷1e9 = PB); colunas por tec aditivas |
 | ~~`NTW_MABE.ALTAIA_PM_MES_4G/5G`~~ | ~~Volumetria RAN (módulo Core)~~ | **Descontinuada** — o módulo Core foi removido e substituído pelo módulo Tráfego quando a fonte mudou |
 
-### `VW_CAPEX_MASTER_FULL@NEXUS_LINK` (mapeada, uso futuro)
+### `VW_CAPEX_MASTER_FULL@NEXUS_LINK` — integrada (CAC de "Endereço por Tecnologia")
 
 View de CAPEX/orçamento consolidado do NEXUS, acessada via database link
 (não é uma tabela local — não precisa de schema prefix tipo `NTW_OP.`).
-É essencialmente **`TB_NEXUS_CN_CE` aberta por `SOURCE_AJUSTADO`
-(TIM/B2B Mobile), sem `IBGE`** — mesma família de dado do rateio
-"Endereço por Tecnologia" (`R2_ENDERECO_POR_TECNOLOGIA`), com uma
-dimensão de segmento a mais e uma camada tecnológica a mais.
+Alimenta o card **"Endereço por Tecnologia"** (Raia 2,
+`R2_ENDERECO_POR_TECNOLOGIA` em `summary/queries.py`) com CAC por Casa
+Nova (CN) x Casa Existente (CE), por tecnologia (4G/5G) e por
+**cenário** (`SCENARIO`).
 
-Query de referência, já com as decisões de negócio confirmadas pelo
-usuário aplicadas:
+**A primeira exploração desta view** (`DLV_LEVEL_1`/`DLV_LEVEL_2`/
+`DLV_LEVEL_3`/`SOURCE_AJUSTADO`, rateio TIM×B2B Mobile por projeto) foi
+**abandonada** — o usuário trouxe uma query pronta e mais simples, que
+deriva tecnologia e tipo de casa direto do texto de `DELIVERABLE` (via
+`CASE`/`INSTR`), sem tocar em `DLV_LEVEL_*`/`SOURCE_AJUSTADO`/projeto
+algum. Se um dia surgir a necessidade de abrir por segmento (TIM x B2B
+Mobile) ou por projeto, aquela investigação IBGE-livre continua válida
+como ponto de partida, mas não é o que está em produção.
+
+Query real (sem bind — sem filtro geográfico nem de ano, ver por quê
+abaixo):
 
 ```sql
-SELECT
-    DLV_LEVEL_1 AS LAYERS,
-    SOURCE_AJUSTADO,
-    DLV_LEVEL_2 AS PROJETO,
-    DLV_LEVEL_3 AS TIPO_CASA,
-    SUM(KPI)
-FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
-WHERE SCENARIO = '2026 CAC (26-28) V02'
-  AND PRIORIDADE = 'IMPRESCINDÍVEL'
-  AND LAYER_SUBAREA = 'MOBILE ACCESS'
-  AND DLV_LEVEL_1 IN ('5G LAYERS', '4G LAYERS', '4G/5G LAYERS')
-  AND DLV_LEVEL_2 <> 'ACORDO VIVO'
-  AND DLV_LEVEL_3 <> 'RAN SHARING'
-  AND DLV_LEVEL_3 <> 'DROP'
-  AND SOURCE_AJUSTADO IN ('TIM', 'B2B MOBILE')
-GROUP BY DLV_LEVEL_1, SOURCE_AJUSTADO, DLV_LEVEL_2, DLV_LEVEL_3
-ORDER BY SOURCE_AJUSTADO DESC, DLV_LEVEL_1 DESC
+WITH BASE AS (
+    SELECT
+        SCENARIO,
+        DELIVERABLE,
+        NVL(KPI, 0) AS KPI,
+        CASE
+            WHEN INSTR(LOWER(DELIVERABLE), 'casa nova') > 0
+             AND INSTR(LOWER(DELIVERABLE), '4g em 5g') = 0
+             AND INSTR(LOWER(DELIVERABLE), 'indoor') = 0
+                THEN 'CN'
+            WHEN INSTR(LOWER(DELIVERABLE), 'casa existente') > 0
+                THEN 'CE'
+            ELSE NULL
+        END AS TIPO_CASA,
+        CASE
+            WHEN UPPER(SUBSTR(DELIVERABLE, 1, 4)) LIKE '4G E%' THEN '5G'
+            WHEN INSTR(UPPER(SUBSTR(DELIVERABLE, 1, 4)), '4G') > 0 THEN '4G'
+            WHEN INSTR(UPPER(SUBSTR(DELIVERABLE, 1, 4)), '5G') > 0 THEN '5G'
+            ELSE NULL
+        END AS TECH
+    FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
+    WHERE PRIORIDADE = 'IMPRESCINDÍVEL'
+      AND (AREA_CTIO IS NULL OR UPPER(TRIM(AREA_CTIO)) NOT IN (
+              'INFLAÇÃO', 'PROJETO ESTRUTURAL - OPER', 'VARIAÇÃO CAMBIAL',
+              'VARIAÇÃO CAMBIAL - B2B ICT', 'VARIAÇÃO CAMBIAL - TIM',
+              'VARIAÇÃO CAMBIAL - ULTRA FIBRA'))
+      AND (LAYER_SUBAREA IS NULL OR UPPER(TRIM(LAYER_SUBAREA)) NOT IN (
+              'OPERATIONS', 'PLANNING & CONTROL'))
+      AND DELIVERABLE IS NOT NULL
+      AND TRIM(DELIVERABLE) IS NOT NULL
+      AND UPPER(TRIM(DELIVERABLE)) <> 'N/A'
+)
+SELECT SCENARIO, TECH, TIPO_CASA, SUM(KPI) AS CAC
+FROM BASE
+WHERE TECH IS NOT NULL AND TIPO_CASA IS NOT NULL
+GROUP BY SCENARIO, TECH, TIPO_CASA
+ORDER BY SCENARIO, TECH, TIPO_CASA
 ```
 
-**Decisões de negócio já confirmadas pelo usuário** (não re-perguntar):
+**Decisões de arquitetura** (não reabrir sem motivo):
 
-- `DLV_LEVEL_1` (`LAYERS`) fica com **3 baldes distintos, sem fundir**:
-  `5G LAYERS`, `4G LAYERS`, `4G/5G LAYERS`. O combinado (`4G/5G LAYERS`)
-  **não** deve ser somado dentro de `5G` nem de `4G` — é uma categoria
-  própria.
-- `5G B2C LAYERS` foi **removido do escopo** (tirado do `IN (...)`) — não
-  faz parte do rateio deste módulo.
-- `SOURCE_AJUSTADO`: **B2B Mobile não deve ser excluído** — o rateio
-  inclui TIM e B2B Mobile juntos (`IN ('TIM', 'B2B MOBILE')` mantido).
-- `DLV_LEVEL_2` (`PROJETO`): **os nomes nunca batem** com
-  `TB_ROLLOUT_ACESSO.PRIORIDADE` (confirmado pelo usuário) — a ideia de
-  ratear por projeto real fica descartada. `DLV_LEVEL_2` deve ser tratado
-  como não-join-ável; ao consumir esta base, **agregar (somar) por cima
-  dela** em vez de manter como dimensão de saída (ou seja, o `GROUP BY`
-  efetivo pra qualquer query nova deveria ser só
-  `DLV_LEVEL_1, SOURCE_AJUSTADO, DLV_LEVEL_3`, descartando `DLV_LEVEL_2`
-  depois do filtro `<> 'ACORDO VIVO'`).
-
-**Escopo TIM×B2B em `TB_ROLLOUT_ACESSO` — resolvido pelo usuário**: os
-registros de B2B Mobile **estão** em `TB_ROLLOUT_ACESSO`, identificados
-por `PRIORIDADE = 'B2B MOBILE'`. Ou seja, a coluna `PRIORIDADE` é
-**sobrecarregada** — pra maioria das linhas ela é o nome do projeto
-(o que alimenta "Top 10 Projetos"), mas pra linhas de B2B Mobile ela
-carrega o valor fixo `'B2B MOBILE'` no lugar de um nome de projeto. Isso
-resolve o bloqueador do rateio: o numerador (OCs) pode ser separado por
-`SOURCE_AJUSTADO` via `CASE WHEN R.PRIORIDADE = 'B2B MOBILE' THEN
-'B2B MOBILE' ELSE 'TIM' END`, casando com os dois valores de
-`SOURCE_AJUSTADO` na view.
-
-**Inconsistência corrigida**: `R2_TOP_PROJECTS` (usada por "Top 10
-Projetos" em Raia 2 e Raia 3, via `get_r3_top_projects` que só chama
-`get_r2_top_projects`) misturava `PRIORIDADE = 'B2B MOBILE'` (marcador
-de segmento, não nome de projeto) no ranking de projetos. Corrigido com
-`AND r.PRIORIDADE <> 'B2B MOBILE'` no WHERE — "Top 10 Projetos" agora só
-mostra nomes de projeto de verdade.
-
-**Ainda em aberto / bloqueadores restantes antes de integrar**:
-1. Valores distintos reais de `DLV_LEVEL_1` e `DLV_LEVEL_3` (um `SELECT
-   DISTINCT` resolve) — pra confirmar que os 3 valores de `LAYERS`
-   batem exatamente com essas strings e que `TIPO_CASA` mapeia pra
-   CN/CE sem surpresa.
-2. Se "Top 10 Projetos" deve excluir `PRIORIDADE = 'B2B MOBILE'` (ver
-   inconsistência acima).
-3. Unidade de `KPI` (R$ / R$ milhões / outra).
-4. Se `SCENARIO = '2026 CAC (26-28) V02'` deve ficar fixo no código ou
-   virar filtro (nome de cenário parece mudar por ciclo de
-   planejamento).
-
-Quando for integrar, comece confirmando esses pontos em vez de assumir
-— o rateio financeiro é a área do projeto onde já erramos antes (rateio
-com denominador filtrado por engano), então mais vale perguntar de novo.
-
-## Questões em aberto (não resolvidas ainda)
-
-- ~~Filtro de município não parece filtrar~~ **RESOLVIDO**: a causa raiz
-  era exatamente o descasamento de nome suspeitado antes — várias queries
-  filtravam `MUNICIPIO` (texto) direto contra a própria coluna de
-  `TB_FT_BASE_UNICA_SITES`/`NTW_MABE.BASE_TB_END_ID_NEW`, em vez de
-  resolver o nome via `MUNICIPIOS_FECHAMENTO` (que é de onde vem a busca
-  do autocomplete do filtro). Corrigido em toda a aba Sites e em
-  "Mobile Sites por Tecnologia"/"Fornecedor por Site" (Resumo Raia 1)
-  resolvendo o(s) nome(s) de município pro `IBGE` via
-  `MUNICIPIOS_FECHAMENTO` antes de filtrar (`_build_municipio_ibge_clause`
-  em `sites/service.py` e `summary/service.py`); pra
-  `BASE_TB_END_ID_NEW`, que não tem `IBGE` próprio, a ponte é feita por
-  `END_ID` via `TB_FT_BASE_UNICA_SITES`
-  (`_build_municipio_end_id_clause`). UF não precisou do mesmo tratamento
-  (sigla de 2 letras não tem a mesma variação de acentuação/grafia).
+- **Sem filtro geográfico nem de ano** — a view não tem `IBGE`/UF nem
+  join confiável com `TB_ROLLOUT_ACESSO` (nomes de projeto nunca batem,
+  já investigado antes). O card é **nacional**, como o de Meta NEXUS —
+  `get_r2_endereco_por_tecnologia()` não recebe `filters` nem monta
+  WHERE geográfico.
+- **`SCENARIO` vira combo no front, não filtro de servidor**: a resposta
+  já traz todos os cenários (dataset pequeno, algumas dezenas de linhas)
+  agrupados em `cenarios: [...]`; o front escolhe qual mostrar sem
+  request novo. `cenario_default` é `DEFAULT_CAPEX_SCENARIO`
+  (`shared/constants.py`, hoje `"2026 CAC (26-28) V02"`) se existir na
+  resposta, senão o primeiro cenário retornado — nome de cenário muda
+  por ciclo de planejamento, não assumir que esse valor sempre existirá.
+- **Transposto**: `categories` = tecnologia (4G/5G), série = tipo de casa
+  (CN/CE) — cores fixas em `CASA_COLORS` (`shared/constants.py`, mesmo
+  hex de `SMALL_MULTIPLE_COLORS` no front) pra bater visualmente com
+  qualquer outro gráfico de Casa Nova x Casa Existente do portal.
 
 ## Git / PRs
 

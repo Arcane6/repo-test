@@ -35,7 +35,9 @@ FROM NTW_OP.TB_ROLLOUT_ACESSO
 """
 
 # Tabelas sem coluna de referência conhecida — o badge mostra só o nome.
-STATIC_TABLES = ["TB_NEXUS_FINANCEIRO", "TB_NEXUS_CN_CE"]
+# VW_CAPEX_MASTER_FULL: view via DB link (NEXUS_LINK), sem coluna de
+# carga própria — o "cenário" já cumpre esse papel de referência no card.
+STATIC_TABLES = ["TB_NEXUS_FINANCEIRO", "TB_NEXUS_CN_CE", "VW_CAPEX_MASTER_FULL"]
 
 
 def get_refs():

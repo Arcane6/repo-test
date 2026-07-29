@@ -80,6 +80,20 @@ export interface StackedByGroupResponse {
   total: number;
 }
 
+/** Um cenário do combo de "Endereço por Tecnologia" (CAC por 4G/5G x
+ * CN/CE). Nacional — não responde a filtro geográfico/ano. */
+export interface EnderecoPorTecnologiaCenario {
+  cenario: string;
+  categories: string[];
+  series: { name: string; color: string; data: number[] }[];
+  total: number;
+}
+
+export interface EnderecoPorTecnologiaResponse {
+  cenarios: EnderecoPorTecnologiaCenario[];
+  cenario_default: string | null;
+}
+
 /** Contagem de sites por combinação exata de tecnologias (2G/3G/4G/5G) —
  * as 15 regiões não vazias de um diagrama de Venn de 4 conjuntos. */
 export interface SitesVennResponse {
@@ -128,8 +142,10 @@ export const summaryApi = {
     fetchJson<ProjectItem[]>(`${BASE}/r2/top-projects?${query(f)}`),
   r2OrcamentoPorTecnologia: (f: SummaryFilters) =>
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/orcamento-por-tecnologia?${query(f)}`),
-  r2EnderecoPorTecnologia: (f: SummaryFilters) =>
-    fetchJson<StackedByGroupResponse>(`${BASE}/r2/endereco-por-tecnologia?${query(f)}`),
+  /** CAC por cenário (VW_CAPEX_MASTER_FULL) — nacional, não recebe filtros;
+   * o combo de cenário é escolhido no front, sem request novo. */
+  r2EnderecoPorTecnologia: () =>
+    fetchJson<EnderecoPorTecnologiaResponse>(`${BASE}/r2/endereco-por-tecnologia`),
 
   r3NewCitiesByAnf: (f: SummaryFilters) =>
     fetchJson<RegionalSeriesResponse>(`${BASE}/r3/new-cities-by-anf?${query(f)}`),

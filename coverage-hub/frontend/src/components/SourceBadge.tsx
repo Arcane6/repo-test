@@ -8,6 +8,7 @@ const TABLE_LABELS: Record<string, string> = {
   TB_ROLLOUT_ACESSO: "Rollout Acesso",
   TB_NEXUS_FINANCEIRO: "Nexus Financeiro",
   TB_NEXUS_CN_CE: "Nexus CN/CE",
+  VW_CAPEX_MASTER_FULL: "CAPEX Master (NEXUS)",
 };
 
 /**
