@@ -76,6 +76,23 @@ multinacional de telecom. Isso significa:
   contra o Flask local. Sempre valide `python3 -m py_compile` nos
   arquivos backend alterados e `npm run build` no frontend antes de
   considerar uma tarefa concluída.
+- **`package-lock.json` NÃO é versionado** (decisão do usuário, jul/26 —
+  já constava no `.gitignore` desde antes; o arquivo só continuava
+  aparecendo porque estava rastreado, e `.gitignore` não afeta arquivo
+  já rastreado). Consequências práticas, pra ninguém se assustar depois:
+  - As versões das libs do front são resolvidas **na hora do
+    `npm install`**, dentro dos ranges do `package.json` (`^10.1.0`
+    etc.) — dois deploys em datas diferentes podem trazer patches
+    diferentes. Por isso o `npm run build` **depois** do deploy não é
+    formalidade: é o que pega uma regressão vinda de dependência.
+  - **`npm ci` não funciona sem lockfile** (ele exige o arquivo). Hoje
+    nada usa `npm ci` no projeto — se um dia entrar CI/CD de verdade,
+    essa decisão precisa ser reavaliada junto.
+  - Se o motivo de tirar tivesse sido só ruído de diff, a alternativa
+    era manter versionado + `.gitattributes` com
+    `package-lock.json linguist-generated=true -diff` (colapsa nos PRs
+    sem perder reprodutibilidade). Fica registrado como a saída caso a
+    decisão seja revista.
 
 ## Estrutura de módulos
 
