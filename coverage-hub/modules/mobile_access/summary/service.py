@@ -478,14 +478,26 @@ def get_r2_orcamento_por_tecnologia(filters):
     }
 
 
-def get_r2_endereco_por_tecnologia():
-    """CAC por Casa Nova (CN) x Casa Existente (CE), por tecnologia e por
-    cenário — fonte VW_CAPEX_MASTER_FULL@NEXUS_LINK. Sem filtro
-    geográfico (a view não tem essa dimensão — nacional, como o card de
-    Meta NEXUS) e sem filtro de ano: o dataset inteiro (todos os
-    cenários) cabe numa resposta só, e o front escolhe o cenário num
-    combo sem request novo."""
-    rows = execute_query(R2_ENDERECO_POR_TECNOLOGIA) or []
+def get_r2_endereco_por_tecnologia(filters):
+    """CAC rateado por OC entre Casa Nova (CN) e Casa Existente (CE), por
+    tecnologia e por cenário — numerador/denominador do rateio vêm de
+    TB_ROLLOUT_ACESSO (responde a UF/município/regional/projeto/ano,
+    igual Orçamento por Tecnologia); o CAC total por (tech, tipo_casa)
+    vem de VW_CAPEX_MASTER_FULL@NEXUS_LINK. Cenário: o dataset inteiro
+    (todos os cenários) cabe numa resposta só, e o front escolhe qual
+    mostrar num combo sem request novo — só filtro geo/ano refaz a
+    query."""
+    params, ano_int = _prepare_params(filters)
+    params["ano"] = ano_int
+
+    sql = _apply_geo_all(
+        R2_ENDERECO_POR_TECNOLOGIA, filters, params,
+        uf_field="g.UF", mun_field="g.MUNICIPIO",
+        uf_key="uf_filter_g", mun_key="municipio_filter_g",
+        regional_field="g.REGIONAL", regional_key="regional_filter_g",
+        projeto_field="RR.PRIORIDADE",
+    )
+    rows = execute_query(sql, params) or []
 
     techs = ["4G", "5G"]
     classificacoes = ["CN", "CE"]
@@ -497,7 +509,7 @@ def get_r2_endereco_por_tecnologia():
         if cenario not in valores_por_cenario:
             valores_por_cenario[cenario] = {}
             ordem_cenarios.append(cenario)
-        valores_por_cenario[cenario][(r["tech"], r["tipo_casa"])] = r.get("cac", 0) or 0
+        valores_por_cenario[cenario][(r["tech"], r["classificacao"])] = r.get("valor", 0) or 0
 
     cenarios = []
     for cenario in ordem_cenarios:

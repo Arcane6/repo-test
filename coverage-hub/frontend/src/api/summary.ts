@@ -81,7 +81,7 @@ export interface StackedByGroupResponse {
 }
 
 /** Um cenário do combo de "Endereço por Tecnologia" (CAC por 4G/5G x
- * CN/CE). Nacional — não responde a filtro geográfico/ano. */
+ * CN/CE, rateado por OC — responde a filtro geográfico/ano). */
 export interface EnderecoPorTecnologiaCenario {
   cenario: string;
   categories: string[];
@@ -142,10 +142,11 @@ export const summaryApi = {
     fetchJson<ProjectItem[]>(`${BASE}/r2/top-projects?${query(f)}`),
   r2OrcamentoPorTecnologia: (f: SummaryFilters) =>
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/orcamento-por-tecnologia?${query(f)}`),
-  /** CAC por cenário (VW_CAPEX_MASTER_FULL) — nacional, não recebe filtros;
-   * o combo de cenário é escolhido no front, sem request novo. */
-  r2EnderecoPorTecnologia: () =>
-    fetchJson<EnderecoPorTecnologiaResponse>(`${BASE}/r2/endereco-por-tecnologia`),
+  /** CAC rateado por OC (geo/ano respondem a filtro, igual Orçamento por
+   * Tecnologia) e por cenário (VW_CAPEX_MASTER_FULL) — o combo de cenário
+   * é escolhido no front, sem request novo. */
+  r2EnderecoPorTecnologia: (f: SummaryFilters) =>
+    fetchJson<EnderecoPorTecnologiaResponse>(`${BASE}/r2/endereco-por-tecnologia?${query(f)}`),
 
   r3NewCitiesByAnf: (f: SummaryFilters) =>
     fetchJson<RegionalSeriesResponse>(`${BASE}/r3/new-cities-by-anf?${query(f)}`),
