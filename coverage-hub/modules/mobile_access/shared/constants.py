@@ -26,8 +26,9 @@ CASA_COLORS = {"CN": "#26C281", "CE": "#1565C0"}
 # Ano default do filtro "Ano" do Resumo
 DEFAULT_PLAN_YEAR = 2026
 
-# Cenário default do combo "Endereço por Tecnologia" (VW_CAPEX_MASTER_FULL) —
-# pedido explícito do usuário (jul/26). Nome de cenário muda por ciclo de
-# planejamento — se um dia "2026 FCST 6+6 V0" deixar de existir na view,
+# Cenário default de todo combo sobre VW_CAPEX_MASTER_FULL ("Endereço por
+# Tecnologia" e "CAC por Projeto", Raia 2) — pedido explícito do usuário
+# (jul/26, atualizado de "2026 FCST 6+6 V0" pra este). Nome de cenário
+# muda por ciclo de planejamento — se um dia deixar de existir na view,
 # o service cai pro primeiro cenário retornado.
-DEFAULT_CAPEX_SCENARIO = "2026 FCST 6+6 V0"
+DEFAULT_CAPEX_SCENARIO = "2026 CAC (26-28) V02"

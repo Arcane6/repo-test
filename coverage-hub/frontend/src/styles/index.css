@@ -1525,3 +1525,18 @@ h1, h2, h3, h4, h5, h6, .card-title {
   border-top: 2px solid var(--brand-primary);
   border-bottom: 0;
 }
+
+/* Resumo CAPEX+Layers por 5G x 4G (ao lado de CAC por Projeto) — cabeçalho
+ * cheio na cor da marca (as 3 linhas do thead, incluindo os agrupadores
+ * "5G"/"4G"), diferente do .tim-cac-table padrão (cabeçalho cinza neutro):
+ * essa tabela é pequena e vive de comparar duas colunas lado a lado, então
+ * o contraste forte ajuda a olhar rápido. */
+.tim-resumo-tech-table thead th {
+  background: var(--brand-primary) !important;
+  color: #fff !important;
+  font-size: 0.7rem;
+}
+.tim-resumo-tech-table tr.tim-resumo-tech-destaque > * {
+  background: color-mix(in srgb, var(--brand-primary) 10%, var(--tim-card-bg));
+  font-weight: 650;
+}

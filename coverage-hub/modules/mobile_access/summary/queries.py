@@ -459,6 +459,12 @@ ORDER BY R.TECNOLOGIA DESC
 # character set diferente (NVARCHAR2/national), e misturar com literal
 # VARCHAR2 num NVL/comparação estoura. TO_CHAR normaliza pro charset do
 # banco local e é no-op quando a coluna já é VARCHAR2 — não remover.
+#
+# VALOR_5G_MM/VALOR_4G_MM: mesmo VALOR_TOTAL do projeto, só que quebrado
+# por tech (com "4G in 5G Layers" já somado dentro de 4G) — usadas pelo
+# resumo nacional CAPEX 5G x 4G ao lado da tabela (ver
+# _resumo_5g_4g/get_r2_cac_por_projeto), não aparecem na tabela por
+# projeto (que não mostra mais coluna de valor, só CAC).
 R2_CAC_POR_PROJETO = """
 WITH BASE AS (
     SELECT
@@ -492,7 +498,10 @@ SELECT
     SUM(CASE WHEN CAMADA = 'L5G' THEN KPI ELSE 0 END) AS CAC_5G,
     SUM(CASE WHEN CAMADA = 'L4G' THEN KPI ELSE 0 END) AS CAC_4G,
     SUM(CASE WHEN CAMADA = 'L4G5G' THEN KPI ELSE 0 END) AS CAC_4G_IN_5G,
-    ROUND(SUM(VALOR_TOTAL) / 1000000, 2) AS VALOR_TOTAL_MM
+    -- Usadas só no resumo CAPEX 5G x 4G (ao lado da tabela) — "4G in 5G
+    -- Layers" entra dentro de 4G lá, então o valor já vem somado aqui.
+    ROUND(SUM(CASE WHEN CAMADA = 'L5G' THEN VALOR_TOTAL ELSE 0 END) / 1000000, 2) AS VALOR_5G_MM,
+    ROUND(SUM(CASE WHEN CAMADA IN ('L4G', 'L4G5G') THEN VALOR_TOTAL ELSE 0 END) / 1000000, 2) AS VALOR_4G_MM
 FROM BASE
 WHERE TIPO_CASA IS NOT NULL
 GROUP BY
