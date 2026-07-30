@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { regionalDonutOption, stackedBarsOption } from "../../charts/optionBuilders";
+import { CacPorProjetoTable } from "../../components/CacPorProjetoTable";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
@@ -133,6 +134,12 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
               })),
             }}
           />
+        </div>
+
+        {/* Largura inteira: são 7 colunas numéricas + hierarquia CN/CE —
+            não cabe num terço da linha junto com os donuts. */}
+        <div className="col-12">
+          <CacPorProjetoTable />
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
-import { horizontalBarsOption, regionalSunburstOption, vendorDonutSideOption } from "../../charts/optionBuilders";
+import { regionalSunburstOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
@@ -13,11 +13,7 @@ type CasaNovaFonte = "rollout" | "nexus";
 
 export function Raia3({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais, projetos } = filters;
-  const {
-    regional: focusedRegional,
-    toggleRegional,
-    toggleProjeto,
-  } = useResumoFocusStore();
+  const { regional: focusedRegional, toggleRegional } = useResumoFocusStore();
 
   const { data: citiesAnf, isFetching: loadingCitiesAnf } = useQuery({
     queryKey: ["summary-r3-cities-anf", uf, municipio, ano, regionais],
@@ -42,11 +38,6 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
       ? { ...v, value: cnNexus.total }
       : v,
   );
-
-  const { data: projects, isFetching: loadingProjects } = useQuery({
-    queryKey: ["summary-r3-projects", uf, municipio, ano, regionais, projetos],
-    queryFn: () => summaryApi.r3TopProjects(filters),
-  });
 
   return (
     <div className="summary-raia mb-4" style={{ "--raia-color": "#7DC242" } as CSSProperties}>
@@ -79,27 +70,6 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
                 base: citiesAnf?.series[0]?.data[i] ?? 0,
                 ganho: citiesAnf?.series[1]?.data[i] ?? 0,
               })),
-            }}
-          />
-        </div>
-
-        <div className="col-lg-4">
-          <ChartPanel
-            title="Top 10 Projetos"
-            subtitle="Clique num projeto pra filtrar toda a aba"
-            sourceTable="TB_ROLLOUT_ACESSO"
-            height={340}
-            option={horizontalBarsOption((projects ?? []).map((p) => ({ name: p.projeto, value: p.value })))}
-            loading={loadingProjects}
-            onClick={(e) => toggleProjeto(e.name)}
-            imageFilename="r3-top-projetos.png"
-            exportSheet={{
-              name: "R3 Top Projetos",
-              columns: [
-                { header: "Projeto", key: "projeto" },
-                { header: "OCs", key: "value" },
-              ],
-              rows: projects ?? [],
             }}
           />
         </div>

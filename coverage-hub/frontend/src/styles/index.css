@@ -1470,3 +1470,46 @@ h1, h2, h3, h4, h5, h6, .card-title {
   .tim-assistant-suggestion:hover,
   .tim-assistant-send:not(:disabled):hover { transform: none; }
 }
+
+/* ---- Tabela de CAC por Projeto (Raia 2) ----
+ * Hierarquia de 2 níveis (tipo de casa > projeto) numa tabela plana: a
+ * linha de grupo é o subtotal em destaque (azul da marca), as linhas de
+ * projeto ficam indentadas. Números sempre à direita com tabular-nums —
+ * sem isso a coluna "dança" ao trocar de cenário. */
+.tim-cac-table {
+  font-size: 0.85rem;
+}
+.tim-cac-table thead th {
+  background: var(--tim-hover-bg);
+  color: var(--tim-text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--tim-card-border);
+}
+.tim-cac-table td,
+.tim-cac-table tbody th {
+  border-bottom: 1px solid var(--tim-card-border);
+}
+.tim-cac-table td { font-variant-numeric: tabular-nums; }
+
+.tim-cac-table tr.tim-cac-group > * {
+  background: var(--brand-primary);
+  color: #fff;
+  font-weight: 650;
+}
+/* O hover do Bootstrap clarearia a faixa da marca — mantém sólida. */
+.tim-cac-table tr.tim-cac-group:hover > * {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.tim-cac-table tr.tim-cac-total > * {
+  background: var(--tim-hover-bg);
+  color: var(--tim-heading);
+  font-weight: 700;
+  border-top: 2px solid var(--brand-primary);
+  border-bottom: 0;
+}
