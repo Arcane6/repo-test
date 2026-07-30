@@ -139,7 +139,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
         {/* Largura inteira: são 7 colunas numéricas + hierarquia CN/CE —
             não cabe num terço da linha junto com os donuts. */}
         <div className="col-12">
-          <CacPorProjetoTable />
+          <CacPorProjetoTable filters={filters} />
         </div>
       </div>
     </div>

@@ -1506,6 +1506,18 @@ h1, h2, h3, h4, h5, h6, .card-title {
   color: #fff;
 }
 
+/* 2º nível (SOURCE_AJUSTADO): faixa intermediária — mais leve que o azul
+ * do tipo de casa, mais forte que a linha de projeto, pra hierarquia ler
+ * de cima pra baixo sem precisar de indentação exagerada. */
+.tim-cac-table tr.tim-cac-segment > * {
+  background: color-mix(in srgb, var(--brand-primary) 10%, var(--tim-card-bg));
+  color: var(--tim-heading);
+}
+.tim-cac-table tr.tim-cac-segment:hover > * {
+  background: color-mix(in srgb, var(--brand-primary) 14%, var(--tim-card-bg));
+}
+.tim-cac-table .tim-cac-projeto { padding-left: 2.25rem; }
+
 .tim-cac-table tr.tim-cac-total > * {
   background: var(--tim-hover-bg);
   color: var(--tim-heading);

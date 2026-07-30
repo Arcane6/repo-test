@@ -1,6 +1,11 @@
 import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { summaryApi, type CacProjetoAgg, type CacProjetoLinha } from "../api/summary";
+import {
+  summaryApi,
+  type CacProjetoAgg,
+  type CacProjetoLinha,
+  type SummaryFilters,
+} from "../api/summary";
 import { ChartToolbar } from "./ChartToolbar";
 import { Skeleton } from "./Skeleton";
 import { SourceBadge } from "./SourceBadge";
@@ -28,21 +33,23 @@ const COLUNAS: { key: keyof CacProjetoAgg; label: string; fmt: (v: number) => st
 ];
 
 /**
- * CAC do NEXUS por projeto, dentro de Casa Nova x Casa Existente, com as
- * camadas tecnológicas em colunas — o "pivot" que o usuário usa no Excel,
- * agora no portal.
+ * CAC do NEXUS em 3 níveis — Casa Nova/Existente > segmento
+ * (SOURCE_AJUSTADO: TIM, B2B Mobile...) > projeto — com as camadas
+ * tecnológicas em colunas. É o "pivot" que o usuário usa no Excel, agora
+ * no portal.
  *
  * "Outras camadas" existe porque `TOTAL_CAC` (SUM(KPI) de todas as
- * camadas) NÃO é a soma das 3 camadas pivotadas: alguns projetos
- * (AGRO/INDÚSTRIA/LOGÍSTICA) têm KPI em valores de `DLV_LEVEL_1` fora dos
- * 3 baldes. Sem essa coluna o "Total" apareceria maior que a soma das
- * colunas visíveis — exatamente o tipo de número que não fecha e destrói
- * a confiança na tela.
+ * camadas) NÃO é a soma das 3 camadas pivotadas — há KPI em valores de
+ * `DLV_LEVEL_1` fora dos 3 baldes, concentrado nos projetos de B2B Mobile
+ * (AGRO/INDÚSTRIA/LOGÍSTICA). Sem essa coluna o "Total" apareceria maior
+ * que a soma das colunas visíveis — exatamente o tipo de número que não
+ * fecha e destrói a confiança na tela.
  */
-export function CacPorProjetoTable() {
+export function CacPorProjetoTable({ filters }: { filters: SummaryFilters }) {
+  const { uf, municipio, ano, regionais, projetos } = filters;
   const { data, isLoading } = useQuery({
-    queryKey: ["summary-r2-cac-por-projeto"],
-    queryFn: () => summaryApi.r2CacPorProjeto(),
+    queryKey: ["summary-r2-cac-por-projeto", uf, municipio, ano, regionais, projetos],
+    queryFn: () => summaryApi.r2CacPorProjeto(filters),
   });
 
   const [escolhido, setEscolhido] = useState<string | null>(null);
@@ -50,7 +57,9 @@ export function CacPorProjetoTable() {
   const cenario = data?.cenarios.find((c) => c.cenario === cenarioAtual);
 
   const linhasExport = (cenario?.grupos ?? []).flatMap((g) =>
-    g.linhas.map((l) => ({ tipo_casa: g.label, ...l })),
+    g.segmentos.flatMap((sg) =>
+      sg.linhas.map((l) => ({ tipo_casa: g.label, segmento: sg.segmento, ...l })),
+    ),
   );
 
   return (
@@ -82,6 +91,7 @@ export function CacPorProjetoTable() {
                   name: "R2 CAC por Projeto",
                   columns: [
                     { header: "Tipo de Casa", key: "tipo_casa" },
+                    { header: "Segmento", key: "segmento" },
                     { header: "Projeto", key: "projeto" },
                     { header: "5G Layers", key: "cac_5g" },
                     { header: "4G Layers", key: "cac_4g" },
@@ -98,9 +108,9 @@ export function CacPorProjetoTable() {
         </div>
 
         <p className="text-muted small mb-3">
-          Endereços (CAC) por projeto e camada tecnológica — Casa Nova x Casa Existente.
-          Nacional: a fonte não tem dimensão geográfica, então este quadro não responde
-          aos filtros de UF/município.
+          Endereços (CAC) por segmento e projeto, em camadas tecnológicas — Casa Nova x
+          Casa Existente. O CAC do NEXUS é rateado por OC do rollout, então responde aos
+          filtros da aba.
         </p>
 
         <div className="table-responsive" style={{ maxHeight: 460 }}>
@@ -143,15 +153,30 @@ export function CacPorProjetoTable() {
                         </td>
                       ))}
                     </tr>
-                    {grupo.linhas.map((linha: CacProjetoLinha) => (
-                      <tr key={`${grupo.tipo_casa}-${linha.projeto}`}>
-                        <td className="ps-4">{linha.projeto}</td>
-                        {COLUNAS.map((c) => (
-                          <td key={c.key} className="text-end">
-                            {c.fmt(linha[c.key])}
-                          </td>
+
+                    {grupo.segmentos.map((seg) => (
+                      <Fragment key={`${grupo.tipo_casa}-${seg.segmento}`}>
+                        <tr className="tim-cac-segment">
+                          <th scope="rowgroup" className="ps-4">
+                            {seg.segmento}
+                          </th>
+                          {COLUNAS.map((c) => (
+                            <td key={c.key} className="text-end fw-semibold">
+                              {c.fmt(seg.subtotal[c.key])}
+                            </td>
+                          ))}
+                        </tr>
+                        {seg.linhas.map((linha: CacProjetoLinha) => (
+                          <tr key={`${grupo.tipo_casa}-${seg.segmento}-${linha.projeto}`}>
+                            <td className="tim-cac-projeto">{linha.projeto}</td>
+                            {COLUNAS.map((c) => (
+                              <td key={c.key} className="text-end">
+                                {c.fmt(linha[c.key])}
+                              </td>
+                            ))}
+                          </tr>
                         ))}
-                      </tr>
+                      </Fragment>
                     ))}
                   </Fragment>
                 ))}
