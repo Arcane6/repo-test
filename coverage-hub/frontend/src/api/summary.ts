@@ -69,11 +69,6 @@ export interface RegionalSeriesResponse {
   total: number;
 }
 
-export interface ProjectItem {
-  projeto: string;
-  value: number;
-}
-
 export interface StackedByGroupResponse {
   categories: string[];
   series: { name: string; color: string; data: number[] }[];
@@ -91,6 +86,39 @@ export interface EnderecoPorTecnologiaCenario {
 
 export interface EnderecoPorTecnologiaResponse {
   cenarios: EnderecoPorTecnologiaCenario[];
+  cenario_default: string | null;
+}
+
+/** Uma linha (projeto) da tabela de CAC por projeto. `cac_outras` é o que
+ * sobra entre TOTAL_CAC e as 3 camadas pivotadas — sem essa coluna a
+ * tabela não fecharia (ver seção da view no CLAUDE.md). */
+export interface CacProjetoLinha {
+  projeto: string;
+  cac_5g: number;
+  cac_4g: number;
+  cac_4g_in_5g: number;
+  cac_outras: number;
+  total_cac: number;
+  valor_mm: number;
+}
+
+export type CacProjetoAgg = Omit<CacProjetoLinha, "projeto">;
+
+export interface CacProjetoGrupo {
+  tipo_casa: "CN" | "CE";
+  label: string;
+  linhas: CacProjetoLinha[];
+  subtotal: CacProjetoAgg;
+}
+
+export interface CacPorProjetoCenario {
+  cenario: string;
+  grupos: CacProjetoGrupo[];
+  total: CacProjetoAgg;
+}
+
+export interface CacPorProjetoResponse {
+  cenarios: CacPorProjetoCenario[];
   cenario_default: string | null;
 }
 
@@ -138,8 +166,11 @@ export const summaryApi = {
   /** Meta NEXUS de Casa Nova — nacional, não recebe filtros. */
   r2CasaNovaNexus: () =>
     fetchJson<CasaNovaNexusResponse>(`${BASE}/r2/casa-nova-nexus`),
-  r2TopProjects: (f: SummaryFilters) =>
-    fetchJson<ProjectItem[]>(`${BASE}/r2/top-projects?${query(f)}`),
+  /** CAC por projeto (Casa Nova x Casa Existente), por cenário — nacional
+   * (VW_CAPEX_MASTER_FULL não tem dimensão geográfica); o combo de cenário
+   * é escolhido no front, sem request novo. */
+  r2CacPorProjeto: () =>
+    fetchJson<CacPorProjetoResponse>(`${BASE}/r2/cac-por-projeto`),
   r2OrcamentoPorTecnologia: (f: SummaryFilters) =>
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/orcamento-por-tecnologia?${query(f)}`),
   /** CAC rateado por OC (geo/ano respondem a filtro, igual Orçamento por
@@ -152,6 +183,4 @@ export const summaryApi = {
     fetchJson<RegionalSeriesResponse>(`${BASE}/r3/new-cities-by-anf?${query(f)}`),
   r3Vendors: (f: SummaryFilters) =>
     fetchJson<LabeledValue[]>(`${BASE}/r3/vendors?${query(f)}`),
-  r3TopProjects: (f: SummaryFilters) =>
-    fetchJson<ProjectItem[]>(`${BASE}/r3/top-projects?${query(f)}`),
 };

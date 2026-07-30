@@ -25,7 +25,7 @@ from modules.mobile_access.summary.queries import (
     R2_NEW_CITIES_BY_ANF,
     R2_VENDORS_NEW_SITES,
     R2_CASA_NOVA_NEXUS,
-    R2_TOP_PROJECTS,
+    R2_CAC_POR_PROJETO,
     R2_ORCAMENTO_POR_TECNOLOGIA,
     R2_ENDERECO_POR_TECNOLOGIA,
     R3_TOTAL_CITIES_BY_REGIONAL,
@@ -424,21 +424,100 @@ def get_casa_nova_nexus():
     return {"total": sum(t["qtd"] for t in por_tech), "por_tech": por_tech}
 
 
-def get_r2_top_projects(filters):
-    params, ano_int = _prepare_params(filters)
-    params["ano"] = ano_int
+CASA_LABELS = {"CN": "Casa Nova", "CE": "Casa Existente"}
 
-    sql = _apply_geo_all(
-        R2_TOP_PROJECTS, filters, params,
-        uf_field="d.UF", mun_field="d.MUNICIPIO",
-        uf_key="uf_filter_d", mun_key="municipio_filter_d",
-        regional_field="d.REGIONAL", regional_key="regional_filter_d",
+
+def _linha_cac(projeto, cac_5g, cac_4g, cac_4g_in_5g, total_cac, valor_mm):
+    """Uma linha da tabela de CAC por projeto.
+
+    Arredonda cada célula ANTES de somar (CAC é contagem de endereço —
+    fracionário não faz sentido pra quem lê), e deriva "outras camadas"
+    do que sobra entre TOTAL_CAC e as 3 camadas pivotadas. Sem essa
+    coluna a tabela não fecharia: existem valores de DLV_LEVEL_1 fora dos
+    3 baldes (AGRO/INDÚSTRIA/LOGÍSTICA, confirmado no CSV de amostra), e
+    o "Total" pareceria maior que a soma das colunas visíveis.
+    """
+    c5 = round(cac_5g or 0)
+    c4 = round(cac_4g or 0)
+    c45 = round(cac_4g_in_5g or 0)
+    total = round(total_cac or 0)
+    return {
+        "projeto": projeto,
+        "cac_5g": c5,
+        "cac_4g": c4,
+        "cac_4g_in_5g": c45,
+        "cac_outras": total - (c5 + c4 + c45),
+        "total_cac": total,
+        "valor_mm": round(valor_mm or 0, 2),
+    }
+
+
+_CAMPOS_CAC = ("cac_5g", "cac_4g", "cac_4g_in_5g", "cac_outras", "total_cac")
+
+
+def _somar_cac(linhas):
+    """Subtotal/total somando as células JÁ arredondadas das linhas — o
+    total sempre fecha com o que está na tela, não com o bruto do banco."""
+    agg = {campo: sum(l[campo] for l in linhas) for campo in _CAMPOS_CAC}
+    agg["valor_mm"] = round(sum(l["valor_mm"] for l in linhas), 2)
+    return agg
+
+
+def get_r2_cac_por_projeto():
+    """CAC do NEXUS por projeto (DLV_LEVEL_2), dentro de Casa Nova x Casa
+    Existente, com as camadas tecnológicas em colunas — por cenário.
+
+    Nacional: `VW_CAPEX_MASTER_FULL@NEXUS_LINK` não tem IBGE/UF/município,
+    então este visual não recebe filtro geográfico (mesma situação do card
+    de Meta NEXUS). O front escolhe o cenário num combo sem request novo.
+    """
+    rows = execute_query(R2_CAC_POR_PROJETO) or []
+
+    por_cenario = {}
+    ordem_cenarios = []
+    for r in rows:
+        cenario = r["scenario"]
+        if cenario not in por_cenario:
+            por_cenario[cenario] = {"CN": [], "CE": []}
+            ordem_cenarios.append(cenario)
+        tipo_casa = r["tipo_casa"]
+        if tipo_casa not in por_cenario[cenario]:
+            continue
+        por_cenario[cenario][tipo_casa].append(_linha_cac(
+            r["projeto"],
+            r.get("cac_5g"), r.get("cac_4g"), r.get("cac_4g_in_5g"),
+            r.get("total_cac"), r.get("valor_total_mm"),
+        ))
+
+    cenarios = []
+    for cenario in ordem_cenarios:
+        grupos = []
+        for tipo_casa in ("CN", "CE"):
+            linhas = por_cenario[cenario][tipo_casa]
+            if not linhas:
+                continue
+            # Maior CAC primeiro (o SQL ordena alfabético; pra leitura
+            # executiva o que importa é onde está o volume).
+            linhas.sort(key=lambda l: l["total_cac"], reverse=True)
+            grupos.append({
+                "tipo_casa": tipo_casa,
+                "label": CASA_LABELS[tipo_casa],
+                "linhas": linhas,
+                "subtotal": _somar_cac(linhas),
+            })
+        todas = [l for g in grupos for l in g["linhas"]]
+        cenarios.append({
+            "cenario": cenario,
+            "grupos": grupos,
+            "total": _somar_cac(todas) if todas else _somar_cac([]),
+        })
+
+    nomes = [c["cenario"] for c in cenarios]
+    cenario_default = (
+        DEFAULT_CAPEX_SCENARIO if DEFAULT_CAPEX_SCENARIO in nomes
+        else (nomes[0] if nomes else None)
     )
-    rows = execute_query(sql, params) or []
-    return [
-        {"projeto": r["prioridade"], "value": r.get("qtd", 0) or 0}
-        for r in rows
-    ]
+    return {"cenarios": cenarios, "cenario_default": cenario_default}
 
 
 # ---------------------------------------------------------------------------
@@ -644,7 +723,3 @@ def get_r3_vendors(filters):
     result.sort(key=lambda x: x["value"], reverse=True)
     return result
 
-
-def get_r3_top_projects(filters):
-    """Top 10 projetos do plano é o mesmo — ele não é acumulativo."""
-    return get_r2_top_projects(filters)

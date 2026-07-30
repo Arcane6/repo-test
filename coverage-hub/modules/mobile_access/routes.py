@@ -139,9 +139,11 @@ def api_summary_r2_casa_nova_nexus():
     """Meta NEXUS de Casa Nova (nacional, sem filtro geográfico)."""
     return jsonify(summary.get_casa_nova_nexus())
 
-@mobile_access_bp.route("/api/summary/r2/top-projects")
-def api_summary_r2_projects():
-    return jsonify(summary.get_r2_top_projects(parse_filters()))
+@mobile_access_bp.route("/api/summary/r2/cac-por-projeto")
+def api_summary_r2_cac_por_projeto():
+    """CAC por projeto (Casa Nova x Casa Existente), por cenário. Sem
+    parse_filters(): VW_CAPEX_MASTER_FULL não tem dimensão geográfica."""
+    return jsonify(summary.get_r2_cac_por_projeto())
 
 @mobile_access_bp.route("/api/summary/r2/orcamento-por-tecnologia")
 def api_summary_r2_orcamento():
@@ -159,10 +161,6 @@ def api_summary_r3_cities_anf():
 @mobile_access_bp.route("/api/summary/r3/vendors")
 def api_summary_r3_vendors():
     return jsonify(summary.get_r3_vendors(parse_filters()))
-
-@mobile_access_bp.route("/api/summary/r3/top-projects")
-def api_summary_r3_projects():
-    return jsonify(summary.get_r3_top_projects(parse_filters()))
 
 
 # ---------------------------------------------------------------------------

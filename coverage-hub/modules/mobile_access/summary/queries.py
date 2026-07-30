@@ -386,32 +386,65 @@ WHERE UPPER(TRIM(TIPO_CASA)) = 'CN'
 GROUP BY UPPER(TRIM(TECH))
 ORDER BY qtd DESC
 """
-# ---------- Top 10 projetos (plano 26) ----------
-# Fonte: TB_ROLLOUT_ACESSO GROUP BY PRIORIDADE
-
-R2_TOP_PROJECTS = """
+# ---------- CAC por projeto (Casa Nova x Casa Existente, por cenário) ----------
+# Substituiu o antigo "Top 10 Projetos" (que contava OCs de
+# TB_ROLLOUT_ACESSO por PRIORIDADE): agora é o CAC do NEXUS aberto por
+# projeto (DLV_LEVEL_2) dentro de Casa Nova / Casa Existente, com as
+# camadas tecnológicas pivotadas em colunas.
+#
+# ⚠️ TOTAL_CAC é SUM(KPI) de TODAS as camadas, e NÃO é a soma das 3
+# colunas pivotadas — existem valores de DLV_LEVEL_1 fora dos 3 baldes
+# (visto nos projetos AGRO / INDÚSTRIA / LOGÍSTICA). O service calcula
+# "outras camadas" = TOTAL_CAC - (5G + 4G + 4G_IN_5G) e mostra como
+# coluna própria, pra tabela fechar por construção sem esconder KPI.
+#
+# Sem filtro geográfico: a view não tem IBGE/UF/município (ver seção da
+# view no CLAUDE.md) — este visual é NACIONAL, por cenário.
+R2_CAC_POR_PROJETO = """
+WITH BASE AS (
+    SELECT
+        SCENARIO,
+        DLV_LEVEL_1,
+        DLV_LEVEL_2,
+        DLV_LEVEL_3,
+        NVL(KPI, 0) AS KPI,
+        NVL(VALOR_TOTAL, 0) AS VALOR_TOTAL,
+        CASE
+            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA NOVA'
+                THEN 'CN'
+            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA EXISTENTE'
+                THEN 'CE'
+        END AS TIPO_CASA
+    FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
+    WHERE UPPER(TRIM(PRIORIDADE)) = 'IMPRESCINDÍVEL'
+      AND UPPER(TRIM(LAYER_SUBAREA)) = 'MOBILE ACCESS'
+      AND DLV_LEVEL_3 IS NOT NULL
+      AND UPPER(TRIM(DLV_LEVEL_3)) IN ('CASA NOVA', 'CASA EXISTENTE')
+)
 SELECT
-    r.PRIORIDADE,
-    COUNT(*) AS qtd
-FROM NTW_OP.TB_ROLLOUT_ACESSO r
-LEFT JOIN (
-    SELECT IBGE, UF, MUNICIPIO, REGIONAL
-    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    WHERE TRUNC(DT_CARGA) = (
-        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    )
-) d ON d.IBGE = r.COD_IBGE
-WHERE r.PLANO = :ano
-  AND r.STATUS_OC = 'ACTIVATED'
-  AND r.PRIORIDADE IS NOT NULL
-  AND r.PRIORIDADE <> 'B2B MOBILE'
-  {uf_filter_d}
-  {municipio_filter_d}
-  {regional_filter_d}
-  {projeto_filter}
-GROUP BY r.PRIORIDADE
-ORDER BY qtd DESC
-FETCH FIRST 10 ROWS ONLY
+    SCENARIO,
+    TIPO_CASA,
+    NVL(DLV_LEVEL_2, 'N/A') AS PROJETO,
+    SUM(CASE WHEN UPPER(TRIM(DLV_LEVEL_1)) = '5G LAYERS' THEN KPI ELSE 0 END) AS CAC_5G,
+    SUM(CASE WHEN UPPER(TRIM(DLV_LEVEL_1)) = '4G LAYERS' THEN KPI ELSE 0 END) AS CAC_4G,
+    SUM(
+        CASE
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) IN ('4G IN 5G LAYERS', '4G/5G LAYERS')
+            THEN KPI ELSE 0
+        END
+    ) AS CAC_4G_IN_5G,
+    SUM(KPI) AS TOTAL_CAC,
+    ROUND(SUM(VALOR_TOTAL) / 1000000, 2) AS VALOR_TOTAL_MM
+FROM BASE
+WHERE TIPO_CASA IS NOT NULL
+GROUP BY
+    SCENARIO,
+    TIPO_CASA,
+    NVL(DLV_LEVEL_2, 'N/A')
+ORDER BY
+    SCENARIO,
+    CASE TIPO_CASA WHEN 'CN' THEN 1 WHEN 'CE' THEN 2 ELSE 3 END,
+    NVL(DLV_LEVEL_2, 'N/A')
 """
 
 # ---------- Cidades 5G por regional (fechamento 26 = base 25 + ganho 26) ----------

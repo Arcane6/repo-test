@@ -795,7 +795,7 @@ consome token; se o token não existe, cria-se o token primeiro.
 | `NTW_OP.MUNICIPIOS_FECHAMENTO` | Presença 2G/3G/4G/5G por município (aba Cidades), Cidades por Regional | Sempre filtrar `TRUNC(DT_CARGA) = MAX(DT_CARGA)` — carga histórica, não só o último dia. **Velocímetros (Cidades) e Linha do Tempo — alvo EOY26 do 5G**: `MES_DIV_5G` só tem data **realizada** (não existe linha com data futura para cidade ainda não ativada), então calcular o `eoy_curr` só por `MES_DIV_5G < próximo ano` colapsa no mesmo valor do YTD (ex.: mostrava 1.112 quando o alvo real é 1.089 + 134 do plano = 1.223). Corrigido: `eoy_curr_5g = eoy_prev_5g + planejado_5g`, onde `planejado_5g` conta `IBGE IN (SELECT IBGE FROM REL_CIDADES_PLANEJADO_26)` com guard `MES_DIV_5G IS NULL OR MES_DIV_5G >= início do ano` (evita contar 2× quem já era 5G antes do ano-plano). Só o **5G** tem esse ajuste — é o único card do velocímetro alimentado por um plano de cidades novas dedicado; os outros (2G/3G/4G/TIM) seguem só por data. A **Linha do Tempo** (`TIMESERIES_TEMPLATE`) espelha isso: a curva 5G ganha um ponto em **dez/26** somando as cidades do plano ainda não realizadas (mesmo guard, `JOIN REL_CIDADES_PLANEJADO_26`) — sem isso a curva "morria" no mês corrente, sem refletir o alvo do ano. |
 | `NTW_OP.TB_FT_BASE_UNICA_SITES` | Sites físicos por tecnologia (Raia 1, aba Sites) | **Recorte de `MES_REF` depende da tela**: a **aba Sites** usa `MES_REF = MAX(MES_REF)` (inventário atual, sempre o mais recente); a **raia Fechamento 25 do Resumo** usa o **fechamento de dezembro do ano anterior ao plano** (`TRUNC(MES_REF,'MM') = TRUNC(:baseline_date,'MM')`, com `baseline_date = 31/dez/ano-1`) — é um fechamento histórico, não o load mais novo. Pra bater com o Power BI antigo: `TIPO_SITE <> 'ROAMING VIVO'`, `MOBILE_SITE = 'SIM'`, `TECNOLOGIA <> '-'`. Coluna `TECNOLOGIA` vem como string tipo `"2G/3G/4G"` — usa `LIKE '%2G%'` pra testar presença. Também tem `END_ID` (site único), `IBGE` (join exato com `MUNICIPIOS_FECHAMENTO`, preferir a UF+MUNICIPIO por string), `STATUS_END_ID` (ex.: `'ATIVADO'`), `FLAG_TX_PROFILE_ENG` (perfil de transmissão configurado), `LATITUDE`/`LONGITUDE` (coordenada do site, confirmadas — usadas em `SITES_GEO_POINTS`) e, segundo o usuário, coluna(s) de fornecedor por tecnologia (nome exato ainda não confirmado) |
 | `NTW_MABE.BASE_TB_END_ID_NEW` | Fornecedor (vendor) dominante por site | Cascata de colunas `VENDOR_NR_*`/`VENDOR_LTE_*`/`VENDOR_UMTS_*`/`VENDOR_GSM_*` via `COALESCE`, maior banda primeiro dentro de cada tec |
-| `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente. **Grão = OC, não endereço**: a mesma Casa Nova gera 2+ OCs (4G e 5G separadas) — contagens de "sites/endereços" devem deduplicar por `(COD_IBGE, ID_MASTER_PIVOT)` (`COUNT(DISTINCT ...)` em `R2_VENDORS_NEW_SITES`; era `COUNT(*)` e inflava 2171 vs ~1000 reais, pego cruzando com a meta do `TB_NEXUS_CN_CE`). **`PRIORIDADE` é sobrecarregada**: pra maioria das linhas é o nome do projeto (alimenta "Top 10 Projetos"), mas linhas de B2B Mobile carregam o valor fixo `'B2B MOBILE'` no lugar de um nome — `R2_TOP_PROJECTS` filtra `PRIORIDADE <> 'B2B MOBILE'` por isso, senão o ranking de projetos mistura esse marcador de segmento como se fosse projeto |
+| `NTW_OP.TB_ROLLOUT_ACESSO` | Plano de rollout (Raia 2), OCs | Sem coluna de site físico único (ver acima). `PLANO` = ano, `STATUS_OC='ACTIVATED'`, `CLASSIFICACAO_CASA` distingue Casa Nova (`NEW SITE`/`CO SITE CASA NOVA`) de Casa Existente. **Grão = OC, não endereço**: a mesma Casa Nova gera 2+ OCs (4G e 5G separadas) — contagens de "sites/endereços" devem deduplicar por `(COD_IBGE, ID_MASTER_PIVOT)` (`COUNT(DISTINCT ...)` em `R2_VENDORS_NEW_SITES`; era `COUNT(*)` e inflava 2171 vs ~1000 reais, pego cruzando com a meta do `TB_NEXUS_CN_CE`). **`PRIORIDADE` é sobrecarregada**: pra maioria das linhas é o nome do projeto, mas linhas de B2B Mobile carregam o valor fixo `'B2B MOBILE'` no lugar de um nome — qualquer ranking por projeto tirado daqui precisa de `PRIORIDADE <> 'B2B MOBILE'`, senão mistura esse marcador de segmento como se fosse projeto. Hoje **nenhum visual usa `PRIORIDADE` como projeto** (o antigo "Top 10 Projetos" foi substituído pela tabela "CAC por Projeto", que usa `DLV_LEVEL_2` do NEXUS) |
 | `NTW_OP.REL_CIDADES_PLANEJADO_26` | Novas Cidades por Regional (Raia 2 — "Novas Cidades por Regional") | Lista **fechada** das cidades novas do plano 26: 1 linha por `IBGE` (`REGIONAL, UF, ANF, MUNICIPIO, IBGE`), sem `MES_REF`/`DT_CARGA` — `GROUP BY REGIONAL, COUNT(*)` direto, sem recorte de data. Município filtra via ponte IBGE (`_build_municipio_ibge_clause`), não por nome direto — evita mismatch de acentuação com o autocomplete (que busca em `MUNICIPIOS_FECHAMENTO`). Antes esse gráfico usava `MUNICIPIOS_FECHAMENTO` com `MES_DIV_5G` (fechamento/realizado) — trocado porque misturava a raia de Plano com dado já realizado. |
 | `TB_NEXUS_FINANCEIRO` | CAPEX/OPEX/LEASE por tipo | Usada só no rateio "Orçamento por Tecnologia" — sem schema/join direto, rateada por nº de OCs |
 | `TB_NEXUS_CN_CE` | Meta de Casa Nova | `CAC` com `TIPO_CASA='CN'` é a **contagem-meta de endereços novos** (4G 755 + 5G 245 = 1000) — fonte do toggle "Meta NEXUS" no donut Fornecedores EoY 26 (`/api/summary/r2/casa-nova-nexus`). É **nacional** (sem UF/regional) — não responde aos filtros, e o subtítulo do card avisa. **Não é mais** a fonte de "Endereço por Tecnologia" (ver `VW_CAPEX_MASTER_FULL` abaixo) — esse uso foi substituído. |
@@ -886,6 +886,64 @@ CLASSIFICACAO` no final.
   (CN/CE) — cores fixas em `CASA_COLORS` (`shared/constants.py`, mesmo
   hex de `SMALL_MULTIPLE_COLORS` no front) pra bater visualmente com
   qualquer outro gráfico de Casa Nova x Casa Existente do portal.
+
+#### Segundo visual da mesma view: tabela "CAC por Projeto" (Raia 2)
+
+`R2_CAC_POR_PROJETO` + `get_r2_cac_por_projeto()` + rota
+`/api/summary/r2/cac-por-projeto` + `components/CacPorProjetoTable.tsx`.
+Tabela de largura inteira **abaixo dos 3 gráficos da Raia 2**, com
+hierarquia Casa Nova / Casa Existente > projeto (`DLV_LEVEL_2`) e as
+camadas tecnológicas (`DLV_LEVEL_1`) pivotadas em colunas. **Substituiu o
+antigo "Top 10 Projetos"** (que contava OCs de `TB_ROLLOUT_ACESSO` por
+`PRIORIDADE`, na Raia 3) — aquele card, a query `R2_TOP_PROJECTS`, os
+services `get_r2_top_projects`/`get_r3_top_projects` e as rotas
+`/r2/top-projects` + `/r3/top-projects` foram **removidos**.
+
+- **⚠️ `TOTAL_CAC` (`SUM(KPI)`) NÃO é a soma das 3 camadas pivotadas.**
+  Existem valores de `DLV_LEVEL_1` fora dos 3 baldes — confirmado no CSV
+  de amostra nos projetos **AGRO, INDÚSTRIA e LOGÍSTICA** (ex.: LOGÍSTICA
+  CN tem 4G=289 mas `TOTAL_CAC`=562). O service deriva
+  **`cac_outras` = TOTAL_CAC − (5G + 4G + 4G_in_5G)** e mostra como coluna
+  própria ("Outras camadas"), então a tabela fecha por construção e nada
+  de KPI fica escondido. Não remover essa coluna sem antes descobrir
+  quais são esses outros `DLV_LEVEL_1` — sem ela o "Total" aparece maior
+  que a soma das colunas visíveis, que é exatamente o tipo de número que
+  não fecha e queima a credibilidade da tela.
+  (O pivot de referência do usuário no Excel soma só as 3 camadas — por
+  isso o total dele dá 5.207 e o nosso `TOTAL_CAC` dá 5.728; a diferença
+  de 521 é justamente "outras camadas".)
+- **Célula arredondada ANTES de somar**: subtotal e total geral somam os
+  valores já arredondados das linhas exibidas, nunca o bruto — mesmo
+  princípio do resto do projeto (total tem que fechar com o que está na
+  tela). Com isso as 3 colunas de camada reproduzem exatamente o pivot do
+  usuário (CN 253/806/222, CE 3.104/755/67, total 3.357/1.561/289).
+- **Nacional, sem filtro geográfico**: diferente de "Endereço por
+  Tecnologia", esta tabela **não** passa por rateio de OC — é `SUM(KPI)`
+  direto da view, que não tem IBGE/UF/município. O subtítulo do card
+  avisa. **Não existe estratificação por município aqui** (ver "Em
+  aberto" abaixo).
+- **Ordenação**: o SQL ordena projeto alfabeticamente, mas o service
+  reordena por `total_cac` desc — pra leitura executiva o que importa é
+  onde está o volume (é o que o pivot de referência também faz).
+- **Sem cross-filter por projeto**: o `projeto` do `useResumoFocusStore`
+  perdeu o único gatilho que tinha (o clique no antigo "Top 10
+  Projetos"). O `DLV_LEVEL_2` desta tabela **não serve** como substituto:
+  os nomes nunca batem com `TB_ROLLOUT_ACESSO.PRIORIDADE` (já
+  documentado acima), então clicar aqui filtraria por um nome que não
+  casa com nada e esvaziaria os outros gráficos. A plumbing do filtro
+  (`projeto_filter` nas queries, `parse_filters`) continua intacta,
+  só sem quem a acione.
+
+**Em aberto**: o usuário pediu a tabela "também estratificada por
+município", mas `VW_CAPEX_MASTER_FULL` **não tem** `IBGE`/UF/município
+(confirmado no CSV de amostra: as colunas são só SCENARIO, TIPO_CASA,
+DLV_LEVEL_2 e as métricas). Só há dois caminhos, ambos dependendo de
+decisão do usuário: (a) ratear o CAC por município via OC do
+`TB_ROLLOUT_ACESSO`, igual "Endereço por Tecnologia" faz — mas aí cada
+célula vira valor fracionário/rateado por projeto × município, o que
+pode não significar nada de útil; ou (b) o usuário indicar uma coluna
+geográfica na view que a gente ainda não conhece. Não assumir nenhum dos
+dois sem confirmar.
 
 ## Git / PRs
 
