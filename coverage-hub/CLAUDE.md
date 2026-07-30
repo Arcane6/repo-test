@@ -918,23 +918,15 @@ services `get_r2_top_projects`/`get_r3_top_projects` e as rotas
   princípio do resto do projeto (total tem que fechar com o que está na
   tela). Com isso as 3 colunas de camada reproduzem exatamente o pivot do
   usuário (CN 253/806/222, CE 3.104/755/67, total 3.357/1.561/289).
-- **Rateio geográfico por OC, igual "Endereço por Tecnologia"**: a view
-  não tem IBGE/UF/município, então o CAC nacional é distribuído pelo peso
-  de OCs do `TB_ROLLOUT_ACESSO` (numerador = OCs do recorte filtrado;
-  denominador = universo completo, nunca filtrado). A tabela **responde**
-  a UF/município/regional/projeto/ano.
-  - O peso é por **(TECH, TIPO_CASA)**, usando a MESMA regra de `TECH` do
-    card "Endereço por Tecnologia" — assim os dois visuais escalam junto e
-    continuam comparáveis. `TECH` (chave do rateio) é **independente** de
-    `CAMADA` (coluna da tabela): `4G/5G LAYERS` é coluna própria na
-    tabela, mas conta como `4G` no rateio.
-  - `NUMERADOR`/`DENOMINADOR` agregam as OCs **antes** de multiplicar. É
-    equivalente a multiplicar linha a linha e somar (o fator é constante
-    dentro do grupo) e evita o fan-out do card irmão.
-  - `INNER JOIN` com o numerador: se o recorte não tem OC de um
-    (TECH, TIPO_CASA), aquele CAC desaparece da tabela — comportamento
-    intencional (sem rollout na geografia, não há CAC a atribuir ali) e
-    igual ao do card irmão.
+- **NACIONAL, sem rateio geográfico** — decisão fechada do usuário
+  (jul/26), depois de um ciclo curto em que o rateio por OC foi
+  implementado e revertido. Motivo: como o rollout não tem
+  `SOURCE_AJUSTADO` nem projeto que casem com o NEXUS, o peso geográfico
+  seria **idêntico pra todos os projetos** dentro de um mesmo
+  (tech, tipo de casa) — mudaria só a magnitude, nunca a composição. Ou
+  seja: número diferente sem informação nova. Não reintroduzir rateio
+  aqui (diferente de "Endereço por Tecnologia", onde o rateio faz sentido
+  porque a granularidade de saída é a própria tech).
 - **Ordenação**: o SQL ordena projeto alfabeticamente, mas o service
   reordena por `total_cac` desc — pra leitura executiva o que importa é
   onde está o volume (é o que o pivot de referência também faz).
@@ -946,6 +938,19 @@ services `get_r2_top_projects`/`get_r3_top_projects` e as rotas
   casa com nada e esvaziaria os outros gráficos. A plumbing do filtro
   (`projeto_filter` nas queries, `parse_filters`) continua intacta,
   só sem quem a acione.
+
+**⚠️ `ORA-12704: character set mismatch` (já aconteceu em produção)**:
+`SOURCE_AJUSTADO` e `TAG_2` vêm do NEXUS por DB link com character set
+diferente do banco local (national/NVARCHAR2). Usar essas colunas cruas
+num `NVL`/comparação com literal `VARCHAR2` estoura ORA-12704 — foi
+exatamente o que derrubou `/r2/cac-por-projeto` na primeira subida. As
+duas queries da view agora envolvem essas colunas em **`TO_CHAR(...)`**,
+que normaliza pro charset local e é no-op quando a coluna já é VARCHAR2.
+As outras colunas da view (`DLV_LEVEL_1/2/3`, `PRIORIDADE`,
+`LAYER_SUBAREA`, `KPI`, `VALOR_TOTAL`) são VARCHAR2/NUMBER comuns e
+dispensam o wrapper — a query original do usuário rodava no DBeaver sem
+ele. Ao usar QUALQUER coluna nova dessa view, se der ORA-12704, o
+primeiro remédio é `TO_CHAR`.
 
 **Onde está o "outras camadas" — mistério resolvido**: o KPI fora dos 3
 baldes de `DLV_LEVEL_1` está **inteiramente em B2B Mobile**. Confirmado
