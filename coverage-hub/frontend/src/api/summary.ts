@@ -91,14 +91,16 @@ export interface EnderecoPorTecnologiaResponse {
 
 /** Uma linha (projeto) da tabela de CAC por projeto. `total_cac` é só a
  * soma das 3 camadas pivotadas (5G/4G/4G in 5G) — "outras camadas" fica
- * de fora do cálculo por pedido explícito do usuário (ver CLAUDE.md). */
+ * de fora do cálculo por pedido explícito do usuário (ver CLAUDE.md).
+ * Sem `valor_mm`: a coluna "Valor (R$ mi)" saiu desta tabela (o valor
+ * financeiro voltou a aparecer, mas só no resumo `CacResumoTech` ao
+ * lado — ver `CacResumoTecnologia.tsx`). */
 export interface CacProjetoLinha {
   projeto: string;
   cac_5g: number;
   cac_4g: number;
   cac_4g_in_5g: number;
   total_cac: number;
-  valor_mm: number;
 }
 
 export type CacProjetoAgg = Omit<CacProjetoLinha, "projeto">;
@@ -117,10 +119,30 @@ export interface CacProjetoGrupo {
   subtotal: CacProjetoAgg;
 }
 
+/** Uma célula do resumo 5G x 4G: valor de cada tech + % daquele tech
+ * sobre o total da linha (CAPEX ou Layers), e o total da linha. */
+export interface CacResumoCelula {
+  v5g: number;
+  pct5g: number;
+  v4g: number;
+  pct4g: number;
+  total: number;
+}
+
+/** Resumo nacional CAPEX + Layers por tecnologia (5G x 4G) do mesmo
+ * cenário do CAC por Projeto — "4G in 5G Layers" entra dentro de "4G". */
+export interface CacResumoTech {
+  capex: CacResumoCelula;
+  layers: CacResumoCelula;
+  casa_nova: CacResumoCelula;
+  casa_existente: CacResumoCelula;
+}
+
 export interface CacPorProjetoCenario {
   cenario: string;
   grupos: CacProjetoGrupo[];
   total: CacProjetoAgg;
+  resumo_tech: CacResumoTech;
 }
 
 export interface CacPorProjetoResponse {

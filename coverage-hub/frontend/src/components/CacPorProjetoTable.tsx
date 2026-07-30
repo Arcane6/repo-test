@@ -1,6 +1,5 @@
-import { Fragment, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { summaryApi, type CacProjetoAgg, type CacProjetoLinha } from "../api/summary";
+import { Fragment } from "react";
+import type { CacPorProjetoCenario, CacProjetoAgg, CacProjetoLinha } from "../api/summary";
 import { ChartToolbar } from "./ChartToolbar";
 import { Skeleton } from "./Skeleton";
 import { SourceBadge } from "./SourceBadge";
@@ -13,18 +12,20 @@ function num(v: number) {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
 
-function moeda(v: number) {
-  if (!v) return "–";
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 const COLUNAS: { key: keyof CacProjetoAgg; label: string; fmt: (v: number) => string }[] = [
   { key: "cac_5g", label: "5G Layers", fmt: num },
   { key: "cac_4g", label: "4G Layers", fmt: num },
   { key: "cac_4g_in_5g", label: "4G in 5G Layers", fmt: num },
   { key: "total_cac", label: "Total CAC", fmt: num },
-  { key: "valor_mm", label: "Valor (R$ mi)", fmt: moeda },
 ];
+
+interface CacPorProjetoTableProps {
+  cenarios: CacPorProjetoCenario[];
+  cenarioAtual: string | null;
+  cenario: CacPorProjetoCenario | undefined;
+  onChangeCenario: (cenario: string) => void;
+  isLoading: boolean;
+}
 
 /**
  * CAC do NEXUS em 3 níveis — Casa Nova/Existente > segmento
@@ -36,17 +37,19 @@ const COLUNAS: { key: keyof CacProjetoAgg; label: string; fmt: (v: number) => st
  * usuário (jul/26) pra excluir "outras camadas" (KPI de DLV_LEVEL_1 fora
  * desses 3 baldes, concentrado em B2B Mobile) do cálculo, não só escondê-la
  * da tela. Não reintroduzir essa coluna sem pedido novo.
+ *
+ * Sem coluna de valor (R$ mi) — saiu daqui a pedido do usuário; o valor
+ * financeiro voltou a aparecer no resumo `CacResumoTecnologia`, ao lado.
+ * O cenário selecionado é estado do pai (`Raia2`), compartilhado com esse
+ * resumo — os dois trocam juntos quando o combo muda.
  */
-export function CacPorProjetoTable() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["summary-r2-cac-por-projeto"],
-    queryFn: () => summaryApi.r2CacPorProjeto(),
-  });
-
-  const [escolhido, setEscolhido] = useState<string | null>(null);
-  const cenarioAtual = escolhido ?? data?.cenario_default ?? data?.cenarios[0]?.cenario ?? null;
-  const cenario = data?.cenarios.find((c) => c.cenario === cenarioAtual);
-
+export function CacPorProjetoTable({
+  cenarios,
+  cenarioAtual,
+  cenario,
+  onChangeCenario,
+  isLoading,
+}: CacPorProjetoTableProps) {
   const linhasExport = (cenario?.grupos ?? []).flatMap((g) =>
     g.segmentos.flatMap((sg) =>
       sg.linhas.map((l) => ({ tipo_casa: g.label, segmento: sg.segmento, ...l })),
@@ -66,11 +69,11 @@ export function CacPorProjetoTable() {
               className="form-select form-select-sm"
               style={{ width: 220 }}
               value={cenarioAtual ?? ""}
-              onChange={(e) => setEscolhido(e.target.value)}
+              onChange={(e) => onChangeCenario(e.target.value)}
               aria-label="Cenário do CAC por projeto"
-              disabled={!data?.cenarios.length}
+              disabled={!cenarios.length}
             >
-              {(data?.cenarios ?? []).map((c) => (
+              {cenarios.map((c) => (
                 <option key={c.cenario} value={c.cenario}>
                   {c.cenario}
                 </option>
@@ -88,7 +91,6 @@ export function CacPorProjetoTable() {
                     { header: "4G Layers", key: "cac_4g" },
                     { header: "4G in 5G Layers", key: "cac_4g_in_5g" },
                     { header: "Total CAC", key: "total_cac" },
-                    { header: "Valor Total (R$ mi)", key: "valor_mm" },
                   ],
                   rows: linhasExport,
                 })

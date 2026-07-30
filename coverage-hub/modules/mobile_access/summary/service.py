@@ -436,7 +436,7 @@ def get_casa_nova_nexus(filters):
 CASA_LABELS = {"CN": "Casa Nova", "CE": "Casa Existente"}
 
 
-def _linha_cac(projeto, cac_5g, cac_4g, cac_4g_in_5g, valor_mm):
+def _linha_cac(projeto, cac_5g, cac_4g, cac_4g_in_5g):
     """Uma linha da tabela de CAC por projeto.
 
     Arredonda cada célula ANTES de somar (CAC é contagem de endereço —
@@ -445,6 +445,10 @@ def _linha_cac(projeto, cac_5g, cac_4g, cac_4g_in_5g, valor_mm):
     (jul/26) pra excluir "outras camadas" do cálculo, não só escondê-la da
     tela. A view não fica mais SUM(KPI) bruto nenhum: qualquer KPI fora
     dessas 3 camadas (histórico: B2B Mobile, ver git blame) some do total.
+
+    Sem `valor_mm`: a coluna "Valor (R$ mi)" saiu desta tabela (pedido do
+    usuário, jul/26) — o valor financeiro agora só aparece no resumo
+    nacional CAPEX 5G x 4G (`_resumo_5g_4g`), ao lado desta tabela.
     """
     c5 = round(cac_5g or 0)
     c4 = round(cac_4g or 0)
@@ -455,7 +459,6 @@ def _linha_cac(projeto, cac_5g, cac_4g, cac_4g_in_5g, valor_mm):
         "cac_4g": c4,
         "cac_4g_in_5g": c45,
         "total_cac": c5 + c4 + c45,
-        "valor_mm": round(valor_mm or 0, 2),
     }
 
 
@@ -465,15 +468,52 @@ _CAMPOS_CAC = ("cac_5g", "cac_4g", "cac_4g_in_5g", "total_cac")
 def _somar_cac(linhas):
     """Subtotal/total somando as células JÁ arredondadas das linhas — o
     total sempre fecha com o que está na tela, não com o bruto do banco."""
-    agg = {campo: sum(l[campo] for l in linhas) for campo in _CAMPOS_CAC}
-    agg["valor_mm"] = round(sum(l["valor_mm"] for l in linhas), 2)
-    return agg
+    return {campo: sum(l[campo] for l in linhas) for campo in _CAMPOS_CAC}
+
+
+def _resumo_5g_4g(rows):
+    """Resumo nacional CAPEX + Layers por tecnologia (5G x 4G), pro
+    visual ao lado da tabela "CAC por Projeto" (mesmo cenário/linhas —
+    só agregado mais grosso, sem segmento/projeto).
+
+    "4G in 5G Layers" entra dentro de "4G" aqui (pedido do usuário,
+    jul/26) — nas camadas (`CAC_4G` + `CAC_4G_IN_5G`) e no valor
+    (`VALOR_4G_MM` já vem somado assim da query). Célula arredondada
+    ANTES de somar, mesmo princípio do resto da tabela.
+    """
+    def cel(v5, v4):
+        total = v5 + v4
+        return {
+            "v5g": v5, "pct5g": round(v5 / total * 100) if total else 0,
+            "v4g": v4, "pct4g": round(v4 / total * 100) if total else 0,
+            "total": total,
+        }
+
+    def layers(subset):
+        v5 = sum(round(r.get("cac_5g") or 0) for r in subset)
+        v4 = sum(round(r.get("cac_4g") or 0) + round(r.get("cac_4g_in_5g") or 0) for r in subset)
+        return v5, v4
+
+    capex_5g = round(sum(round(r.get("valor_5g_mm") or 0, 2) for r in rows), 2)
+    capex_4g = round(sum(round(r.get("valor_4g_mm") or 0, 2) for r in rows), 2)
+    layers_5g, layers_4g = layers(rows)
+    cn_5g, cn_4g = layers([r for r in rows if r["tipo_casa"] == "CN"])
+    ce_5g, ce_4g = layers([r for r in rows if r["tipo_casa"] == "CE"])
+
+    return {
+        "capex": cel(capex_5g, capex_4g),
+        "layers": cel(layers_5g, layers_4g),
+        "casa_nova": cel(cn_5g, cn_4g),
+        "casa_existente": cel(ce_5g, ce_4g),
+    }
 
 
 def get_r2_cac_por_projeto():
     """CAC do NEXUS em 3 níveis — Casa Nova/Existente > segmento
     (SOURCE_AJUSTADO: TIM, B2B Mobile...) > projeto (DLV_LEVEL_2) — com as
-    camadas tecnológicas em colunas, por cenário.
+    camadas tecnológicas em colunas, por cenário. Ao lado, um resumo
+    nacional CAPEX+Layers por tecnologia (5G x 4G) — mesmo cenário
+    escolhido no combo, sem request novo (`_resumo_5g_4g`).
 
     NACIONAL, sem rateio geográfico (decisão do usuário): a view não tem
     IBGE/UF/município, e ratear por OC aqui não teria significado — o peso
@@ -483,14 +523,17 @@ def get_r2_cac_por_projeto():
     """
     rows = execute_query(R2_CAC_POR_PROJETO) or []
 
-    # cenário -> tipo_casa -> segmento -> [linhas]
+    # cenário -> linhas cruas (pro resumo 5g x 4g) / tipo_casa -> segmento -> [linhas]
+    rows_por_cenario = {}
     por_cenario = {}
     ordem_cenarios = []
     for r in rows:
         cenario = r["scenario"]
         if cenario not in por_cenario:
             por_cenario[cenario] = {"CN": {}, "CE": {}}
+            rows_por_cenario[cenario] = []
             ordem_cenarios.append(cenario)
+        rows_por_cenario[cenario].append(r)
         tipo_casa = r["tipo_casa"]
         if tipo_casa not in por_cenario[cenario]:
             continue
@@ -499,7 +542,6 @@ def get_r2_cac_por_projeto():
         segmentos.setdefault(segmento, []).append(_linha_cac(
             r["projeto"],
             r.get("cac_5g"), r.get("cac_4g"), r.get("cac_4g_in_5g"),
-            r.get("valor_total_mm"),
         ))
 
     cenarios = []
@@ -533,6 +575,7 @@ def get_r2_cac_por_projeto():
             "cenario": cenario,
             "grupos": grupos,
             "total": _somar_cac([g["subtotal"] for g in grupos]),
+            "resumo_tech": _resumo_5g_4g(rows_por_cenario[cenario]),
         })
 
     nomes = [c["cenario"] for c in cenarios]

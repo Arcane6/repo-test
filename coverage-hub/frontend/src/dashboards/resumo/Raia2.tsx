@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { regionalDonutOption, stackedBarsOption } from "../../charts/optionBuilders";
 import { CacPorProjetoTable } from "../../components/CacPorProjetoTable";
+import { CacResumoTecnologia } from "../../components/CacResumoTecnologia";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
@@ -29,6 +30,17 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
   const [cenarioEscolhido, setCenarioEscolhido] = useState<string | null>(null);
   const cenarioAtual = cenarioEscolhido ?? endereco?.cenario_default ?? endereco?.cenarios[0]?.cenario ?? null;
   const enderecoCenario = endereco?.cenarios.find((c) => c.cenario === cenarioAtual);
+
+  // "CAC por Projeto" e o resumo "MBB Evolution + B2B IoT" ao lado
+  // compartilham o mesmo cenário selecionado (estado aqui, não em cada
+  // componente) — trocar o combo de um atualiza os dois juntos.
+  const { data: cac, isLoading: loadingCac } = useQuery({
+    queryKey: ["summary-r2-cac-por-projeto"],
+    queryFn: () => summaryApi.r2CacPorProjeto(),
+  });
+  const [cacEscolhido, setCacEscolhido] = useState<string | null>(null);
+  const cacCenarioAtual = cacEscolhido ?? cac?.cenario_default ?? cac?.cenarios[0]?.cenario ?? null;
+  const cacCenario = cac?.cenarios.find((c) => c.cenario === cacCenarioAtual);
 
   const valorFmt = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
@@ -138,10 +150,20 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
           />
         </div>
 
-        {/* Largura inteira: são 7 colunas numéricas + hierarquia CN/CE —
-            não cabe num terço da linha junto com os donuts. */}
-        <div className="col-12">
-          <CacPorProjetoTable />
+        {/* Resumo CAPEX+Layers (compacto, à esquerda) + CAC por Projeto
+            (detalhe por segmento/projeto, encurtado e jogado à direita) —
+            os dois no mesmo cenário selecionado (estado acima). */}
+        <div className="col-lg-4">
+          <CacResumoTecnologia cenario={cacCenario} isLoading={loadingCac} />
+        </div>
+        <div className="col-lg-8">
+          <CacPorProjetoTable
+            cenarios={cac?.cenarios ?? []}
+            cenarioAtual={cacCenarioAtual}
+            cenario={cacCenario}
+            onChangeCenario={setCacEscolhido}
+            isLoading={loadingCac}
+          />
         </div>
       </div>
     </div>

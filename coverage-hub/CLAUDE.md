@@ -1049,6 +1049,53 @@ os itens com alguma decisão real ficam documentados aqui.
   Fechamento"** em todo o app (`SourceBadge.tsx`, `TABLE_LABELS`, fonte
   única) — recorria em Resumo, Cidades e Sites, trocado uma vez só.
 
+## "CAC por Projeto" ganhou um resumo ao lado — jul/26
+
+Segundo ajuste na mesma seção (depois da remoção de "outras camadas" —
+ver seção da view `VW_CAPEX_MASTER_FULL` abaixo). Pedido do usuário:
+tirar a coluna de valor (R$ mi) da tabela por projeto, encurtá-la e
+jogá-la pra direita, e abrir um resumo novo à esquerda.
+
+- **Layout da Raia 2** (`Raia2.tsx`): a linha antes só com
+  `<CacPorProjetoTable />` em `col-12` virou duas colunas —
+  `<CacResumoTecnologia />` em `col-lg-4` (esquerda) +
+  `<CacPorProjetoTable />` em `col-lg-8` (direita, mais estreita que
+  antes). Os dois **compartilham o mesmo cenário selecionado**: o estado
+  (`cacEscolhido`/`cacCenarioAtual`) e a única `useQuery` de
+  `r2CacPorProjeto` subiram pra `Raia2`, que passa `cenario`/`cenarios`/
+  `onChangeCenario` pros dois componentes (agora só de apresentação, sem
+  fetch próprio) — trocar o combo (que mora só no `CacPorProjetoTable`)
+  atualiza os dois juntos, sem request novo.
+- **`CacPorProjetoTable` perdeu a coluna "Valor (R$ mi)"** — `valor_mm`
+  saiu de `CacProjetoLinha`/`_linha_cac`/`_somar_cac`/export. O valor
+  financeiro não sumiu do produto, só saiu **desta** tabela (que agora só
+  mostra CAC/Layers) e voltou a aparecer no resumo novo.
+- **`CacResumoTecnologia.tsx`** (novo componente + `_resumo_5g_4g` em
+  `service.py`): resumo nacional CAPEX (R$ mi) + Layers (contagem de
+  endereços) por tecnologia — 5G x 4G — com % de cada tech sobre o total
+  da própria linha, e uma quebra CAPEX/Layers total → Casa Nova/Casa
+  Existente. Mesmos dados de `R2_CAC_POR_PROJETO`, só agregados mais
+  grosso (sem segmento/projeto) — **não é uma query nova**, reaproveita
+  as linhas cruas já trazidas pra tabela por projeto.
+  - **"4G in 5G Layers" entra dentro de "4G" aqui** (pedido explícito) —
+    diferente da tabela ao lado, que ainda mostra as 3 camadas separadas.
+    Tanto o Layers (`cac_4g + cac_4g_in_5g`) quanto o CAPEX
+    (`VALOR_4G_MM` já vem somado assim direto da SQL, via
+    `CAMADA IN ('L4G','L4G5G')`) fazem essa fusão.
+  - **Query ganhou `VALOR_5G_MM`/`VALOR_4G_MM`** (substituindo o antigo
+    `VALOR_TOTAL_MM` por projeto, que não existe mais) — mesmo princípio
+    de `CAC_5G`/`CAC_4G`/`CAC_4G_IN_5G`, só que pro valor financeiro em
+    vez da contagem de endereço.
+  - Título "MBB Evolution + B2B IoT" é texto fixo (rótulo do card, igual
+    a peça de referência do usuário) — não é um filtro novo nem uma
+    dimensão da view, é só como esse resumo é chamado.
+- **`DEFAULT_CAPEX_SCENARIO` mudou de `"2026 FCST 6+6 V0"` pra
+  `"2026 CAC (26-28) V02"`** (`shared/constants.py`) — pedido explícito
+  do usuário, e a constante é **global**: também muda o cenário-padrão de
+  "Endereço por Tecnologia" (Raia 2), que usa a mesma constante. Nome de
+  cenário muda por ciclo de planejamento — não assumir que esse valor
+  sempre existirá na view.
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.
