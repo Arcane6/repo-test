@@ -900,19 +900,20 @@ camadas de `DLV_LEVEL_1` pivotadas em colunas. **Substituiu o antigo
 services `get_r2_top_projects`/`get_r3_top_projects` e as rotas
 `/r2/top-projects` + `/r3/top-projects` foram **removidos**.
 
-- **⚠️ `TOTAL_CAC` (`SUM(KPI)`) NÃO é a soma das 3 camadas pivotadas.**
-  Existem valores de `DLV_LEVEL_1` fora dos 3 baldes — confirmado no CSV
-  de amostra nos projetos **AGRO, INDÚSTRIA e LOGÍSTICA** (ex.: LOGÍSTICA
-  CN tem 4G=289 mas `TOTAL_CAC`=562). O service deriva
-  **`cac_outras` = TOTAL_CAC − (5G + 4G + 4G_in_5G)** e mostra como coluna
-  própria ("Outras camadas"), então a tabela fecha por construção e nada
-  de KPI fica escondido. Não remover essa coluna sem antes descobrir
-  quais são esses outros `DLV_LEVEL_1` — sem ela o "Total" aparece maior
-  que a soma das colunas visíveis, que é exatamente o tipo de número que
-  não fecha e queima a credibilidade da tela.
-  (O pivot de referência do usuário no Excel soma só as 3 camadas — por
-  isso o total dele dá 5.207 e o nosso `TOTAL_CAC` dá 5.728; a diferença
-  de 521 é justamente "outras camadas".)
+- **⚠️ "Outras camadas" foi removida do cálculo (pedido explícito do
+  usuário, jul/26)** — histórico, não reintroduzir sem pedido novo.
+  Antes, `TOTAL_CAC` vinha de `SUM(KPI)` de TODAS as camadas de
+  `DLV_LEVEL_1`, e como esse bruto não batia com a soma das 3 camadas
+  pivotadas (existiam valores fora dos 3 baldes, concentrados nos
+  projetos de B2B Mobile — AGRO/INDÚSTRIA/LOGÍSTICA), o service derivava
+  a diferença como uma 4ª coluna ("Outras camadas") só pra tabela fechar.
+  O usuário decidiu que isso não deveria nem entrar na conta: a query
+  (`R2_CAC_POR_PROJETO`) não traz mais `SUM(KPI)` bruto, só
+  `CAC_5G`/`CAC_4G`/`CAC_4G_IN_5G`, e `total_cac` no service
+  (`_linha_cac`) é só a soma dessas 3 — qualquer KPI de B2B Mobile fora
+  desses baldes simplesmente não entra em nenhum número da tabela. Isso
+  também faz o total bater exatamente com o pivot de referência do
+  usuário no Excel (que também só soma as 3 camadas: 5.207).
 - **Célula arredondada ANTES de somar**: subtotal e total geral somam os
   valores já arredondados das linhas exibidas, nunca o bruto — mesmo
   princípio do resto do projeto (total tem que fechar com o que está na
@@ -952,14 +953,15 @@ dispensam o wrapper — a query original do usuário rodava no DBeaver sem
 ele. Ao usar QUALQUER coluna nova dessa view, se der ORA-12704, o
 primeiro remédio é `TO_CHAR`.
 
-**Onde está o "outras camadas" — mistério resolvido**: o KPI fora dos 3
-baldes de `DLV_LEVEL_1` está **inteiramente em B2B Mobile**. Confirmado
-com o pivot de referência do usuário: os projetos AGRO, INDÚSTRIA e
-LOGÍSTICA (os únicos com `cac_outras` > 0) são exatamente os projetos de
-`SOURCE_AJUSTADO = 'B2B MOBILE'`, e o subtotal de TIM tem
-`cac_outras = 0` nos dois tipos de casa. Ou seja: abrir por
-`SOURCE_AJUSTADO` explicou a diferença — não é dado sujo, é a camada de
-B2B que não cabe nos 3 baldes de RAN.
+**Onde estava o "outras camadas" — mistério resolvido (histórico)**: o
+KPI fora dos 3 baldes de `DLV_LEVEL_1` estava **inteiramente em B2B
+Mobile**. Confirmado com o pivot de referência do usuário: os projetos
+AGRO, INDÚSTRIA e LOGÍSTICA (os únicos com KPI fora dos 3 baldes) são
+exatamente os projetos de `SOURCE_AJUSTADO = 'B2B MOBILE'`, e o subtotal
+de TIM não tinha nada fora dos 3 baldes nos dois tipos de casa. Não era
+dado sujo — era a camada de B2B que não cabe nos 3 baldes de RAN. Essa
+investigação foi o que deu confiança pra remover a coluna do cálculo
+(acima) em vez de só escondê-la.
 
 **A hierarquia fecha em 4 níveis por construção**: linha (célula
 arredondada) → subtotal do segmento (soma das linhas) → subtotal do

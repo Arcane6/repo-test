@@ -89,15 +89,14 @@ export interface EnderecoPorTecnologiaResponse {
   cenario_default: string | null;
 }
 
-/** Uma linha (projeto) da tabela de CAC por projeto. `cac_outras` é o que
- * sobra entre TOTAL_CAC e as 3 camadas pivotadas — sem essa coluna a
- * tabela não fecharia (ver seção da view no CLAUDE.md). */
+/** Uma linha (projeto) da tabela de CAC por projeto. `total_cac` é só a
+ * soma das 3 camadas pivotadas (5G/4G/4G in 5G) — "outras camadas" fica
+ * de fora do cálculo por pedido explícito do usuário (ver CLAUDE.md). */
 export interface CacProjetoLinha {
   projeto: string;
   cac_5g: number;
   cac_4g: number;
   cac_4g_in_5g: number;
-  cac_outras: number;
   total_cac: number;
   valor_mm: number;
 }
