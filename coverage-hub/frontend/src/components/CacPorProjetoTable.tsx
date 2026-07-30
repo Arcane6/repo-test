@@ -22,7 +22,6 @@ const COLUNAS: { key: keyof CacProjetoAgg; label: string; fmt: (v: number) => st
   { key: "cac_5g", label: "5G Layers", fmt: num },
   { key: "cac_4g", label: "4G Layers", fmt: num },
   { key: "cac_4g_in_5g", label: "4G in 5G Layers", fmt: num },
-  { key: "cac_outras", label: "Outras camadas", fmt: num },
   { key: "total_cac", label: "Total CAC", fmt: num },
   { key: "valor_mm", label: "Valor (R$ mi)", fmt: moeda },
 ];
@@ -33,12 +32,10 @@ const COLUNAS: { key: keyof CacProjetoAgg; label: string; fmt: (v: number) => st
  * tecnológicas em colunas. É o "pivot" que o usuário usa no Excel, agora
  * no portal.
  *
- * "Outras camadas" existe porque `TOTAL_CAC` (SUM(KPI) de todas as
- * camadas) NÃO é a soma das 3 camadas pivotadas — há KPI em valores de
- * `DLV_LEVEL_1` fora dos 3 baldes, concentrado nos projetos de B2B Mobile
- * (AGRO/INDÚSTRIA/LOGÍSTICA). Sem essa coluna o "Total" apareceria maior
- * que a soma das colunas visíveis — exatamente o tipo de número que não
- * fecha e destrói a confiança na tela.
+ * `total_cac` é só a soma de 5G/4G/4G in 5G Layers — pedido explícito do
+ * usuário (jul/26) pra excluir "outras camadas" (KPI de DLV_LEVEL_1 fora
+ * desses 3 baldes, concentrado em B2B Mobile) do cálculo, não só escondê-la
+ * da tela. Não reintroduzir essa coluna sem pedido novo.
  */
 export function CacPorProjetoTable() {
   const { data, isLoading } = useQuery({
@@ -90,7 +87,6 @@ export function CacPorProjetoTable() {
                     { header: "5G Layers", key: "cac_5g" },
                     { header: "4G Layers", key: "cac_4g" },
                     { header: "4G in 5G Layers", key: "cac_4g_in_5g" },
-                    { header: "Outras camadas", key: "cac_outras" },
                     { header: "Total CAC", key: "total_cac" },
                     { header: "Valor Total (R$ mi)", key: "valor_mm" },
                   ],

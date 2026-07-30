@@ -441,11 +441,12 @@ ORDER BY R.TECNOLOGIA DESC
 #     > DLV_LEVEL_2 (projeto)
 # com as camadas de DLV_LEVEL_1 pivotadas em colunas.
 #
-# ⚠️ TOTAL_CAC é SUM(KPI) de TODAS as camadas, e NÃO é a soma das 3
-# colunas pivotadas. O service deriva "outras camadas" e mostra como
-# coluna própria, pra tabela fechar por construção sem esconder KPI. Esse
-# resto está INTEIRAMENTE em B2B Mobile (ver CLAUDE.md) — abrir por
-# SOURCE_AJUSTADO foi o que explicou a diferença.
+# ⚠️ Não trazer SUM(KPI) bruto (todas as camadas de DLV_LEVEL_1) — só
+# CAC_5G/CAC_4G/CAC_4G_IN_5G. O bruto incluía "outras camadas" (KPI fora
+# desses 3 baldes, concentrado em B2B Mobile — ver histórico no git/
+# CLAUDE.md), e o usuário pediu explicitamente pra tirar isso do cálculo
+# (jul/26), não só escondido da tela como antes. `total_cac` no service é
+# a soma só dessas 3 camadas.
 #
 # SEM rateio geográfico (decisão do usuário): a view não tem
 # IBGE/UF/município, e ratear o CAC por OC aqui não teria significado —
@@ -491,7 +492,6 @@ SELECT
     SUM(CASE WHEN CAMADA = 'L5G' THEN KPI ELSE 0 END) AS CAC_5G,
     SUM(CASE WHEN CAMADA = 'L4G' THEN KPI ELSE 0 END) AS CAC_4G,
     SUM(CASE WHEN CAMADA = 'L4G5G' THEN KPI ELSE 0 END) AS CAC_4G_IN_5G,
-    SUM(KPI) AS TOTAL_CAC,
     ROUND(SUM(VALOR_TOTAL) / 1000000, 2) AS VALOR_TOTAL_MM
 FROM BASE
 WHERE TIPO_CASA IS NOT NULL

@@ -436,32 +436,30 @@ def get_casa_nova_nexus(filters):
 CASA_LABELS = {"CN": "Casa Nova", "CE": "Casa Existente"}
 
 
-def _linha_cac(projeto, cac_5g, cac_4g, cac_4g_in_5g, total_cac, valor_mm):
+def _linha_cac(projeto, cac_5g, cac_4g, cac_4g_in_5g, valor_mm):
     """Uma linha da tabela de CAC por projeto.
 
     Arredonda cada célula ANTES de somar (CAC é contagem de endereço —
-    fracionário não faz sentido pra quem lê), e deriva "outras camadas"
-    do que sobra entre TOTAL_CAC e as 3 camadas pivotadas. Sem essa
-    coluna a tabela não fecharia: existem valores de DLV_LEVEL_1 fora dos
-    3 baldes (AGRO/INDÚSTRIA/LOGÍSTICA, confirmado no CSV de amostra), e
-    o "Total" pareceria maior que a soma das colunas visíveis.
+    fracionário não faz sentido pra quem lê). `total_cac` é só a soma das
+    3 camadas pivotadas (5G/4G/4G in 5G) — pedido explícito do usuário
+    (jul/26) pra excluir "outras camadas" do cálculo, não só escondê-la da
+    tela. A view não fica mais SUM(KPI) bruto nenhum: qualquer KPI fora
+    dessas 3 camadas (histórico: B2B Mobile, ver git blame) some do total.
     """
     c5 = round(cac_5g or 0)
     c4 = round(cac_4g or 0)
     c45 = round(cac_4g_in_5g or 0)
-    total = round(total_cac or 0)
     return {
         "projeto": projeto,
         "cac_5g": c5,
         "cac_4g": c4,
         "cac_4g_in_5g": c45,
-        "cac_outras": total - (c5 + c4 + c45),
-        "total_cac": total,
+        "total_cac": c5 + c4 + c45,
         "valor_mm": round(valor_mm or 0, 2),
     }
 
 
-_CAMPOS_CAC = ("cac_5g", "cac_4g", "cac_4g_in_5g", "cac_outras", "total_cac")
+_CAMPOS_CAC = ("cac_5g", "cac_4g", "cac_4g_in_5g", "total_cac")
 
 
 def _somar_cac(linhas):
@@ -501,7 +499,7 @@ def get_r2_cac_por_projeto():
         segmentos.setdefault(segmento, []).append(_linha_cac(
             r["projeto"],
             r.get("cac_5g"), r.get("cac_4g"), r.get("cac_4g_in_5g"),
-            r.get("total_cac"), r.get("valor_total_mm"),
+            r.get("valor_total_mm"),
         ))
 
     cenarios = []
