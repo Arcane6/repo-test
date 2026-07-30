@@ -49,8 +49,16 @@ const fmt = (v: number) => v.toLocaleString("pt-BR");
  * Sites por tecnologia, em barras horizontais por combinação exata (uma
  * barra por cada uma das 15 combinações não vazias de 2G/3G/4G/5G — cada
  * site conta uma única vez, na combinação exata que possui). Clicar numa
- * barra filtra o próprio gráfico por aquela combinação; clicar de novo
- * limpa.
+ * barra destaca aquela combinação (as outras ficam esmaecidas); clicar de
+ * novo limpa.
+ *
+ * ⚠️ `selected` é só destaque visual local — NÃO é enviado como filtro
+ * pro backend. Antes o clique reconsultava a API filtrando a base pela
+ * combinação clicada, o que zerava TODAS as outras barras (a soma delas
+ * também é calculada sobre a mesma base filtrada) — parecia bug ("clica e
+ * fica zerado"), porque de fato zerava. O gráfico inteiro existe pra
+ * mostrar a distribuição das 15 combinações lado a lado; filtrando a
+ * própria base pra uma combinação não sobra o que comparar.
  */
 export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais, projetos } = filters;
@@ -58,8 +66,8 @@ export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
   const instanceRef = useRef<echarts.ECharts | null>(null);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["summary-r1-sites-venn", uf, municipio, ano, regionais, projetos, selected],
-    queryFn: () => summaryApi.r1SitesVenn(filters, selected),
+    queryKey: ["summary-r1-sites-venn", uf, municipio, ano, regionais, projetos],
+    queryFn: () => summaryApi.r1SitesVenn(filters),
   });
 
   const regions = data?.regions;
@@ -95,8 +103,8 @@ export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
             </div>
             <small className="text-muted d-block mb-2">
               {selected
-                ? `Filtrando por ${REGION_LABELS[selected]} — clique de novo pra limpar`
-                : "Cada site conta uma única vez, na combinação exata que possui — clique numa barra pra filtrar"}
+                ? `Destacando ${REGION_LABELS[selected]} — clique de novo pra limpar`
+                : "Cada site conta uma única vez — clique numa barra pra filtrar a combinação"}
             </small>
           </div>
           <ChartToolbar

@@ -136,8 +136,8 @@ def api_summary_r2_vendors():
 
 @mobile_access_bp.route("/api/summary/r2/casa-nova-nexus")
 def api_summary_r2_casa_nova_nexus():
-    """Meta NEXUS de Casa Nova (nacional, sem filtro geográfico)."""
-    return jsonify(summary.get_casa_nova_nexus())
+    """Meta NEXUS de Casa Nova, rateada geograficamente pelo rollout."""
+    return jsonify(summary.get_casa_nova_nexus(parse_filters()))
 
 @mobile_access_bp.route("/api/summary/r2/cac-por-projeto")
 def api_summary_r2_cac_por_projeto():
@@ -186,11 +186,6 @@ def api_sites_by_tecnologia():
     return jsonify(sites.get_sites_by_tecnologia(_sites_filters()))
 
 
-@mobile_access_bp.route("/api/sites/vendors")
-def api_sites_vendors():
-    return jsonify(sites.get_sites_vendors(_sites_filters()))
-
-
 @mobile_access_bp.route("/api/sites/pivot")
 def api_sites_pivot():
     return jsonify(sites.get_sites_pivot(_sites_filters()))
@@ -199,11 +194,6 @@ def api_sites_pivot():
 @mobile_access_bp.route("/api/sites/geo-points")
 def api_sites_geo_points():
     return jsonify(sites.get_sites_geo_points(_sites_filters()))
-
-
-@mobile_access_bp.route("/api/sites/tipo")
-def api_sites_tipo():
-    return jsonify(sites.get_sites_tipo(_sites_filters()))
 
 
 @mobile_access_bp.route("/api/sites/hierarchy")

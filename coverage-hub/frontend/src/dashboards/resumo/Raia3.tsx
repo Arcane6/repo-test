@@ -7,8 +7,9 @@ import { useResumoFocusStore } from "../../store/resumoFocus";
 
 /** Fonte do nº de "Casa Nova a contratar" no donut de fornecedores:
  *  - rollout: TB_ROLLOUT_ACESSO deduplicado por endereço (responde aos filtros)
- *  - nexus:   meta TB_NEXUS_CN_CE (755 CN 4G + 245 CN 5G = 1000; NACIONAL,
- *             não recorta por UF/regional — por isso o aviso no subtítulo) */
+ *  - nexus:   meta TB_NEXUS_CN_CE (755 CN 4G + 245 CN 5G = 1000 nacional),
+ *             rateada geograficamente pelo peso de OCs do rollout — também
+ *             responde a UF/município/regional (ver R2_CASA_NOVA_NEXUS_RATEIO) */
 type CasaNovaFonte = "rollout" | "nexus";
 
 export function Raia3({ filters }: { filters: SummaryFilters }) {
@@ -27,8 +28,8 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
 
   const [cnFonte, setCnFonte] = useState<CasaNovaFonte>("rollout");
   const { data: cnNexus } = useQuery({
-    queryKey: ["summary-r2-casa-nova-nexus"],
-    queryFn: () => summaryApi.r2CasaNovaNexus(),
+    queryKey: ["summary-r2-casa-nova-nexus", uf, municipio, ano, regionais],
+    queryFn: () => summaryApi.r2CasaNovaNexus(filters),
   });
 
   // Com a fonte NEXUS, o valor da fatia "A Contratar" vira a meta nacional
@@ -43,15 +44,15 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
     <div className="summary-raia mb-4" style={{ "--raia-color": "#7DC242" } as CSSProperties}>
       <div className="d-flex align-items-center mb-3">
         <span className="raia-badge me-2" style={{ background: "#7DC242" }}>R3</span>
-        <h5 className="fw-bold mb-0">Fechamento 26 (Projeção)</h5>
-        <small className="text-muted ms-3">Baseline + Plano — onde vamos fechar o ano</small>
+        <h5 className="fw-bold mb-0">Fechamento 2026 (Projeção)</h5>
+        <small className="text-muted ms-3">Baseline + Plano — como vamos fechar o ano</small>
       </div>
 
       <div className="row g-3">
         <div className="col-lg-6">
           <ChartPanel
-            title="Cidades 5G por Regional (Projeção EoY)"
-            subtitle="Clique num regional pra filtrar toda a aba"
+            title="Cidades 5G por Regional"
+            subtitle="Clique num regional pra filtrar"
             sourceTable={["MUNICIPIOS_FECHAMENTO", "REL_CIDADES_PLANEJADO_26"]}
             height={340}
             option={citiesAnf ? regionalSunburstOption(citiesAnf, focusedRegional) : {}}
@@ -80,12 +81,12 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
             subtitle={
               cnFonte === "rollout"
                 ? "Sites físicos · Base 25 + Casa Nova (endereços únicos do rollout)"
-                : "Sites físicos · Base 25 + Casa Nova (meta NEXUS — nacional, não filtra)"
+                : "Sites físicos · Base 25 + Casa Nova (meta NEXUS, rateada pelo rollout)"
             }
             sourceTable={
               cnFonte === "rollout"
                 ? ["BASE_TB_END_ID_NEW", "TB_ROLLOUT_ACESSO"]
-                : ["BASE_TB_END_ID_NEW", "TB_NEXUS_CN_CE"]
+                : ["BASE_TB_END_ID_NEW", "TB_NEXUS_CN_CE", "TB_ROLLOUT_ACESSO"]
             }
             height={340}
             headerExtra={
@@ -102,7 +103,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
                   type="button"
                   className={`btn ${cnFonte === "nexus" ? "btn-primary" : "btn-outline-secondary"}`}
                   onClick={() => setCnFonte("nexus")}
-                  title="Meta NEXUS (TB_NEXUS_CN_CE) — nacional, não recorta por filtro"
+                  title="Meta NEXUS (TB_NEXUS_CN_CE) rateada geograficamente pelo peso de OCs do rollout — responde aos filtros"
                 >
                   Meta NEXUS
                 </button>

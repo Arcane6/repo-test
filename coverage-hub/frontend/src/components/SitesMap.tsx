@@ -6,6 +6,7 @@ import { ChartToolbar } from "./ChartToolbar";
 import { SourceBadge } from "./SourceBadge";
 import { Skeleton } from "./Skeleton";
 import { downloadSheet } from "../utils/excelExport";
+import { downloadKml } from "../utils/kmlExport";
 import { sitesApi, type SitesFilters } from "../api/sites";
 import { useThemeStore } from "../theme/useThemeStore";
 import { TECH_COLORS, TECH_ORDER } from "../theme";
@@ -148,12 +149,12 @@ export function SitesMap({ filters }: { filters: SitesFilters }) {
         <div className="d-flex justify-content-between align-items-start mb-1 flex-wrap gap-2">
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
-              <h6 className="fw-bold mb-0">Sites no Mapa</h6>
+              <h6 className="fw-bold mb-0">Distribuição geográfica dos sites</h6>
               <SourceBadge table="TB_FT_BASE_UNICA_SITES" />
             </div>
             <small className="text-muted d-block mb-2">
-              Cada ponto é um site, colorido pela tecnologia máxima — arraste, role pra
-              dar zoom, use o controle no canto pra trocar de camada
+              Cada site é um ponto colorido pela sua melhor tecnologia — arraste, role pra
+              dar zoom.
             </small>
           </div>
           <div className="d-flex align-items-center gap-2">
@@ -189,6 +190,13 @@ export function SitesMap({ filters }: { filters: SitesFilters }) {
                   rows: points,
                 })
               }
+              extraActions={[
+                {
+                  icon: "bi bi-geo",
+                  title: "Exportar KML (Google Earth, QGIS, etc.)",
+                  onClick: () => downloadKml("sites-mapa.kml", points, "Sites — Acesso Móvel"),
+                },
+              ]}
             />
           </div>
         </div>

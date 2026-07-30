@@ -170,9 +170,9 @@ export const summaryApi = {
     fetchJson<SlicesResponse>(`${BASE}/r2/new-cities-by-anf?${query(f)}`),
   r2VendorsNewSites: (f: SummaryFilters) =>
     fetchJson<LabeledValue[]>(`${BASE}/r2/vendors-new-sites?${query(f)}`),
-  /** Meta NEXUS de Casa Nova — nacional, não recebe filtros. */
-  r2CasaNovaNexus: () =>
-    fetchJson<CasaNovaNexusResponse>(`${BASE}/r2/casa-nova-nexus`),
+  /** Meta NEXUS de Casa Nova, rateada geograficamente pelo rollout — responde a UF/município/regional. */
+  r2CasaNovaNexus: (f: SummaryFilters) =>
+    fetchJson<CasaNovaNexusResponse>(`${BASE}/r2/casa-nova-nexus?${query(f)}`),
   /** CAC em 3 níveis (Casa Nova/Existente > segmento > projeto) — nacional,
    * sem rateio (a view não tem dimensão geográfica); o combo de cenário é
    * escolhido no front, sem request novo. */

@@ -56,7 +56,7 @@ export function SitesPivotTable({ filters }: { filters: SitesFilters }) {
       <div className="card-body d-flex flex-column">
         <div className="d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
           <div className="d-flex align-items-center gap-2">
-            <h6 className="fw-bold mb-0">Sites por Regional / UF / Município</h6>
+            <h6 className="fw-bold mb-0">Sites por Município</h6>
             <SourceBadge table="TB_FT_BASE_UNICA_SITES" />
           </div>
           <div className="d-flex align-items-center gap-2 flex-wrap">

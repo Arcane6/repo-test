@@ -1,6 +1,14 @@
+interface ExtraAction {
+  icon: string;
+  title: string;
+  onClick: () => void;
+}
+
 interface ChartToolbarProps {
   onDownloadImage?: () => void;
   onExportData?: () => void;
+  /** Ações extras além do par padrão (ex.: exportar KML no mapa de sites). */
+  extraActions?: ExtraAction[];
 }
 
 /**
@@ -8,8 +16,8 @@ interface ChartToolbarProps {
  * (PNG, pra colar em PPTX) e exportar os dados brutos por trás dele
  * (Excel). Qualquer gráfico novo ganha isso só passando os callbacks.
  */
-export function ChartToolbar({ onDownloadImage, onExportData }: ChartToolbarProps) {
-  if (!onDownloadImage && !onExportData) return null;
+export function ChartToolbar({ onDownloadImage, onExportData, extraActions }: ChartToolbarProps) {
+  if (!onDownloadImage && !onExportData && !extraActions?.length) return null;
 
   return (
     <div className="d-flex gap-1">
@@ -33,6 +41,17 @@ export function ChartToolbar({ onDownloadImage, onExportData }: ChartToolbarProp
           <i className="bi bi-file-earmark-excel" />
         </button>
       )}
+      {extraActions?.map((a) => (
+        <button
+          key={a.title}
+          type="button"
+          className="btn btn-sm btn-outline-secondary"
+          title={a.title}
+          onClick={a.onClick}
+        >
+          <i className={a.icon} />
+        </button>
+      ))}
     </div>
   );
 }

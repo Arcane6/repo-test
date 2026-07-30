@@ -157,7 +157,7 @@ def get_kpis(ufs=None, municipios=None, tecs=None, venn_region=None):
     return {
         "total_municipios": total,
         "cards": [
-            {"label": "Municípios TIM", "value": cobertos, "percent": _pct(cobertos, total), "color": TIM_BRAND_COLOR},
+            {"label": "Presença TIM", "value": cobertos, "percent": _pct(cobertos, total), "color": TIM_BRAND_COLOR},
             {"label": "5G", "value": m_5g, "percent": _pct(m_5g, total), "color": TECH_COLORS["5G"]},
             {"label": "4G", "value": m_4g, "percent": _pct(m_4g, total), "color": TECH_COLORS["4G"]},
             {"label": "3G", "value": m_3g, "percent": _pct(m_3g, total), "color": TECH_COLORS["3G"]},
@@ -261,7 +261,7 @@ def get_gauges(ufs=None, municipios=None, tecs=None, venn_region=None):
     return {
         "labels": {"prev": prev_label, "curr": curr_label},
         "total_municipios": row.get("total_municipios", 0) or 0,
-        "cards": [card("Municípios TIM", "tim", TIM_BRAND_COLOR)]
+        "cards": [card("Presença TIM", "tim", TIM_BRAND_COLOR)]
         + [card(t, t.lower(), TECH_COLORS[t]) for t in reversed(TECH_ORDER)],
     }
 

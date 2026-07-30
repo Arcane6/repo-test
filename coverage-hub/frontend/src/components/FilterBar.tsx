@@ -62,7 +62,15 @@ export function FilterBar({ fields }: FilterBarProps) {
                 placeholder="Todas as UFs"
                 options={ufOptions.map((u) => ({ value: u, label: u }))}
                 value={uf.map((u) => ({ value: u, label: u }))}
-                onChange={(selected) => setValues("uf", selected.map((s) => s.value))}
+                onChange={(selected) => {
+                  // Limpa o município selecionado ao trocar de UF: o filtro
+                  // guarda só o nome do município (sem a UF de origem), então
+                  // uma cidade escolhida antes de mudar a UF podia ficar
+                  // presa numa combinação impossível (UF X + município de
+                  // outra UF) e zerar tudo em silêncio.
+                  setValues("uf", selected.map((s) => s.value));
+                  if (municipio.length > 0) setValues("municipio", []);
+                }}
               />
             </div>
           )}
@@ -77,6 +85,8 @@ export function FilterBar({ fields }: FilterBarProps) {
                 menuPosition="fixed"
                 placeholder="Digite um município..."
                 loadOptions={loadMunicipios}
+                defaultOptions
+                cacheOptions={uf.join(",")}
                 value={municipio.map((m) => ({ value: m, label: m }))}
                 onChange={(selected) =>
                   setValues(
@@ -130,14 +140,6 @@ export function FilterBar({ fields }: FilterBarProps) {
             </button>
           </div>
         </div>
-
-        {fields.includes("tecnologia") && tecnologia.length > 0 && (
-          <div className="small text-muted mt-2">
-            <i className="bi bi-info-circle me-1" />
-            Filtro de tecnologia aplicado via clique no gráfico de frequências
-            também aparece aqui — os dois estão sincronizados.
-          </div>
-        )}
       </div>
     </div>
   );

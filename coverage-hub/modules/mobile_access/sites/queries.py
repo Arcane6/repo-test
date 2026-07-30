@@ -44,7 +44,7 @@ WITH BASE AS (
     {municipio_filter_site}
 ),
 GEO AS (
-    SELECT IBGE, REGIONAL
+    SELECT IBGE, REGIONAL, UF, MUNICIPIO
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -83,14 +83,24 @@ WHERE 1=1
 """
 
 # ---------- Pivot: mesmas duas métricas acima, abertas por Regional/UF/ ----------
-# Município. Uma linha por (Regional, UF, Município) com as 9 colunas de
-# métrica — o agrupamento/hierarquia de exibição fica por conta do
-# frontend, o backend só entrega a base já agregada no menor grão.
+# Município. Uma linha por município (agrupado por IBGE — ver nota abaixo)
+# com as 9 colunas de métrica — o agrupamento/hierarquia de exibição fica
+# por conta do frontend, o backend só entrega a base já agregada no menor
+# grão.
+#
+# ⚠️ Agrupar por IBGE (`b.IBGE`), NUNCA por `b.UF`/`b.MUNICIPIO` (texto):
+# já apareceu em produção o total de linhas passando de 5570 (o nº real de
+# municípios do Brasil) pra 5623 — a mesma cidade grava o nome de forma
+# levemente diferente em snapshots/linhas diferentes de
+# TB_FT_BASE_UNICA_SITES (acento, espaço, caixa), então agrupar pelo texto
+# fragmentava um único município em duas linhas. UF/Município exibidos vêm
+# do nome CANÔNICO de MUNICIPIOS_FECHAMENTO (GEO), com fallback pro nome
+# bruto do site só no raríssimo caso de IBGE sem match.
 SITES_PIVOT = SITES_BASE_CTE + """
 SELECT
     g.REGIONAL,
-    b.UF,
-    b.MUNICIPIO,
+    COALESCE(g.UF, MAX(b.UF)) AS UF,
+    COALESCE(g.MUNICIPIO, MAX(b.MUNICIPIO)) AS MUNICIPIO,
     SUM(CASE WHEN b.HAS_5G = 1 THEN 1 ELSE 0 END) AS max_5g,
     SUM(CASE WHEN b.HAS_5G = 0 AND b.HAS_4G = 1 THEN 1 ELSE 0 END) AS max_4g,
     SUM(CASE WHEN b.HAS_5G = 0 AND b.HAS_4G = 0 AND b.HAS_3G = 1 THEN 1 ELSE 0 END) AS max_3g,
@@ -104,63 +114,8 @@ FROM BASE b
 LEFT JOIN GEO g ON g.IBGE = b.IBGE
 WHERE 1=1
 {regional_filter_site}
-GROUP BY g.REGIONAL, b.UF, b.MUNICIPIO
-ORDER BY g.REGIONAL, b.UF, b.MUNICIPIO
-"""
-
-# ---------- Fornecedor dominante por site ----------
-# Fonte: NTW_MABE.BASE_TB_END_ID_NEW — mesma tabela e mesma cascata de
-# colunas VENDOR_* (maior banda primeiro dentro de cada tec) já usada em
-# R1_VENDORS (summary/queries.py), confirmada pelo usuário via query real
-# do Power BI antigo (Odbc.Query em NTW_MABE.BASE_TB_END_ID_NEW). Aqui o
-# join é feito DENTRO do universo de sites já filtrado desta aba (BASE),
-# não como query independente — assim o total de "sites com fornecedor"
-# bate com o total das outras visões da mesma tela, em vez de ter dois
-# universos de sites diferentes na mesma aba.
-SITES_VENDORS = SITES_BASE_CTE + """,
-VENDOR_BASE AS (
-    SELECT
-        END_ID,
-        -- Cascata 5G (maior banda primeiro): 3500 > 26000 > 2600 > 2300 > 2100 > 1800 > 700
-        -- NULLIF(TRIM(...), '') normaliza string vazia/só espaço pra NULL em
-        -- CADA coluna antes do COALESCE — sem isso, uma banda maior com ''
-        -- "vencia" a cascata e escondia o fornecedor real de uma banda menor.
-        COALESCE(
-            NULLIF(TRIM(VENDOR_NR_3500), ''), NULLIF(TRIM(VENDOR_NR_26000), ''), NULLIF(TRIM(VENDOR_NR_2600DSS), ''),
-            NULLIF(TRIM(VENDOR_NR_2300), ''), NULLIF(TRIM(VENDOR_NR_2100DSS), ''), NULLIF(TRIM(VENDOR_NR_1800DSS), ''), NULLIF(TRIM(VENDOR_NR_700DSS), '')
-        ) AS VENDOR_5G,
-        -- Cascata 4G: 2600P > 2600 > 2600RS > 2300 > 2100 > 1800 > 850 > 700
-        COALESCE(
-            NULLIF(TRIM(VENDOR_LTE_2600P), ''), NULLIF(TRIM(VENDOR_LTE_2600), ''), NULLIF(TRIM(VENDOR_LTE_2600RS), ''),
-            NULLIF(TRIM(VENDOR_LTE_2300), ''), NULLIF(TRIM(VENDOR_LTE_2100), ''), NULLIF(TRIM(VENDOR_LTE_1800), ''),
-            NULLIF(TRIM(VENDOR_LTE_850), ''), NULLIF(TRIM(VENDOR_LTE_700), '')
-        ) AS VENDOR_4G,
-        -- Cascata 3G: 2100 > 850
-        COALESCE(NULLIF(TRIM(VENDOR_UMTS_2100), ''), NULLIF(TRIM(VENDOR_UMTS_850), '')) AS VENDOR_3G,
-        -- Cascata 2G: 1800 > 900
-        COALESCE(NULLIF(TRIM(VENDOR_GSM_1800), ''), NULLIF(TRIM(VENDOR_GSM_900), '')) AS VENDOR_2G
-    FROM NTW_MABE.BASE_TB_END_ID_NEW
-    WHERE REF = (
-        SELECT REF
-        FROM (
-            SELECT REF
-            FROM NTW_MABE.BASE_TB_END_ID_NEW
-            GROUP BY REF
-            ORDER BY TO_DATE(REF, 'MM-YYYY') DESC
-        )
-        WHERE ROWNUM = 1
-    )
-)
-SELECT
-    COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'NÃO INFORMADO') AS VENDOR,
-    COUNT(*) AS qtd
-FROM BASE b
-LEFT JOIN GEO g ON g.IBGE = b.IBGE
-LEFT JOIN VENDOR_BASE vb ON vb.END_ID = b.END_ID
-WHERE 1=1
-{regional_filter_site}
-GROUP BY COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'NÃO INFORMADO')
-ORDER BY qtd DESC
+GROUP BY b.IBGE, g.REGIONAL, g.UF, g.MUNICIPIO
+ORDER BY g.REGIONAL, 2, 3
 """
 
 # ---------- Sites com coordenada — um ponto por site, com a tecnologia ----------
@@ -187,34 +142,6 @@ AND LATITUDE IS NOT NULL
 AND LONGITUDE IS NOT NULL
 {uf_filter_site}
 {municipio_filter_site}
-"""
-
-# ---------- Tipo de site — universo diferente das queries acima: aqui ----------
-# NÃO filtra MOBILE_SITE = 'SIM' (é justamente uma das dimensões
-# mostradas), só STATUS_END_ID = 'ATIVADO' e exclui roaming. Cruza
-# MOBILE_SITE x TX_PROFILE (FLAG_TX_PROFILE_ENG) num 2x2.
-SITES_TIPO = """
-WITH BASE_TIPO AS (
-    SELECT
-        END_ID, IBGE, UF, MUNICIPIO,
-        MOBILE_SITE,
-        FLAG_TX_PROFILE_ENG
-    FROM NTW_OP.TB_FT_BASE_UNICA_SITES
-    WHERE MES_REF = (
-        SELECT MAX(MES_REF) FROM NTW_OP.TB_FT_BASE_UNICA_SITES
-    )
-    AND STATUS_END_ID = 'ATIVADO'
-    AND TIPO_SITE <> 'ROAMING VIVO'
-    {uf_filter_site}
-    {municipio_filter_site}
-)
-SELECT
-    SUM(CASE WHEN MOBILE_SITE = 'SIM' AND FLAG_TX_PROFILE_ENG = 'SIM' THEN 1 ELSE 0 END) AS mobile_tx,
-    SUM(CASE WHEN MOBILE_SITE = 'SIM' AND (FLAG_TX_PROFILE_ENG IS NULL OR FLAG_TX_PROFILE_ENG <> 'SIM') THEN 1 ELSE 0 END) AS mobile_no_tx,
-    SUM(CASE WHEN (MOBILE_SITE IS NULL OR MOBILE_SITE <> 'SIM') AND FLAG_TX_PROFILE_ENG = 'SIM' THEN 1 ELSE 0 END) AS nonmobile_tx,
-    SUM(CASE WHEN (MOBILE_SITE IS NULL OR MOBILE_SITE <> 'SIM') AND (FLAG_TX_PROFILE_ENG IS NULL OR FLAG_TX_PROFILE_ENG <> 'SIM') THEN 1 ELSE 0 END) AS nonmobile_no_tx,
-    COUNT(*) AS total_sites
-FROM BASE_TIPO
 """
 
 # ---------- Árvore de composição de sites (Total de Sites Ativos) ----------

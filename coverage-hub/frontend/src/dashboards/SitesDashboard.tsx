@@ -3,9 +3,11 @@ import { FilterBar } from "../components/FilterBar";
 import { ChartPanel } from "../components/ChartPanel";
 import { SitesPivotTable } from "../components/SitesPivotTable";
 import { SitesMap } from "../components/SitesMap";
-import { barsByTechOption, siteHierarchyTreeOption, vendorDonutSideOption } from "../charts/optionBuilders";
+import { barsByTechOption, siteHierarchyTreeOption } from "../charts/optionBuilders";
 import { sitesApi } from "../api/sites";
 import { useFilterStore } from "../store/filters";
+
+const fmt = (v: number) => v.toLocaleString("pt-BR");
 
 export function SitesDashboard() {
   const { uf, municipio } = useFilterStore();
@@ -21,29 +23,10 @@ export function SitesDashboard() {
     queryFn: () => sitesApi.byTecnologia(filters),
   });
 
-  const { data: vendors, isFetching: loadingVendors } = useQuery({
-    queryKey: ["sites-vendors", uf, municipio],
-    queryFn: () => sitesApi.vendors(filters),
-  });
-
-  const { data: tipo, isFetching: loadingTipo } = useQuery({
-    queryKey: ["sites-tipo", uf, municipio],
-    queryFn: () => sitesApi.tipo(filters),
-  });
-
   const { data: hierarchy, isFetching: loadingHierarchy } = useQuery({
     queryKey: ["sites-hierarchy", uf, municipio],
     queryFn: () => sitesApi.hierarchy(filters),
   });
-
-  const tipoItems = tipo
-    ? [
-        { label: "Móvel · TX Profile", value: tipo.mobile_tx, color: "#003399" },
-        { label: "Móvel · sem TX Profile", value: tipo.mobile_no_tx, color: "#7d9cff" },
-        { label: "Não-móvel · TX Profile", value: tipo.nonmobile_tx, color: "#6c757d" },
-        { label: "Não-móvel · sem TX Profile", value: tipo.nonmobile_no_tx, color: "#c7ccd1" },
-      ]
-    : [];
 
   return (
     <div className="tim-page-enter">
@@ -56,14 +39,14 @@ export function SitesDashboard() {
       <div className="row g-3">
         <div className="col-lg-6">
           <ChartPanel
-            title="Sites por Tecnologia Máxima"
-            subtitle="Cada site conta uma única vez, na tecnologia mais nova que tem (cascata 5G > 4G > 3G > 2G)"
+            title="Sites por melhor Tecnologia"
+            subtitle={`Cada site conta apenas na melhor tecnologia que tem (5G > 4G > 3G > 2G) · Total: ${fmt(maxTech?.total ?? 0)}`}
             sourceTable="TB_FT_BASE_UNICA_SITES"
             option={barsByTechOption(maxTech?.bars ?? [], maxTech?.total ?? 0)}
             loading={loadingMaxTech}
-            imageFilename="sites-por-tecnologia-maxima.png"
+            imageFilename="sites-por-melhor-tecnologia.png"
             exportSheet={{
-              name: "Sites por Tecnologia Máxima",
+              name: "Sites por Melhor Tecnologia",
               columns: [
                 { header: "Tecnologia", key: "tec" },
                 { header: "Sites", key: "value" },
@@ -96,13 +79,25 @@ export function SitesDashboard() {
       <div className="row g-3 mt-1">
         <div className="col-12">
           <ChartPanel
-            title="Composição de Sites"
-            subtitle="Da base bruta (Total de Sites Ativos) até o universo Mobile Sites usado nos gráficos acima — inventário mais recente, não o fechamento congelado da Raia 1 do Resumo"
+            title="Total de sites ativos"
+            subtitle="Da base completa de Sites Ativos aos Sites utilizado nos gráficos acima."
             sourceTable="TB_FT_BASE_UNICA_SITES"
             height={280}
             option={siteHierarchyTreeOption(hierarchy)}
             loading={loadingHierarchy}
             imageFilename="sites-composicao-de-sites.png"
+            footnote={
+              <>
+                * Mobile Sites — fonte oficial:{" "}
+                <a
+                  href="https://app.powerbi.com/groups/me/reports/c377f81a-656f-4458-b7d7-89928a45c7af/ReportSectione82bf651216ff56f09fa?experience=power-bi"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Power BI
+                </a>
+              </>
+            }
             exportSheet={{
               name: "Sites Composição",
               columns: [
@@ -130,48 +125,6 @@ export function SitesDashboard() {
       <div className="row g-3 mt-1">
         <div className="col-12">
           <SitesMap filters={filters} />
-        </div>
-      </div>
-
-      <div className="row g-3 mt-1">
-        <div className="col-lg-6">
-          <ChartPanel
-            title="Fornecedor Dominante por Site"
-            subtitle="Cascata por banda (maior primeiro) dentro de cada tecnologia — mesma fonte e regra do 'Fornecedor por Site' do Resumo"
-            sourceTable="BASE_TB_END_ID_NEW"
-            height={280}
-            option={vendorDonutSideOption(vendors ?? [])}
-            loading={loadingVendors}
-            imageFilename="sites-fornecedor-dominante.png"
-            exportSheet={{
-              name: "Sites por Fornecedor",
-              columns: [
-                { header: "Fornecedor", key: "label" },
-                { header: "Sites", key: "value" },
-              ],
-              rows: vendors ?? [],
-            }}
-          />
-        </div>
-
-        <div className="col-lg-6">
-          <ChartPanel
-            title="Tipo de Site"
-            subtitle="Site móvel × perfil de transmissão configurado (TX Profile) — inclui site não-móvel, universo diferente das outras visões desta aba"
-            sourceTable="TB_FT_BASE_UNICA_SITES"
-            height={280}
-            option={vendorDonutSideOption(tipoItems)}
-            loading={loadingTipo}
-            imageFilename="sites-tipo-de-site.png"
-            exportSheet={{
-              name: "Tipo de Site",
-              columns: [
-                { header: "Categoria", key: "label" },
-                { header: "Sites", key: "value" },
-              ],
-              rows: tipoItems,
-            }}
-          />
         </div>
       </div>
 

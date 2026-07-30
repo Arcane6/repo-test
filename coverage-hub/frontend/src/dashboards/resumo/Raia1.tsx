@@ -29,7 +29,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
     <div className="summary-raia mb-4" style={{ "--raia-color": "#003399" } as CSSProperties}>
       <div className="d-flex align-items-center mb-3">
         <span className="raia-badge me-2" style={{ background: "#003399" }}>R1</span>
-        <h5 className="fw-bold mb-0">Fechamento 25</h5>
+        <h5 className="fw-bold mb-0">Fechamento 2025</h5>
         <small className="text-muted ms-3">Rede consolidada até 31/dez do ano anterior</small>
       </div>
 
@@ -37,8 +37,9 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-4">
           <ChartPanel
             title="Cidades Cobertas por Tecnologia"
-            subtitle="Clique numa barra pra destacar a tecnologia nas outras raias"
+            subtitle="Clique numa barra para filtrar uma tecnologia"
             sourceTable="MUNICIPIOS_FECHAMENTO"
+            sourceDateFormat="month"
             option={barsByTechOption(cities?.bars ?? [], cities?.total ?? 0, focusedTec)}
             loading={loadingCities}
             onClick={(e) => toggleTecnologia(e.name)}
@@ -58,7 +59,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
         </div>
         <div className="col-lg-4">
           <ChartPanel
-            title="Fornecedor por Site"
+            title="Sites por Fornecedor"
             sourceTable="BASE_TB_END_ID_NEW"
             height={340}
             option={vendorDonutSideOption(vendors ?? [])}
@@ -76,13 +77,25 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
         </div>
         <div className="col-12">
           <ChartPanel
-            title="Composição de Sites"
-            subtitle="Da base bruta (Total de Sites Ativos) até o universo Mobile Sites usado nos gráficos acima"
+            title="Total de sites ativos"
+            subtitle="Da base completa de Sites Ativos aos Sites utilizado nos gráficos acima."
             sourceTable="TB_FT_BASE_UNICA_SITES"
             height={280}
             option={siteHierarchyTreeOption(hierarchy)}
             loading={loadingHierarchy}
             imageFilename="r1-composicao-de-sites.png"
+            footnote={
+              <>
+                * Mobile Sites — fonte oficial:{" "}
+                <a
+                  href="https://app.powerbi.com/groups/me/reports/c377f81a-656f-4458-b7d7-89928a45c7af/ReportSectione82bf651216ff56f09fa?experience=power-bi"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Power BI
+                </a>
+              </>
+            }
             exportSheet={{
               name: "R1 Composição de Sites",
               columns: [

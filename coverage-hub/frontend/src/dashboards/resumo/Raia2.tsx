@@ -36,14 +36,14 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
     <div className="summary-raia mb-4" style={{ "--raia-color": "#F5C518" } as CSSProperties}>
       <div className="d-flex align-items-center mb-3">
         <span className="raia-badge me-2" style={{ background: "#F5C518", color: "#000" }}>R2</span>
-        <h5 className="fw-bold mb-0">Plano 26</h5>
-        <small className="text-muted ms-3">O que planejamos entregar no ano</small>
+        <h5 className="fw-bold mb-0">Plano 2026</h5>
+        <small className="text-muted ms-3">O que planejamos entregar nesse ano</small>
       </div>
 
       <div className="row g-3">
         <div className="col-lg-4">
           <ChartPanel
-            title="Novas Cidades por Regional"
+            title="Novas Cidades 5G por Regional"
             subtitle="Clique num regional pra filtrar toda a aba"
             sourceTable="REL_CIDADES_PLANEJADO_26"
             height={340}
@@ -66,7 +66,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
           <ChartPanel
             title="Orçamento por Tecnologia"
             subtitle="CAPEX x OPEX/LEASE rateado por OC (R$ milhões)"
-            sourceTable={["TB_ROLLOUT_ACESSO", "TB_NEXUS_FINANCEIRO"]}
+            sourceTable="TB_NEXUS_FINANCEIRO"
             height={340}
             option={stackedBarsOption(
               orcamento?.categories ?? [],
@@ -75,6 +75,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
             )}
             loading={loadingOrcamento}
             imageFilename="r2-orcamento-por-tecnologia.png"
+            footnote="* Valores por município estimados a partir da estratificação do Rollout de Acesso (referência: Data do arquivo de rollout)."
             exportSheet={{
               name: "R2 Orçamento por Tecnologia",
               columns: [
@@ -94,7 +95,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
         <div className="col-lg-4">
           <ChartPanel
             title="Endereço por Tecnologia"
-            subtitle="CAC rateado por OC — Casa Nova (CN) x Casa Existente (CE)"
+            subtitle="Novos endereços no CAC — Casa Nova (CN) x Casa Existente (CE)"
             sourceTable={["TB_ROLLOUT_ACESSO", "VW_CAPEX_MASTER_FULL"]}
             height={340}
             headerExtra={
@@ -120,6 +121,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
             )}
             loading={loadingEndereco}
             imageFilename="r2-endereco-por-tecnologia.png"
+            footnote="* Valores por município estimados a partir da estratificação do Rollout de Acesso (referência: Data do arquivo de rollout)."
             exportSheet={{
               name: "R2 Endereço por Tecnologia",
               columns: [
