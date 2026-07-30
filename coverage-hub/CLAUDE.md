@@ -1096,6 +1096,59 @@ jogá-la pra direita, e abrir um resumo novo à esquerda.
   cenário muda por ciclo de planejamento — não assumir que esse valor
   sempre existirá na view.
 
+## "Endereço por Tecnologia" — unificado com "CAC por Projeto" (jul/26)
+
+Dois ajustes depois de o usuário conferir os números do resumo "MBB
+Evolution + B2B IoT" contra uma fonte externa (achou o CAPEX "bem
+diferente" do esperado — 1.845,3 total, 1.674,7 em 5G + 170,6 em 4G).
+
+- **`CAPEX_BASE` (dentro de `R2_ENDERECO_POR_TECNOLOGIA`) trocou de
+  classificação de TECH/TIPO_CASA pra ser IDÊNTICA à de
+  `R2_CAC_POR_PROJETO`** — pedido explícito do usuário ("a mecânica...
+  deve ser a mesma da tabela MBB Evolution + B2B IoT"). A classificação
+  antiga (histórica, não reintroduzir) usava `TAG_2`/`SOURCE_AJUSTADO`
+  numa lista extensa de valores especiais e um `ELSE '5G'` que jogava
+  QUALQUER KPI não classificado pra dentro de 5G — inclusive o que
+  `R2_CAC_POR_PROJETO` já tinha identificado como "outras camadas" (KPI
+  de `DLV_LEVEL_1` fora dos 3 baldes, ver seção da view acima) e excluído
+  do cálculo lá. As duas queries divergiam por isso: uma incluía esse
+  resto (dentro de 5G), a outra não incluía em lugar nenhum. Agora as
+  duas usam a mesma `CASE` simples (`DLV_LEVEL_1 = '5G LAYERS'` → 5G,
+  `'4G LAYERS'` → 4G, `'4G IN 5G LAYERS'`/`'4G/5G LAYERS'` → 4G, resto
+  fica de fora), com os mesmos filtros (`PRIORIDADE='IMPRESCINDÍVEL'`,
+  `LAYER_SUBAREA='MOBILE ACCESS'`, `DLV_LEVEL_3 IN ('CASA NOVA','CASA
+  EXISTENTE')`). O rateio geográfico por OC (`ROLLOUT_REFERENCIA`/
+  `TOTAL_OCS_GRUPO_ALL`) continua exclusivo deste visual — só a
+  classificação de tech/tipo de casa foi unificada.
+  - **⚠️ Números ainda não confirmados contra o Oracle real** — este
+    sandbox não tem conectividade com o banco (ver "Rodar frontend", no
+    topo do arquivo). O usuário reportou o CAPEX do resumo
+    "MBB Evolution + B2B IoT" divergindo de uma referência externa
+    (esperado: 1.845,3 = 1.674,7 5G + 170,6 4G); a query e a
+    classificação foram revisadas e documentadas aqui, mas **validar os
+    dois visuais (Endereço por Tecnologia e MBB Evolution) contra o
+    Oracle real no primeiro deploy** antes de considerar resolvido.
+- **Rótulo de total acima da barra empilhada ficava travado ao
+  esconder uma série pela legenda** (bug real, achado pelo usuário
+  clicando em CN/CE): `buildStackedSeries` (`optionBuilders.ts`)
+  desenha uma série fantasma (`"__total__"`) só pra escrever o total em
+  cima da barra — antes o valor vinha de uma closure JS calculada uma
+  única vez (soma de TODAS as séries reais), então trocar a seleção na
+  legenda escondia a barra mas não recalculava esse texto. Fix em duas
+  pontas:
+  1. A série fantasma agora carrega o total dentro do próprio dado
+     (`data: [{value: 0, total: t}, ...]`) em vez de indexar uma
+     closure externa por `dataIndex` — o `label.formatter` só lê
+     `p.data.total`.
+  2. `Chart.tsx` ganhou um novo efeito (`legendselectchanged`) que
+     detecta a série `"__total__"`, recalcula os totais somando só as
+     séries ainda selecionadas, e atualiza a série fantasma via
+     `chart.setOption` — mesmo princípio já usado pro total no centro
+     dos donuts (efeito irmão, logo acima no mesmo arquivo), agora
+     também pra barra empilhada. Vale pra qualquer gráfico que use
+     `showTotalLabel: true` (Orçamento por Tecnologia e Endereço por
+     Tecnologia hoje) — não é específico de um card.
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.
