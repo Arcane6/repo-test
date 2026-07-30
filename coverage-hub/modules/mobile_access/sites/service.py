@@ -15,22 +15,9 @@ from modules.mobile_access.sites.queries import (
     SITES_BY_MAX_TECH,
     SITES_BY_TECNOLOGIA,
     SITES_PIVOT,
-    SITES_VENDORS,
     SITES_GEO_POINTS,
-    SITES_TIPO,
     SITES_HIERARCHY,
 )
-
-
-# Mesma paleta de VENDOR_COLORS de summary/service.py — cada aba mantém
-# sua própria cópia (ver nota acima sobre duplicação de helpers).
-VENDOR_COLORS = {
-    "NOKIA":     "#124191",
-    "ERICSSON":  "#0082F0",
-    "HUAWEI":    "#E60012",
-    "ZTE":       "#3A67C1",
-    "NÃO INFORMADO": "#6c757d",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -143,26 +130,6 @@ def get_sites_by_tecnologia(filters):
     return _tech_bars_payload(row)
 
 
-def get_sites_vendors(filters):
-    """Fornecedor dominante por site (cascata NTW_MABE.BASE_TB_END_ID_NEW,
-    maior banda primeiro dentro de cada tec) — join feito dentro do
-    universo de sites já filtrado desta aba, pra bater com o total das
-    outras visões da mesma tela."""
-    params = {}
-    sql = _apply_geo(SITES_VENDORS, filters, params)
-    rows = execute_query(sql, params) or []
-    result = []
-    for r in rows:
-        name = r.get("vendor", "NÃO INFORMADO") or "NÃO INFORMADO"
-        value = r.get("qtd", 0) or 0
-        result.append({
-            "label": name,
-            "value": value,
-            "color": VENDOR_COLORS.get(name, "#888888"),
-        })
-    return result
-
-
 def get_sites_pivot(filters):
     """Base linha-a-linha (Regional, UF, Município) com as duas métricas
     (max-tech e por-tecnologia) — a UI decide como agrupar/expandir."""
@@ -211,22 +178,6 @@ def get_sites_geo_points(filters):
             }
             for r in rows
         ],
-    }
-
-
-def get_sites_tipo(filters):
-    """Cruza MOBILE_SITE x TX_PROFILE (FLAG_TX_PROFILE_ENG) — universo
-    diferente das outras views desta aba: inclui site não-móvel também,
-    só exige STATUS_END_ID='ATIVADO' e exclui roaming."""
-    params = {}
-    sql = _apply_geo(SITES_TIPO, filters, params)
-    row = (execute_query(sql, params) or [{}])[0]
-    return {
-        "mobile_tx": row.get("mobile_tx", 0) or 0,
-        "mobile_no_tx": row.get("mobile_no_tx", 0) or 0,
-        "nonmobile_tx": row.get("nonmobile_tx", 0) or 0,
-        "nonmobile_no_tx": row.get("nonmobile_no_tx", 0) or 0,
-        "total_sites": row.get("total_sites", 0) or 0,
     }
 
 

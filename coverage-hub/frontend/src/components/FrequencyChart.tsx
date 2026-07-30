@@ -13,12 +13,16 @@ function bandaSortKey(banda: string): [number, string] {
 }
 
 /**
- * Frequências por banda, empilhadas por tecnologia (legenda). Clicar num
- * segmento filtra o resto do dashboard por aquela tecnologia (cross-filter)
- * — clicar de novo remove o filtro.
+ * Frequências por banda, empilhadas por tecnologia (legenda).
+ *
+ * ⚠️ Já teve clique-pra-filtrar (cross-filter de tecnologia) aqui —
+ * removido a pedido do usuário, que ficou preso no filtro sem conseguir
+ * sair clicando de novo. Filtro de tecnologia continua disponível pelo
+ * seletor da FilterBar (mesmo `tecnologia` do store, só sem o atalho de
+ * clicar direto na barra).
  */
 export function FrequencyChart() {
-  const { uf, municipio, tecnologia, vennRegion, toggle } = useFilterStore();
+  const { uf, municipio, tecnologia, vennRegion } = useFilterStore();
 
   const { data, isFetching } = useQuery({
     queryKey: ["actual-frequencies", uf, municipio, tecnologia, vennRegion],
@@ -52,7 +56,7 @@ export function FrequencyChart() {
       const [bn, bs] = bandaSortKey(b.banda);
       return an !== bn ? an - bn : as_.localeCompare(bs);
     });
-    const categories = sortedBars.map((b) => `${b.banda} MHz (${b.tec})`);
+    const categories = sortedBars.map((b) => `${b.tec} ${b.banda}MHz`);
 
     const tecsPresent = TECH_ORDER.filter((t) => bars.some((b) => b.tec === t));
 
@@ -62,7 +66,7 @@ export function FrequencyChart() {
       data: sortedBars.map((b) => (b.tec === tec ? b.value : 0)),
     }));
 
-    const built = stackedBarsOption(categories, series);
+    const built = stackedBarsOption(categories, series, { showValueLabels: true });
     // Com banda+tecnologia na mesma categoria, o eixo fica mais lotado —
     // rótulo rotacionado pra não sobrepor.
     const xAxis = built.xAxis as Record<string, unknown>;
@@ -78,8 +82,7 @@ export function FrequencyChart() {
 
   return (
     <ChartPanel
-      title="Frequências Utilizadas por Tecnologia"
-      subtitle="Clique num segmento para filtrar o dashboard por aquela tecnologia"
+      title="Número de municípios por tecnologia e frequência de lançamento"
       sourceTable="MUNICIPIOS_FECHAMENTO"
       option={option}
       loading={isFetching}
@@ -93,9 +96,6 @@ export function FrequencyChart() {
           { header: "Municípios", key: "value" },
         ],
         rows: bars,
-      }}
-      onClick={(event) => {
-        if (event.seriesName) toggle("tecnologia", event.seriesName);
       }}
     />
   );

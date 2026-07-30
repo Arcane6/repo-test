@@ -7,6 +7,7 @@ export function MobileAccessLayout() {
       <PageHeader
         icon="bi bi-broadcast-pin"
         title="Acesso Móvel"
+        subtitle="Ajuste o zoom do seu navegador para 75% para uma experiência otimizada nessa página"
         breadcrumb={[{ label: "Home", to: "/" }, { label: "Acesso Móvel" }]}
       />
 

@@ -83,7 +83,7 @@ export function VennDiagram() {
           />
         </div>
         <small className="text-muted d-block mb-3">
-          4G retirado para simplificação — 100% dos municípios · clique numa fatia pra filtrar
+          4G retirado para simplificação pois está em 100% dos municípios
         </small>
 
         <div className="d-flex gap-3 mb-3 flex-wrap">

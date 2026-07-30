@@ -52,20 +52,6 @@ export interface SitesPivotResponse {
   rows: SitesPivotRow[];
 }
 
-export interface SitesTipoResponse {
-  mobile_tx: number;
-  mobile_no_tx: number;
-  nonmobile_tx: number;
-  nonmobile_no_tx: number;
-  total_sites: number;
-}
-
-export interface LabeledValue {
-  label: string;
-  value: number;
-  color: string;
-}
-
 export interface SitesGeoPoint {
   end_id: string;
   uf: string | null;
@@ -85,12 +71,8 @@ export const sitesApi = {
     fetchJson<TechBarsResponse>(`${BASE}/by-max-tech?${query(f)}`),
   byTecnologia: (f: SitesFilters) =>
     fetchJson<TechBarsResponse>(`${BASE}/by-tecnologia?${query(f)}`),
-  vendors: (f: SitesFilters) =>
-    fetchJson<LabeledValue[]>(`${BASE}/vendors?${query(f)}`),
   pivot: (f: SitesFilters) =>
     fetchJson<SitesPivotResponse>(`${BASE}/pivot?${query(f)}`),
-  tipo: (f: SitesFilters) =>
-    fetchJson<SitesTipoResponse>(`${BASE}/tipo?${query(f)}`),
   geoPoints: (f: SitesFilters) =>
     fetchJson<SitesGeoPointsResponse>(`${BASE}/geo-points?${query(f)}`),
   hierarchy: (f: SitesFilters) =>

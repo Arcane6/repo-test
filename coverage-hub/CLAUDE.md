@@ -967,6 +967,86 @@ grupo (soma dos segmentos) → total geral (soma dos grupos). Nunca
 recalcular um nível a partir do bruto do banco: quebraria a garantia de
 que o total bate com o que está na tela.
 
+## Bateria de ajustes de UI/dados — jul/26 (Resumo/Cidades/Sites)
+
+Lote grande de pedidos vindos de terceiros (usuários finais), a maioria
+label/título/subtítulo/fonte (mecânico, sem decisão de arquitetura) — só
+os itens com alguma decisão real ficam documentados aqui.
+
+- **Município aparecendo vazio ao abrir o filtro** (Resumo/Cidades/Sites,
+  reportado como bug): `AsyncSelect` (react-select) só chama `loadOptions`
+  quando o usuário digita — sem `defaultOptions`, abrir o combo sem
+  digitar nada mostra "nenhuma opção" mesmo o backend já suportando busca
+  vazia (`MUNICIPIOS_SEARCH_QUERY` com `LIKE '%'` quando `q=''`). Fix:
+  `defaultOptions` (dispara `loadOptions('')` no mount) +
+  `cacheOptions={uf.join(',')}` (invalida o cache quando a UF muda, senão
+  a lista "default" carregada sem UF ficava presa depois de filtrar por
+  UF). Em `FilterBar.tsx`, componente compartilhado pelas 3 abas.
+- **Selecionar UF fazia "tudo sumir"** (aba Sites): o filtro guarda só o
+  nome do município (`municipio: string[]`), sem saber a UF de origem —
+  se o usuário já tinha um município de outro estado selecionado, trocar
+  a UF criava uma combinação impossível (UF X **e** município de UF Y),
+  e como os dois filtros são `AND` no SQL, tudo zerava em silêncio. Fix:
+  trocar a UF limpa a seleção de município (`FilterBar.tsx`). Não
+  verificado contra Oracle real (sem esse ambiente no sandbox) — é a
+  causa mais plausível encontrada por leitura de código; se o sintoma
+  persistir em produção, reabrir investigação.
+- **"Mobile Sites por Tecnologia" zerava ao clicar numa barra**: o clique
+  reenviava a combinação clicada como filtro real pro backend
+  (`sitevenn`), que resolve contra `R1_SITES_VENN_REGION_CLAUSES` e
+  restringe a base **antes** de recalcular as 15 combinações — restringir
+  a própria base do gráfico que existe justamente pra comparar as 15
+  combinações lado a lado é o motivo de tudo mais zerar. Fix
+  (`SitesComboChart.tsx`): clique agora é só destaque visual local
+  (`selected`), nunca mais vai pro backend — mesmo padrão de "Cidades
+  Cobertas por Tecnologia" (barra dimerizada, não some).
+- **"Frequências Utilizadas por Tecnologia" prendia o filtro** (clique
+  não dava pra desfazer): clique escrevia direto no `useFilterStore`
+  (`tecnologia`), cross-filtrando a aba inteira — removido a pedido do
+  usuário. O filtro de tecnologia continua disponível pelo seletor da
+  própria `FilterBar`, só sem o atalho de clicar na barra.
+- **Sites por Município somando 5623 em vez de 5570** (nº real de
+  municípios do Brasil): `SITES_PIVOT` agrupava por `b.UF, b.MUNICIPIO`
+  (texto cru de `TB_FT_BASE_UNICA_SITES`) em vez de por `IBGE` — a mesma
+  cidade grava o nome com pequenas variações (acento/espaço/caixa) em
+  linhas diferentes da base de sites, fragmentando um município em duas
+  linhas. Fix: `GROUP BY b.IBGE` (chave estável), com UF/Município
+  exibidos vindos do nome **canônico** de `MUNICIPIOS_FECHAMENTO` (via
+  `GEO`, mesmo CTE já usado pro `REGIONAL`), fallback pro nome cru do
+  site só se o IBGE não bater com nenhum município conhecido. Mesma
+  classe de bug que motivou a ponte-por-IBGE em Tráfego/Transporte — não
+  agrupar por nome de município em texto livre em nenhuma query nova.
+- **Meta NEXUS (toggle "Meta NEXUS" em Fornecedores EoY 26) passou a
+  responder a filtro geográfico**: antes era puramente nacional
+  (`TB_NEXUS_CN_CE`, sem UF/regional). Agora rateada pelo mesmo padrão de
+  "Orçamento por Tecnologia"/"Endereço por Tecnologia" — peso = OCs de
+  Casa Nova do rollout dentro do filtro ÷ OCs de Casa Nova do rollout no
+  Brasil inteiro (denominador sempre sem filtro), por tecnologia,
+  aplicado à meta nacional de cada tech (`R2_CASA_NOVA_NEXUS_RATEIO`,
+  `get_casa_nova_nexus(filters)`).
+- **KMZ do mapa de sites virou KML**: usuário pediu KMZ; implementado
+  `.kml` puro (`utils/kmlExport.ts`) em vez de zipar — todo software que
+  abre KMZ abre KML (KMZ é só um KML zipado), e não valia adicionar uma
+  lib de zip ao bundle só pra economizar o tamanho do arquivo. Se um dia
+  o tamanho do arquivo virar problema de verdade, essa é a hora de
+  reconsiderar.
+- **"Fornecedor Dominante por Site" e "Tipo de Site" removidos da aba
+  Sites** (pedido explícito) — junto foram as queries/service/rotas
+  (`SITES_VENDORS`, `SITES_TIPO`, `get_sites_vendors`, `get_sites_tipo`,
+  `/api/sites/vendors`, `/api/sites/tipo`) e o client
+  (`sitesApi.vendors`/`.tipo`). "Fornecedor por Site" do **Resumo**
+  (`R1_VENDORS`) é uma fonte/query diferente e não foi tocado.
+- **Filtro "Ano" removido do Resumo**: a raia já é fixa por ano
+  implicitamente (Fechamento 2025/Plano 2026/Fechamento 2026) — o
+  seletor era redundante. Sem UI, `ano` no filtro fica sempre `null`; o
+  backend já tinha fallback pra `DEFAULT_PLAN_YEAR` quando `ano` não vem
+  (`_prepare_params`), então nada quebrou ao tirar o campo.
+- **"Municípios TIM" (card do velocímetro TIM geral, aba Cidades) virou
+  "Presença TIM"** — só rótulo, mesma métrica.
+- **Fonte "Municípios Fechamento" virou "Municípios TIM Brasil
+  Fechamento"** em todo o app (`SourceBadge.tsx`, `TABLE_LABELS`, fonte
+  única) — recorria em Resumo, Cidades e Sites, trocado uma vez só.
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.

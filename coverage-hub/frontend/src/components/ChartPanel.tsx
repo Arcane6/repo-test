@@ -22,8 +22,12 @@ interface ChartPanelProps {
   exportSheet?: SheetSpec;
   /** Tabela(s)-fonte do gráfico — mostra o badge "de onde vem esse número" ao lado do título. */
   sourceTable?: string | string[];
+  /** "month" mostra a referência do badge sem o dia (MM/YYYY). */
+  sourceDateFormat?: "day" | "month";
   /** Controles extras no cabeçalho (ex.: seletor de fonte de dado do card). */
   headerExtra?: ReactNode;
+  /** Nota de rodapé (ex.: metodologia de estimativa, link pra fonte oficial). */
+  footnote?: ReactNode;
 }
 
 /**
@@ -41,7 +45,9 @@ export function ChartPanel({
   imageFilename,
   exportSheet,
   sourceTable,
+  sourceDateFormat,
   headerExtra,
+  footnote,
 }: ChartPanelProps) {
   const instanceRef = useRef<echarts.ECharts | null>(null);
 
@@ -58,7 +64,7 @@ export function ChartPanel({
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
               <h6 className="fw-bold mb-0">{title}</h6>
-              {sourceTable && <SourceBadge table={sourceTable} />}
+              {sourceTable && <SourceBadge table={sourceTable} dateFormat={sourceDateFormat} />}
             </div>
             {subtitle && <small className="text-muted d-block mb-2">{subtitle}</small>}
             {headerExtra}
@@ -82,6 +88,7 @@ export function ChartPanel({
         ) : (
           <Chart option={option} loading={loading} height={height} instanceRef={instanceRef} onClick={onClick} />
         )}
+        {footnote && <small className="text-muted d-block mt-2">{footnote}</small>}
       </div>
     </div>
   );

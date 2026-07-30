@@ -61,7 +61,9 @@ export function barsByTechOption(
           value: b.value,
           itemStyle: {
             color: b.color,
-            opacity: !focusedTec || focusedTec === b.tec ? 1 : 0.3,
+            opacity: !focusedTec || focusedTec === b.tec ? 1 : 0.15,
+            borderColor: focusedTec === b.tec ? "#212529" : "transparent",
+            borderWidth: focusedTec === b.tec ? 2 : 0,
           },
         })),
         barMaxWidth: 40,
@@ -359,6 +361,11 @@ export function regionalSunburstOption(
       right: 8,
       top: "center",
       itemGap: 8,
+      // Legenda em ordem alfabética — a série (donutData) fica ordenada
+      // por valor (maior fatia primeiro), que é o que faz sentido pro
+      // desenho do donut, mas a lista da legenda é mais fácil de ler
+      // alfabetizada. `legend.data` desacopla as duas ordens.
+      data: [...data.categories].sort((a, b) => a.localeCompare(b, "pt-BR")),
       textStyle: {
         fontSize: 10,
         rich: {
@@ -441,6 +448,9 @@ export function regionalDonutOption(
       itemGap: 10,
       icon: "circle",
       textStyle: { fontSize: 10 },
+      // Legenda em ordem alfabética, independente da ordem das fatias
+      // (que fica por valor desc — ver `sorted` acima).
+      data: slices.map((s) => s.label).sort((a, b) => a.localeCompare(b, "pt-BR")),
     },
     series: [
       {
@@ -603,7 +613,10 @@ export function timeSeriesOption(periods: string[], series: NamedTimeSeries[]): 
         formatter: (value: string) => (value.endsWith("-01") ? value.slice(0, 4) : ""),
       },
     },
-    yAxis: { type: "value", show: false },
+    // Exceção explícita ao padrão global "eixo de valor sem número"
+    // (ver chartTheme.ts) — pedido do usuário pra ler a escala da
+    // Linha do Tempo direto no eixo.
+    yAxis: { type: "value", show: true, axisLabel: { show: true } },
     series: series.map((s) => ({
       name: s.name,
       type: "line",
@@ -849,7 +862,7 @@ export function siteHierarchyTreeOption(data?: SitesHierarchyResponse): EChartsC
   const tree: TreeNode = node("Total de Sites Ativos", data.total_ativos, [
     node("TIM (RF + TX)", data.total_tim_rf_tx, [
       node("Sites TX / DC / PI", data.sem_rf),
-      node("Mobile Sites", data.mobile_sites, [
+      node("Mobile Sites*", data.mobile_sites, [
         node("TIM", data.tim, [
           node("Macro", data.macro),
           node("Small Cell + Móvel + SLS", data.small_cell_movel_sls),

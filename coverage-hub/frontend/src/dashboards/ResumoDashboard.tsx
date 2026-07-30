@@ -36,7 +36,7 @@ export function ResumoDashboard() {
         )}
       </div>
 
-      <FilterBar fields={["uf", "municipio", "ano"]} />
+      <FilterBar fields={["uf", "municipio"]} />
 
       <Raia1 filters={filters} />
       <Raia2 filters={filters} />
