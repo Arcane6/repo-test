@@ -648,6 +648,14 @@ ORDER BY R.TECNOLOGIA, F.TIPO
 # o JOIN com CAPEX_CAC (uma linha por cenário) faz esse "fan-out"
 # naturalmente: cada linha de rollout vira N linhas (uma por cenário),
 # cada uma multiplicada pelo CAC_TOTAL daquele cenário específico.
+#
+# ⚠️ CAPEX_BASE usa a MESMA classificação de TECH/TIPO_CASA de
+# R2_CAC_POR_PROJETO (jul/26, pedido do usuário pra unificar os dois
+# visuais) — antes tinha uma lógica própria, mais complexa, baseada em
+# TAG_2/SOURCE_AJUSTADO, que não excluía "outras camadas" (caía tudo em
+# 5G por padrão) e por isso divergia do total de CAC por Projeto/"MBB
+# Evolution + B2B IoT". Não reintroduzir uma classificação diferente
+# aqui sem sincronizar as duas.
 R2_ENDERECO_POR_TECNOLOGIA = """
 WITH ROLLOUT_REFERENCIA_ALL AS (
     -- Sem filtro geográfico: universo completo, denominador do rateio.
@@ -700,45 +708,41 @@ ROLLOUT_REFERENCIA AS (
     {projeto_filter}
 ),
 CAPEX_BASE AS (
+    -- Mesma classificação de TECH/TIPO_CASA de R2_CAC_POR_PROJETO (CAC por
+    -- Projeto / resumo "MBB Evolution + B2B IoT") — pedido do usuário pra
+    -- unificar a mecânica entre os dois visuais. "4G in 5G Layers" entra
+    -- dentro de "4G", e KPI fora dos 3 baldes (DLV_LEVEL_1) não conta em
+    -- nenhuma tech (histórico: era só B2B Mobile — ver seção própria da
+    -- view no CLAUDE.md). Só o rateio geográfico (OCs) é exclusivo deste
+    -- visual — a classificação em si é idêntica.
     SELECT
         SCENARIO,
-        KPI,
+        NVL(KPI, 0) AS KPI,
         CASE
-            WHEN DLV_LEVEL_3 = 'CASA NOVA' THEN 'CN'
-            WHEN DLV_LEVEL_3 = 'CASA EXISTENTE' THEN 'CE'
+            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA NOVA' THEN 'CN'
+            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA EXISTENTE' THEN 'CE'
         END AS TIPO_CASA,
         CASE
-            WHEN DLV_LEVEL_1 IN ('4G LAYERS', '4G/5G LAYERS')
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) = '5G LAYERS' THEN '5G'
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) = '4G LAYERS' THEN '4G'
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) IN ('4G IN 5G LAYERS', '4G/5G LAYERS')
                 THEN '4G'
-            -- TO_CHAR: sem isso dá ORA-12704 (character set mismatch) —
-            -- essas colunas vêm do NEXUS por DB link com charset
-            -- diferente, e comparar com literal VARCHAR2 estoura.
-            WHEN TO_CHAR(TAG_2) IN (
-                'ROLLOUT - RQUAL',
-                'ROLLOUT - EVENTOS SAZONAIS',
-                'ROLLOUT - OBLIGATION 2.3GHZ',
-                'PLATAFORMA IPSEC',
-                'ROLLOUT ACESSO - RQUAL',
-                'OBRIGAÇÃO 2.3GHZ',
-                'EVENTOS SAZONAIS'
-            )
-                THEN '4G'
-            WHEN TO_CHAR(SOURCE_AJUSTADO) = 'B2B MOBILE IOT'
-                THEN '4G'
-            ELSE '5G'
         END AS TECH
     FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
-    WHERE PRIORIDADE = 'IMPRESCINDÍVEL'
+    WHERE UPPER(TRIM(PRIORIDADE)) = 'IMPRESCINDÍVEL'
+      AND UPPER(TRIM(LAYER_SUBAREA)) = 'MOBILE ACCESS'
+      AND DLV_LEVEL_3 IS NOT NULL
+      AND UPPER(TRIM(DLV_LEVEL_3)) IN ('CASA NOVA', 'CASA EXISTENTE')
 ),
 CAPEX_CAC AS (
     SELECT
         SCENARIO,
-        UPPER(TRIM(TECH)) AS TECH,
-        UPPER(TRIM(TIPO_CASA)) AS TIPO_CASA,
-        SUM(NVL(KPI, 0)) AS CAC_TOTAL
+        TECH,
+        TIPO_CASA,
+        SUM(KPI) AS CAC_TOTAL
     FROM CAPEX_BASE
-    WHERE TIPO_CASA IS NOT NULL
-    GROUP BY SCENARIO, UPPER(TRIM(TECH)), UPPER(TRIM(TIPO_CASA))
+    WHERE TIPO_CASA IS NOT NULL AND TECH IS NOT NULL
+    GROUP BY SCENARIO, TECH, TIPO_CASA
 ),
 TOTAL_OCS_GRUPO_ALL AS (
     -- Denominador do rateio: sempre o universo completo (sem filtro

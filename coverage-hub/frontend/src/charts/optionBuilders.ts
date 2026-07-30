@@ -293,7 +293,11 @@ function buildStackedSeries(
       name: "__total__",
       type: "bar",
       stack: "total",
-      data: categories.map(() => 0),
+      // O total fica no próprio dado (`total`), não numa closure indexada
+      // por `dataIndex` — assim o `Chart` consegue recalcular e atualizar
+      // só esse valor (via setOption) quando a legenda liga/desliga uma
+      // série, sem precisar reconstruir o formatter. Ver Chart.tsx.
+      data: totals.map((t) => ({ value: 0, total: t })),
       itemStyle: { color: "transparent" },
       silent: true,
       tooltip: { show: false },
@@ -302,7 +306,7 @@ function buildStackedSeries(
         position: horizontal ? "right" : "top",
         fontWeight: "bold",
         fontSize: 11,
-        formatter: (p: { dataIndex: number }) => valueFormatter(totals[p.dataIndex]),
+        formatter: (p: { data: { total: number } }) => valueFormatter(p.data.total),
       },
     });
   }

@@ -103,6 +103,48 @@ export function Chart({ option, onClick, height = 360, loading, instanceRef }: C
     };
   }, [option]);
 
+  // Barras empilhadas com total no topo/lado (série fantasma "__total__",
+  // ver buildStackedSeries em optionBuilders.ts): antes o número ficava
+  // travado na soma de TODAS as séries reais, mesmo depois de a legenda
+  // esconder uma delas — o valor exibido não batia mais com as barras
+  // visíveis. Recalcula só as séries ainda selecionadas e atualiza a
+  // série fantasma via setOption (mesmo princípio do total no centro do
+  // donut, acima, mas pra barra empilhada).
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const opt = option as {
+      series?: Array<{ name?: string; data?: unknown[] }>;
+    };
+    const allSeries = Array.isArray(opt.series) ? opt.series : [];
+    const ghostIndex = allSeries.findIndex((s) => s.name === "__total__");
+    if (ghostIndex === -1) return;
+
+    const realSeries = allSeries.filter((s) => s.name !== "__total__");
+
+    const handler = (params: unknown) => {
+      const selected = (params as { selected: Record<string, boolean> }).selected ?? {};
+      const length = realSeries[0]?.data?.length ?? 0;
+      const totals = Array.from({ length }, (_, i) =>
+        realSeries.reduce((sum, s) => {
+          if (selected[s.name ?? ""] === false) return sum;
+          const cell = s.data?.[i] as number | { value?: number } | undefined;
+          const v = typeof cell === "number" ? cell : (cell?.value ?? 0);
+          return sum + (v || 0);
+        }, 0),
+      );
+      const patch = allSeries.map((_, i) =>
+        i === ghostIndex ? { data: totals.map((t) => ({ value: 0, total: t })) } : {},
+      );
+      chart.setOption({ series: patch });
+    };
+
+    chart.on("legendselectchanged", handler);
+    return () => {
+      chart.off("legendselectchanged", handler);
+    };
+  }, [option]);
+
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart || !onClick) return;
