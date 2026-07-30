@@ -1,11 +1,6 @@
 import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  summaryApi,
-  type CacProjetoAgg,
-  type CacProjetoLinha,
-  type SummaryFilters,
-} from "../api/summary";
+import { summaryApi, type CacProjetoAgg, type CacProjetoLinha } from "../api/summary";
 import { ChartToolbar } from "./ChartToolbar";
 import { Skeleton } from "./Skeleton";
 import { SourceBadge } from "./SourceBadge";
@@ -45,11 +40,10 @@ const COLUNAS: { key: keyof CacProjetoAgg; label: string; fmt: (v: number) => st
  * que a soma das colunas visíveis — exatamente o tipo de número que não
  * fecha e destrói a confiança na tela.
  */
-export function CacPorProjetoTable({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano, regionais, projetos } = filters;
+export function CacPorProjetoTable() {
   const { data, isLoading } = useQuery({
-    queryKey: ["summary-r2-cac-por-projeto", uf, municipio, ano, regionais, projetos],
-    queryFn: () => summaryApi.r2CacPorProjeto(filters),
+    queryKey: ["summary-r2-cac-por-projeto"],
+    queryFn: () => summaryApi.r2CacPorProjeto(),
   });
 
   const [escolhido, setEscolhido] = useState<string | null>(null);
@@ -109,8 +103,8 @@ export function CacPorProjetoTable({ filters }: { filters: SummaryFilters }) {
 
         <p className="text-muted small mb-3">
           Endereços (CAC) por segmento e projeto, em camadas tecnológicas — Casa Nova x
-          Casa Existente. O CAC do NEXUS é rateado por OC do rollout, então responde aos
-          filtros da aba.
+          Casa Existente. Nacional: a fonte não tem dimensão geográfica, então este
+          quadro não responde aos filtros da aba.
         </p>
 
         <div className="table-responsive" style={{ maxHeight: 460 }}>

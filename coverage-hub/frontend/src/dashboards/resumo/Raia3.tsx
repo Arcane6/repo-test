@@ -48,7 +48,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
       </div>
 
       <div className="row g-3">
-        <div className="col-lg-4">
+        <div className="col-lg-6">
           <ChartPanel
             title="Cidades 5G por Regional (Projeção EoY)"
             subtitle="Clique num regional pra filtrar toda a aba"
@@ -74,7 +74,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
           />
         </div>
 
-        <div className="col-lg-4">
+        <div className="col-lg-6">
           <ChartPanel
             title="Fornecedores EoY 26"
             subtitle={

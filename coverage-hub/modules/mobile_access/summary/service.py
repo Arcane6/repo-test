@@ -463,27 +463,18 @@ def _somar_cac(linhas):
     return agg
 
 
-def get_r2_cac_por_projeto(filters):
+def get_r2_cac_por_projeto():
     """CAC do NEXUS em 3 níveis — Casa Nova/Existente > segmento
     (SOURCE_AJUSTADO: TIM, B2B Mobile...) > projeto (DLV_LEVEL_2) — com as
     camadas tecnológicas em colunas, por cenário.
 
-    O CAC nacional da view é rateado geograficamente pelo peso de OCs do
-    TB_ROLLOUT_ACESSO (mesma mecânica de "Endereço por Tecnologia"), então
-    este visual RESPONDE a UF/município/regional/projeto/ano. O cenário é
-    escolhido no front, num combo, sem request novo.
+    NACIONAL, sem rateio geográfico (decisão do usuário): a view não tem
+    IBGE/UF/município, e ratear por OC aqui não teria significado — o peso
+    seria idêntico pra todos os projetos do mesmo (tech, tipo de casa),
+    mudando só a magnitude e nunca a composição. O cenário é escolhido no
+    front, num combo, sem request novo.
     """
-    params, ano_int = _prepare_params(filters)
-    params["ano"] = ano_int
-
-    sql = _apply_geo_all(
-        R2_CAC_POR_PROJETO, filters, params,
-        uf_field="g.UF", mun_field="g.MUNICIPIO",
-        uf_key="uf_filter_g", mun_key="municipio_filter_g",
-        regional_field="g.REGIONAL", regional_key="regional_filter_g",
-        projeto_field="RO.PRIORIDADE",
-    )
-    rows = execute_query(sql, params) or []
+    rows = execute_query(R2_CAC_POR_PROJETO) or []
 
     # cenário -> tipo_casa -> segmento -> [linhas]
     por_cenario = {}

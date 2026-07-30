@@ -173,11 +173,11 @@ export const summaryApi = {
   /** Meta NEXUS de Casa Nova — nacional, não recebe filtros. */
   r2CasaNovaNexus: () =>
     fetchJson<CasaNovaNexusResponse>(`${BASE}/r2/casa-nova-nexus`),
-  /** CAC em 3 níveis (Casa Nova/Existente > segmento > projeto), rateado
-   * por OC — responde aos filtros geo/ano; o combo de cenário é escolhido
-   * no front, sem request novo. */
-  r2CacPorProjeto: (f: SummaryFilters) =>
-    fetchJson<CacPorProjetoResponse>(`${BASE}/r2/cac-por-projeto?${query(f)}`),
+  /** CAC em 3 níveis (Casa Nova/Existente > segmento > projeto) — nacional,
+   * sem rateio (a view não tem dimensão geográfica); o combo de cenário é
+   * escolhido no front, sem request novo. */
+  r2CacPorProjeto: () =>
+    fetchJson<CacPorProjetoResponse>(`${BASE}/r2/cac-por-projeto`),
   r2OrcamentoPorTecnologia: (f: SummaryFilters) =>
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/orcamento-por-tecnologia?${query(f)}`),
   /** CAC rateado por OC (geo/ano respondem a filtro, igual Orçamento por

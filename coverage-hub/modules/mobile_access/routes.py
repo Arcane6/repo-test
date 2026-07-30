@@ -141,9 +141,9 @@ def api_summary_r2_casa_nova_nexus():
 
 @mobile_access_bp.route("/api/summary/r2/cac-por-projeto")
 def api_summary_r2_cac_por_projeto():
-    """CAC por Casa Nova/Existente > segmento > projeto, por cenário —
-    rateado por OC, então responde aos filtros geográficos."""
-    return jsonify(summary.get_r2_cac_por_projeto(parse_filters()))
+    """CAC por Casa Nova/Existente > segmento > projeto, por cenário.
+    Sem parse_filters(): nacional, sem rateio (ver service/CLAUDE.md)."""
+    return jsonify(summary.get_r2_cac_por_projeto())
 
 @mobile_access_bp.route("/api/summary/r2/orcamento-por-tecnologia")
 def api_summary_r2_orcamento():
