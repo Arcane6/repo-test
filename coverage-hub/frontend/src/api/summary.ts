@@ -104,10 +104,17 @@ export interface CacProjetoLinha {
 
 export type CacProjetoAgg = Omit<CacProjetoLinha, "projeto">;
 
+/** Segundo nível da pivot: SOURCE_AJUSTADO (TIM, B2B Mobile...). */
+export interface CacProjetoSegmento {
+  segmento: string;
+  linhas: CacProjetoLinha[];
+  subtotal: CacProjetoAgg;
+}
+
 export interface CacProjetoGrupo {
   tipo_casa: "CN" | "CE";
   label: string;
-  linhas: CacProjetoLinha[];
+  segmentos: CacProjetoSegmento[];
   subtotal: CacProjetoAgg;
 }
 
@@ -166,11 +173,11 @@ export const summaryApi = {
   /** Meta NEXUS de Casa Nova — nacional, não recebe filtros. */
   r2CasaNovaNexus: () =>
     fetchJson<CasaNovaNexusResponse>(`${BASE}/r2/casa-nova-nexus`),
-  /** CAC por projeto (Casa Nova x Casa Existente), por cenário — nacional
-   * (VW_CAPEX_MASTER_FULL não tem dimensão geográfica); o combo de cenário
-   * é escolhido no front, sem request novo. */
-  r2CacPorProjeto: () =>
-    fetchJson<CacPorProjetoResponse>(`${BASE}/r2/cac-por-projeto`),
+  /** CAC em 3 níveis (Casa Nova/Existente > segmento > projeto), rateado
+   * por OC — responde aos filtros geo/ano; o combo de cenário é escolhido
+   * no front, sem request novo. */
+  r2CacPorProjeto: (f: SummaryFilters) =>
+    fetchJson<CacPorProjetoResponse>(`${BASE}/r2/cac-por-projeto?${query(f)}`),
   r2OrcamentoPorTecnologia: (f: SummaryFilters) =>
     fetchJson<StackedByGroupResponse>(`${BASE}/r2/orcamento-por-tecnologia?${query(f)}`),
   /** CAC rateado por OC (geo/ano respondem a filtro, igual Orçamento por

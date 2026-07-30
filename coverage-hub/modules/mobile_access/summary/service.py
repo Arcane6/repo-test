@@ -463,27 +463,42 @@ def _somar_cac(linhas):
     return agg
 
 
-def get_r2_cac_por_projeto():
-    """CAC do NEXUS por projeto (DLV_LEVEL_2), dentro de Casa Nova x Casa
-    Existente, com as camadas tecnológicas em colunas — por cenário.
+def get_r2_cac_por_projeto(filters):
+    """CAC do NEXUS em 3 níveis — Casa Nova/Existente > segmento
+    (SOURCE_AJUSTADO: TIM, B2B Mobile...) > projeto (DLV_LEVEL_2) — com as
+    camadas tecnológicas em colunas, por cenário.
 
-    Nacional: `VW_CAPEX_MASTER_FULL@NEXUS_LINK` não tem IBGE/UF/município,
-    então este visual não recebe filtro geográfico (mesma situação do card
-    de Meta NEXUS). O front escolhe o cenário num combo sem request novo.
+    O CAC nacional da view é rateado geograficamente pelo peso de OCs do
+    TB_ROLLOUT_ACESSO (mesma mecânica de "Endereço por Tecnologia"), então
+    este visual RESPONDE a UF/município/regional/projeto/ano. O cenário é
+    escolhido no front, num combo, sem request novo.
     """
-    rows = execute_query(R2_CAC_POR_PROJETO) or []
+    params, ano_int = _prepare_params(filters)
+    params["ano"] = ano_int
 
+    sql = _apply_geo_all(
+        R2_CAC_POR_PROJETO, filters, params,
+        uf_field="g.UF", mun_field="g.MUNICIPIO",
+        uf_key="uf_filter_g", mun_key="municipio_filter_g",
+        regional_field="g.REGIONAL", regional_key="regional_filter_g",
+        projeto_field="RO.PRIORIDADE",
+    )
+    rows = execute_query(sql, params) or []
+
+    # cenário -> tipo_casa -> segmento -> [linhas]
     por_cenario = {}
     ordem_cenarios = []
     for r in rows:
         cenario = r["scenario"]
         if cenario not in por_cenario:
-            por_cenario[cenario] = {"CN": [], "CE": []}
+            por_cenario[cenario] = {"CN": {}, "CE": {}}
             ordem_cenarios.append(cenario)
         tipo_casa = r["tipo_casa"]
         if tipo_casa not in por_cenario[cenario]:
             continue
-        por_cenario[cenario][tipo_casa].append(_linha_cac(
+        segmentos = por_cenario[cenario][tipo_casa]
+        segmento = r["segmento"]
+        segmentos.setdefault(segmento, []).append(_linha_cac(
             r["projeto"],
             r.get("cac_5g"), r.get("cac_4g"), r.get("cac_4g_in_5g"),
             r.get("total_cac"), r.get("valor_total_mm"),
@@ -493,23 +508,33 @@ def get_r2_cac_por_projeto():
     for cenario in ordem_cenarios:
         grupos = []
         for tipo_casa in ("CN", "CE"):
-            linhas = por_cenario[cenario][tipo_casa]
-            if not linhas:
+            segmentos_raw = por_cenario[cenario][tipo_casa]
+            if not segmentos_raw:
                 continue
-            # Maior CAC primeiro (o SQL ordena alfabético; pra leitura
-            # executiva o que importa é onde está o volume).
-            linhas.sort(key=lambda l: l["total_cac"], reverse=True)
+            segmentos = []
+            for nome, linhas in segmentos_raw.items():
+                # Maior CAC primeiro (o SQL ordena alfabético; pra leitura
+                # executiva o que importa é onde está o volume).
+                linhas.sort(key=lambda l: l["total_cac"], reverse=True)
+                segmentos.append({
+                    "segmento": nome,
+                    "linhas": linhas,
+                    "subtotal": _somar_cac(linhas),
+                })
+            segmentos.sort(key=lambda sg: sg["subtotal"]["total_cac"], reverse=True)
+            # Subtotal do grupo soma os SUBTOTAIS dos segmentos (que por sua
+            # vez somam as linhas já arredondadas) — a hierarquia fecha em
+            # todos os níveis, sem número solto.
             grupos.append({
                 "tipo_casa": tipo_casa,
                 "label": CASA_LABELS[tipo_casa],
-                "linhas": linhas,
-                "subtotal": _somar_cac(linhas),
+                "segmentos": segmentos,
+                "subtotal": _somar_cac([sg["subtotal"] for sg in segmentos]),
             })
-        todas = [l for g in grupos for l in g["linhas"]]
         cenarios.append({
             "cenario": cenario,
             "grupos": grupos,
-            "total": _somar_cac(todas) if todas else _somar_cac([]),
+            "total": _somar_cac([g["subtotal"] for g in grupos]),
         })
 
     nomes = [c["cenario"] for c in cenarios]

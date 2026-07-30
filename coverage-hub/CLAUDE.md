@@ -889,12 +889,13 @@ CLASSIFICACAO` no final.
 
 #### Segundo visual da mesma view: tabela "CAC por Projeto" (Raia 2)
 
-`R2_CAC_POR_PROJETO` + `get_r2_cac_por_projeto()` + rota
+`R2_CAC_POR_PROJETO` + `get_r2_cac_por_projeto(filters)` + rota
 `/api/summary/r2/cac-por-projeto` + `components/CacPorProjetoTable.tsx`.
 Tabela de largura inteira **abaixo dos 3 gráficos da Raia 2**, com
-hierarquia Casa Nova / Casa Existente > projeto (`DLV_LEVEL_2`) e as
-camadas tecnológicas (`DLV_LEVEL_1`) pivotadas em colunas. **Substituiu o
-antigo "Top 10 Projetos"** (que contava OCs de `TB_ROLLOUT_ACESSO` por
+hierarquia de **3 níveis** — `DLV_LEVEL_3` (Casa Nova/Existente) >
+`SOURCE_AJUSTADO` (TIM / B2B Mobile) > `DLV_LEVEL_2` (projeto) — e as
+camadas de `DLV_LEVEL_1` pivotadas em colunas. **Substituiu o antigo
+"Top 10 Projetos"** (que contava OCs de `TB_ROLLOUT_ACESSO` por
 `PRIORIDADE`, na Raia 3) — aquele card, a query `R2_TOP_PROJECTS`, os
 services `get_r2_top_projects`/`get_r3_top_projects` e as rotas
 `/r2/top-projects` + `/r3/top-projects` foram **removidos**.
@@ -917,11 +918,23 @@ services `get_r2_top_projects`/`get_r3_top_projects` e as rotas
   princípio do resto do projeto (total tem que fechar com o que está na
   tela). Com isso as 3 colunas de camada reproduzem exatamente o pivot do
   usuário (CN 253/806/222, CE 3.104/755/67, total 3.357/1.561/289).
-- **Nacional, sem filtro geográfico**: diferente de "Endereço por
-  Tecnologia", esta tabela **não** passa por rateio de OC — é `SUM(KPI)`
-  direto da view, que não tem IBGE/UF/município. O subtítulo do card
-  avisa. **Não existe estratificação por município aqui** (ver "Em
-  aberto" abaixo).
+- **Rateio geográfico por OC, igual "Endereço por Tecnologia"**: a view
+  não tem IBGE/UF/município, então o CAC nacional é distribuído pelo peso
+  de OCs do `TB_ROLLOUT_ACESSO` (numerador = OCs do recorte filtrado;
+  denominador = universo completo, nunca filtrado). A tabela **responde**
+  a UF/município/regional/projeto/ano.
+  - O peso é por **(TECH, TIPO_CASA)**, usando a MESMA regra de `TECH` do
+    card "Endereço por Tecnologia" — assim os dois visuais escalam junto e
+    continuam comparáveis. `TECH` (chave do rateio) é **independente** de
+    `CAMADA` (coluna da tabela): `4G/5G LAYERS` é coluna própria na
+    tabela, mas conta como `4G` no rateio.
+  - `NUMERADOR`/`DENOMINADOR` agregam as OCs **antes** de multiplicar. É
+    equivalente a multiplicar linha a linha e somar (o fator é constante
+    dentro do grupo) e evita o fan-out do card irmão.
+  - `INNER JOIN` com o numerador: se o recorte não tem OC de um
+    (TECH, TIPO_CASA), aquele CAC desaparece da tabela — comportamento
+    intencional (sem rollout na geografia, não há CAC a atribuir ali) e
+    igual ao do card irmão.
 - **Ordenação**: o SQL ordena projeto alfabeticamente, mas o service
   reordena por `total_cac` desc — pra leitura executiva o que importa é
   onde está o volume (é o que o pivot de referência também faz).
@@ -934,16 +947,20 @@ services `get_r2_top_projects`/`get_r3_top_projects` e as rotas
   (`projeto_filter` nas queries, `parse_filters`) continua intacta,
   só sem quem a acione.
 
-**Em aberto**: o usuário pediu a tabela "também estratificada por
-município", mas `VW_CAPEX_MASTER_FULL` **não tem** `IBGE`/UF/município
-(confirmado no CSV de amostra: as colunas são só SCENARIO, TIPO_CASA,
-DLV_LEVEL_2 e as métricas). Só há dois caminhos, ambos dependendo de
-decisão do usuário: (a) ratear o CAC por município via OC do
-`TB_ROLLOUT_ACESSO`, igual "Endereço por Tecnologia" faz — mas aí cada
-célula vira valor fracionário/rateado por projeto × município, o que
-pode não significar nada de útil; ou (b) o usuário indicar uma coluna
-geográfica na view que a gente ainda não conhece. Não assumir nenhum dos
-dois sem confirmar.
+**Onde está o "outras camadas" — mistério resolvido**: o KPI fora dos 3
+baldes de `DLV_LEVEL_1` está **inteiramente em B2B Mobile**. Confirmado
+com o pivot de referência do usuário: os projetos AGRO, INDÚSTRIA e
+LOGÍSTICA (os únicos com `cac_outras` > 0) são exatamente os projetos de
+`SOURCE_AJUSTADO = 'B2B MOBILE'`, e o subtotal de TIM tem
+`cac_outras = 0` nos dois tipos de casa. Ou seja: abrir por
+`SOURCE_AJUSTADO` explicou a diferença — não é dado sujo, é a camada de
+B2B que não cabe nos 3 baldes de RAN.
+
+**A hierarquia fecha em 4 níveis por construção**: linha (célula
+arredondada) → subtotal do segmento (soma das linhas) → subtotal do
+grupo (soma dos segmentos) → total geral (soma dos grupos). Nunca
+recalcular um nível a partir do bruto do banco: quebraria a garantia de
+que o total bate com o que está na tela.
 
 ## Git / PRs
 

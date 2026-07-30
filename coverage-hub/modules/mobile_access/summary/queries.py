@@ -386,65 +386,169 @@ WHERE UPPER(TRIM(TIPO_CASA)) = 'CN'
 GROUP BY UPPER(TRIM(TECH))
 ORDER BY qtd DESC
 """
-# ---------- CAC por projeto (Casa Nova x Casa Existente, por cenário) ----------
+# ---------- CAC por projeto (Casa Nova > segmento > projeto, por cenário) ----------
 # Substituiu o antigo "Top 10 Projetos" (que contava OCs de
-# TB_ROLLOUT_ACESSO por PRIORIDADE): agora é o CAC do NEXUS aberto por
-# projeto (DLV_LEVEL_2) dentro de Casa Nova / Casa Existente, com as
-# camadas tecnológicas pivotadas em colunas.
+# TB_ROLLOUT_ACESSO por PRIORIDADE). Hierarquia de 3 níveis, igual ao
+# pivot que o usuário usa no Excel:
+#     DLV_LEVEL_3 (Casa Nova/Existente) > SOURCE_AJUSTADO (TIM/B2B Mobile)
+#     > DLV_LEVEL_2 (projeto)
+# com as camadas de DLV_LEVEL_1 pivotadas em colunas.
 #
 # ⚠️ TOTAL_CAC é SUM(KPI) de TODAS as camadas, e NÃO é a soma das 3
-# colunas pivotadas — existem valores de DLV_LEVEL_1 fora dos 3 baldes
-# (visto nos projetos AGRO / INDÚSTRIA / LOGÍSTICA). O service calcula
-# "outras camadas" = TOTAL_CAC - (5G + 4G + 4G_IN_5G) e mostra como
-# coluna própria, pra tabela fechar por construção sem esconder KPI.
+# colunas pivotadas — existe KPI em DLV_LEVEL_1 fora dos 3 baldes,
+# concentrado nos projetos de B2B Mobile (AGRO/INDÚSTRIA/LOGÍSTICA). O
+# service deriva "outras camadas" e mostra como coluna própria, pra
+# tabela fechar por construção sem esconder KPI.
 #
-# Sem filtro geográfico: a view não tem IBGE/UF/município (ver seção da
-# view no CLAUDE.md) — este visual é NACIONAL, por cenário.
+# RATEIO GEOGRÁFICO (igual "Endereço por Tecnologia"): a view não tem
+# IBGE/UF/município, então o CAC nacional é distribuído pelo peso de OCs
+# do TB_ROLLOUT_ACESSO — numerador = OCs do recorte filtrado, denominador
+# = OCs do universo completo (nunca filtrado, senão o recorte "herdaria"
+# 100% do orçamento nacional do grupo).
+#
+# O peso é calculado por (TECH, TIPO_CASA) usando a MESMA regra de TECH
+# do card "Endereço por Tecnologia" — assim os dois visuais escalam junto
+# e os totais continuam comparáveis entre eles. Note que TECH (chave do
+# rateio) é independente de CAMADA (coluna da tabela): '4G/5G LAYERS' é
+# coluna própria na tabela, mas conta como 4G pro rateio.
 R2_CAC_POR_PROJETO = """
-WITH BASE AS (
+WITH ROLLOUT_OCS AS (
+    SELECT
+        R.COD_IBGE,
+        R.PRIORIDADE,
+        CASE
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
+            ELSE '4G'
+        END AS TECH,
+        CASE
+            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
+            ELSE 'CE'
+        END AS TIPO_CASA,
+        COUNT(1) AS NUM_OCS
+    FROM NTW_OP.TB_ROLLOUT_ACESSO R
+    WHERE R.PLANO = :ano
+      AND R.TECNOLOGIA IN ('4G', '5G')
+    GROUP BY
+        R.COD_IBGE,
+        R.PRIORIDADE,
+        CASE
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%5G%' THEN '5G'
+            WHEN UPPER(R.TECNOLOGIA) LIKE '%NR%' THEN '5G'
+            ELSE '4G'
+        END,
+        CASE
+            WHEN UPPER(R.CLASSIFICACAO_CASA) LIKE '%NEW SITE%' THEN 'CN'
+            ELSE 'CE'
+        END
+),
+GEO AS (
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
+),
+DENOMINADOR AS (
+    -- Universo completo, SEM filtro geográfico.
+    SELECT TECH, TIPO_CASA, SUM(NUM_OCS) AS TOTAL_OCS
+    FROM ROLLOUT_OCS
+    GROUP BY TECH, TIPO_CASA
+),
+NUMERADOR AS (
+    -- Mesmo universo, no recorte filtrado. Agregar antes de multiplicar é
+    -- equivalente a multiplicar linha a linha e somar (o fator é constante
+    -- dentro do grupo), e evita fan-out desnecessário.
+    SELECT RO.TECH, RO.TIPO_CASA, SUM(RO.NUM_OCS) AS OCS_FILTRADAS
+    FROM ROLLOUT_OCS RO
+    LEFT JOIN GEO g ON g.IBGE = RO.COD_IBGE
+    WHERE 1=1
+    {uf_filter_g}
+    {municipio_filter_g}
+    {regional_filter_g}
+    {projeto_filter}
+    GROUP BY RO.TECH, RO.TIPO_CASA
+),
+CAPEX_BASE AS (
     SELECT
         SCENARIO,
-        DLV_LEVEL_1,
-        DLV_LEVEL_2,
-        DLV_LEVEL_3,
-        NVL(KPI, 0) AS KPI,
-        NVL(VALOR_TOTAL, 0) AS VALOR_TOTAL,
         CASE
-            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA NOVA'
-                THEN 'CN'
-            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA EXISTENTE'
-                THEN 'CE'
-        END AS TIPO_CASA
+            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA NOVA' THEN 'CN'
+            WHEN UPPER(TRIM(DLV_LEVEL_3)) = 'CASA EXISTENTE' THEN 'CE'
+        END AS TIPO_CASA,
+        NVL(NULLIF(TRIM(SOURCE_AJUSTADO), ''), 'NÃO INFORMADO') AS SEGMENTO,
+        NVL(NULLIF(TRIM(DLV_LEVEL_2), ''), 'N/A') AS PROJETO,
+        -- Coluna da tabela (independente do TECH do rateio).
+        CASE
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) = '5G LAYERS' THEN 'L5G'
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) = '4G LAYERS' THEN 'L4G'
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) IN ('4G IN 5G LAYERS', '4G/5G LAYERS')
+                THEN 'L4G5G'
+            ELSE 'OUTRAS'
+        END AS CAMADA,
+        -- Chave do rateio: MESMA regra do card "Endereço por Tecnologia".
+        CASE
+            WHEN UPPER(TRIM(DLV_LEVEL_1)) IN (
+                '4G LAYERS', '4G/5G LAYERS', '4G IN 5G LAYERS'
+            ) THEN '4G'
+            WHEN TAG_2 IN (
+                'ROLLOUT - RQUAL',
+                'ROLLOUT - EVENTOS SAZONAIS',
+                'ROLLOUT - OBLIGATION 2.3GHZ',
+                'PLATAFORMA IPSEC',
+                'ROLLOUT ACESSO - RQUAL',
+                'OBRIGAÇÃO 2.3GHZ',
+                'EVENTOS SAZONAIS'
+            ) THEN '4G'
+            WHEN SOURCE_AJUSTADO = 'B2B MOBILE IOT' THEN '4G'
+            ELSE '5G'
+        END AS TECH,
+        NVL(KPI, 0) AS KPI,
+        NVL(VALOR_TOTAL, 0) AS VALOR_TOTAL
     FROM VW_CAPEX_MASTER_FULL@NEXUS_LINK
     WHERE UPPER(TRIM(PRIORIDADE)) = 'IMPRESCINDÍVEL'
       AND UPPER(TRIM(LAYER_SUBAREA)) = 'MOBILE ACCESS'
       AND DLV_LEVEL_3 IS NOT NULL
       AND UPPER(TRIM(DLV_LEVEL_3)) IN ('CASA NOVA', 'CASA EXISTENTE')
+),
+CAPEX_RATEADO AS (
+    SELECT
+        c.SCENARIO,
+        c.TIPO_CASA,
+        c.SEGMENTO,
+        c.PROJETO,
+        c.CAMADA,
+        c.KPI * (n.OCS_FILTRADAS / d.TOTAL_OCS) AS KPI,
+        c.VALOR_TOTAL * (n.OCS_FILTRADAS / d.TOTAL_OCS) AS VALOR_TOTAL
+    FROM CAPEX_BASE c
+    INNER JOIN DENOMINADOR d
+        ON d.TECH = c.TECH AND d.TIPO_CASA = c.TIPO_CASA
+    INNER JOIN NUMERADOR n
+        ON n.TECH = c.TECH AND n.TIPO_CASA = c.TIPO_CASA
+    WHERE c.TIPO_CASA IS NOT NULL
+      AND d.TOTAL_OCS > 0
 )
 SELECT
     SCENARIO,
     TIPO_CASA,
-    NVL(DLV_LEVEL_2, 'N/A') AS PROJETO,
-    SUM(CASE WHEN UPPER(TRIM(DLV_LEVEL_1)) = '5G LAYERS' THEN KPI ELSE 0 END) AS CAC_5G,
-    SUM(CASE WHEN UPPER(TRIM(DLV_LEVEL_1)) = '4G LAYERS' THEN KPI ELSE 0 END) AS CAC_4G,
-    SUM(
-        CASE
-            WHEN UPPER(TRIM(DLV_LEVEL_1)) IN ('4G IN 5G LAYERS', '4G/5G LAYERS')
-            THEN KPI ELSE 0
-        END
-    ) AS CAC_4G_IN_5G,
+    SEGMENTO,
+    PROJETO,
+    SUM(CASE WHEN CAMADA = 'L5G' THEN KPI ELSE 0 END) AS CAC_5G,
+    SUM(CASE WHEN CAMADA = 'L4G' THEN KPI ELSE 0 END) AS CAC_4G,
+    SUM(CASE WHEN CAMADA = 'L4G5G' THEN KPI ELSE 0 END) AS CAC_4G_IN_5G,
     SUM(KPI) AS TOTAL_CAC,
     ROUND(SUM(VALOR_TOTAL) / 1000000, 2) AS VALOR_TOTAL_MM
-FROM BASE
-WHERE TIPO_CASA IS NOT NULL
+FROM CAPEX_RATEADO
 GROUP BY
     SCENARIO,
     TIPO_CASA,
-    NVL(DLV_LEVEL_2, 'N/A')
+    SEGMENTO,
+    PROJETO
 ORDER BY
     SCENARIO,
     CASE TIPO_CASA WHEN 'CN' THEN 1 WHEN 'CE' THEN 2 ELSE 3 END,
-    NVL(DLV_LEVEL_2, 'N/A')
+    SEGMENTO,
+    PROJETO
 """
 
 # ---------- Cidades 5G por regional (fechamento 26 = base 25 + ganho 26) ----------
