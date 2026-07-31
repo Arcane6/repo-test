@@ -99,7 +99,9 @@ export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
               <h6 className="fw-bold mb-0">Mobile Sites por Tecnologia</h6>
-              <SourceBadge table="TB_FT_BASE_UNICA_SITES" />
+              {/* Componente exclusivo da raia "Fechamento 2025" — referência
+                  sempre fixa em 12/2025 (ver SourceBadge/staticRef). */}
+              <SourceBadge table="TB_FT_BASE_UNICA_SITES" staticRef="12/2025" />
             </div>
           </div>
           <ChartToolbar

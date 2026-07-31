@@ -1256,6 +1256,36 @@ Master". Todo o resto do checklist foi implementado.
   5. **"Trocar cores do gráfico" NÃO se aplica ao resumo "MBB Evolution +
      B2B IoT"/tabela "CAC por Projeto"** — só ao gráfico "Endereço por
      Tecnologia" mesmo (não havia pedido pra mudar as outras).
+- **Toda a raia "Fechamento 2025" (R1) mostra a referência de data
+  MOCADA em `12/2025`, sempre** — pedido de acompanhamento do usuário
+  depois da entrega acima. Motivo: o badge de fonte (`/api/refs`) mostra
+  o `MAX(DT_CARGA)`/`MAX(MES_REF)` **real** da tabela, que pode já ter
+  avançado além de dez/2025 (carga contínua — a tabela recebe loads
+  novos com o tempo, mesmo a análise desta raia sempre olhando o
+  snapshot de 31/dez/2025 via `baseline_date`). Mostrar a data real do
+  último load, quando ela diverge do que está de fato sendo exibido,
+  confunde o leitor sobre qual recorte está na tela.
+  - **`SourceBadge` ganhou a prop `staticRef?: string`** — quando
+    presente, ignora completamente o valor vindo de `/api/refs` (a
+    query nem é feita: `enabled: !staticRef`) e mostra esse texto fixo.
+    `ChartPanel` repassa via `sourceStaticRef`. Aplicado nos 4 cards da
+    R1: "Cidades Cobertas por Tecnologia", "Mobile Sites por
+    Tecnologia" (`SitesComboChart` — hardcoded direto no componente,
+    que só é usado nesta raia), "Mobile Sites por Fornecedor" e "Total
+    de sites ativos".
+  - **Escopo é só a raia R1 do Resumo** — as MESMAS tabelas
+    (`TB_FT_BASE_UNICA_SITES`, `BASE_TB_END_ID_NEW`) aparecem também na
+    aba **Sites** (`SitesDashboard.tsx`, `SitesMap.tsx`,
+    `SitesPivotTable.tsx`) mostrando o inventário **atual** (MES_REF
+    mais recente, não o fechamento de dezembro) — essas continuam com a
+    data real do `/api/refs`, sem `staticRef`. Não espalhar o mock pra
+    essas outras telas: são semanticamente diferentes (inventário de
+    hoje vs. fechamento congelado de dez/25).
+  - Literal `"12/2025"` fixo no código (não derivado de
+    `DEFAULT_PLAN_YEAR`) — mesmo valor que o usuário pediu por
+    extenso duas vezes. Se o ciclo de planejamento avançar (baseline
+    virar dez/26 etc.), atualizar a constante `FECHAMENTO_25_REF` em
+    `Raia1.tsx` e o literal em `SitesComboChart.tsx` junto.
 
 ## Git / PRs
 

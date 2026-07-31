@@ -11,6 +11,13 @@ import { TECH_ORDER } from "../../theme";
 
 const tecOptions = TECH_ORDER.map((t) => ({ value: t, label: t }));
 
+// Raia "Fechamento 2025": referência sempre mostrada como 12/2025,
+// mesmo que o MAX(DT_CARGA)/MES_REF real da tabela já tenha avançado
+// (carga contínua) — o fechamento em si é sempre o snapshot de
+// 31/dez/2025, então a data "de verdade" mais recente confundiria o
+// leitor sobre qual recorte está na tela (jul/26, pedido do usuário).
+const FECHAMENTO_25_REF = "12/2025";
+
 export function Raia1({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais } = filters;
   const { tecnologia: focusedTec, toggleTecnologia } = useResumoFocusStore();
@@ -47,7 +54,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
           <ChartPanel
             title="Cidades Cobertas por Tecnologia"
             sourceTable="MUNICIPIOS_FECHAMENTO"
-            sourceDateFormat="month"
+            sourceStaticRef={FECHAMENTO_25_REF}
             option={barsByTechOption(cities?.bars ?? [], cities?.total ?? 0, focusedTec)}
             loading={loadingCities}
             onClick={(e) => toggleTecnologia(e.name)}
@@ -69,6 +76,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
           <ChartPanel
             title="Mobile Sites por Fornecedor"
             sourceTable="BASE_TB_END_ID_NEW"
+            sourceStaticRef={FECHAMENTO_25_REF}
             height={340}
             headerExtra={
               <Select
@@ -101,6 +109,7 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
             title="Total de sites ativos"
             subtitle="Da base completa de Sites Ativos aos Sites utilizado nos gráficos acima."
             sourceTable="TB_FT_BASE_UNICA_SITES"
+            sourceStaticRef={FECHAMENTO_25_REF}
             height={280}
             option={siteHierarchyTreeOption(hierarchy)}
             loading={loadingHierarchy}

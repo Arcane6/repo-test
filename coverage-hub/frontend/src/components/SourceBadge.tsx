@@ -27,16 +27,26 @@ function toMonthYear(ref: string): string {
 export function SourceBadge({
   table,
   dateFormat = "day",
+  staticRef,
 }: {
   table: string | string[];
   /** "month" trunca a referência (formato DD/MM/YYYY) pra MM/YYYY —
    * usado quando o card não quer mostrar o dia. */
   dateFormat?: "day" | "month";
+  /** Referência fixa (ex.: "12/2025"), ignora a data real vinda de
+   * `/api/refs` — usada nos cards da raia "Fechamento 2025" (jul/26,
+   * pedido do usuário): o MAX(DT_CARGA)/MES_REF real da tabela pode já
+   * ter avançado além de dez/2025 (carga contínua), mas o "Fechamento
+   * 2025" é sempre o snapshot de 31/dez/2025 por definição — mostrar a
+   * data real do último load confundiria com um recorte que não é o que
+   * está sendo exibido. */
+  staticRef?: string;
 }) {
   const { data: refs } = useQuery({
     queryKey: ["refs"],
     queryFn: refsApi.get,
     staleTime: 5 * 60_000,
+    enabled: !staticRef,
   });
 
   const tables = Array.isArray(table) ? table : [table];
@@ -44,7 +54,7 @@ export function SourceBadge({
   return (
     <div className="d-flex flex-wrap gap-1">
       {tables.map((t) => {
-        const rawRef = refs?.[t];
+        const rawRef = staticRef ?? refs?.[t];
         const ref = rawRef && dateFormat === "month" ? toMonthYear(rawRef) : rawRef;
         return (
           <span
