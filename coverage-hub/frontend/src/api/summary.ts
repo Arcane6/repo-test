@@ -11,6 +11,13 @@ export interface SummaryFilters {
   ano: string | null;
   regionais?: string[];
   projetos?: string[];
+  /** Filtros globais (jul/26) — ANF (DDD) e faixa de população urbana. */
+  anfs?: string[];
+  popUrbana?: string[];
+  /** Tecnologia: SÓ usada por "Mobile Sites por Fornecedor" (jul/26,
+   * filtro local do card) — Resumo não tem filtro global de tecnologia
+   * (tecnologia ali é destaque visual, não filtro real, ver CLAUDE.md). */
+  tecs?: string[];
 }
 
 function query(filters: SummaryFilters): string {
@@ -20,6 +27,9 @@ function query(filters: SummaryFilters): string {
   if (filters.ano) params.append("ano", filters.ano);
   (filters.regionais ?? []).forEach((v) => params.append("regional", v));
   (filters.projetos ?? []).forEach((v) => params.append("projeto", v));
+  (filters.anfs ?? []).forEach((v) => params.append("anf", v));
+  (filters.popUrbana ?? []).forEach((v) => params.append("pop_urbana", v));
+  (filters.tecs ?? []).forEach((v) => params.append("tecnologia", v));
   return params.toString();
 }
 

@@ -24,6 +24,9 @@ interface ChartPanelProps {
   sourceTable?: string | string[];
   /** "month" mostra a referência do badge sem o dia (MM/YYYY). */
   sourceDateFormat?: "day" | "month";
+  /** Referência fixa do badge (ex.: "12/2025"), ignora a data real — ver
+   * `SourceBadge`. */
+  sourceStaticRef?: string;
   /** Controles extras no cabeçalho (ex.: seletor de fonte de dado do card). */
   headerExtra?: ReactNode;
   /** Nota de rodapé (ex.: metodologia de estimativa, link pra fonte oficial). */
@@ -46,6 +49,7 @@ export function ChartPanel({
   exportSheet,
   sourceTable,
   sourceDateFormat,
+  sourceStaticRef,
   headerExtra,
   footnote,
 }: ChartPanelProps) {
@@ -64,7 +68,9 @@ export function ChartPanel({
           <div>
             <div className="d-flex align-items-center gap-2 mb-1">
               <h6 className="fw-bold mb-0">{title}</h6>
-              {sourceTable && <SourceBadge table={sourceTable} dateFormat={sourceDateFormat} />}
+              {sourceTable && (
+                <SourceBadge table={sourceTable} dateFormat={sourceDateFormat} staticRef={sourceStaticRef} />
+              )}
             </div>
             {subtitle && <small className="text-muted d-block mb-2">{subtitle}</small>}
             {headerExtra}

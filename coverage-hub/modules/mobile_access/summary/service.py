@@ -12,9 +12,9 @@ import math as _math
 
 from database.oracle import execute_query
 
+from modules.mobile_access.shared.filters import build_pop_urbana_clause
 from modules.mobile_access.shared.constants import (
     TECH_COLORS, TECH_ORDER, DEFAULT_PLAN_YEAR, DEFAULT_CAPEX_SCENARIO,
-    CASA_COLORS,
 )
 from modules.mobile_access.summary.queries import (
     R1_SITES_VENN,
@@ -140,13 +140,19 @@ def _apply_geo_all(sql_template, filters, params,
                    uf_field="UF", mun_field="MUNICIPIO",
                    uf_key="uf_filter", mun_key="municipio_filter",
                    regional_field="REGIONAL", regional_key="regional_filter",
-                   projeto_field="r.PRIORIDADE", projeto_key="projeto_filter"):
+                   projeto_field="r.PRIORIDADE", projeto_key="projeto_filter",
+                   anf_field=None, anf_key="anf_filter",
+                   pop_field=None, pop_key="pop_urbana_filter"):
     """
-    Injeta filtros (uf/município/regional/projeto) só nos placeholders que
-    o template realmente tem — cada visual referencia apenas os campos que
-    fazem sentido pra ele.
+    Injeta filtros (uf/município/regional/anf/população urbana/projeto) só
+    nos placeholders que o template realmente tem — cada visual referencia
+    apenas os campos que fazem sentido pra ele. anf_field/pop_field
+    default pro mesmo field do regional (mesma tabela/alias na maioria das
+    queries) quando o chamador não especifica outro.
     """
     fields = _template_fields(sql_template)
+    anf_field = anf_field or regional_field.replace("REGIONAL", "ANF")
+    pop_field = pop_field or regional_field.replace("REGIONAL", "POPULACAO_URBANA")
 
     # Só constrói a cláusula (e registra binds) para o placeholder que o
     # template realmente tem — um bind sem placeholder correspondente
@@ -156,12 +162,15 @@ def _apply_geo_all(sql_template, filters, params,
         mun_key: (mun_field, _normalize_list(filters.get("municipios")), "mun"),
         regional_key: (regional_field, _normalize_list(filters.get("regionais")), "reg"),
         projeto_key: (projeto_field, _normalize_list(filters.get("projetos")), "proj"),
+        anf_key: (anf_field, _normalize_list(filters.get("anfs")), "anf"),
     }
     to_fill = {
         key: _build_in_clause(field, values, prefix, params)
         for key, (field, values, prefix) in spec.items()
         if key in fields
     }
+    if pop_key in fields:
+        to_fill[pop_key] = build_pop_urbana_clause(pop_field, filters.get("pop_urbana"), params, "pop")
     return sql_template.format(**to_fill)
 
 
@@ -209,6 +218,19 @@ VENN_REGION_KEYS = [
 ]
 
 
+def _build_tecnologia_like_clause(field, tecs):
+    """Filtro de tecnologia por presença de substring (TECNOLOGIA vem como
+    string tipo "2G/3G/4G", mesmo formato de TB_FT_BASE_UNICA_SITES em
+    todo o resto do módulo) — "tem pelo menos uma das tecs pedidas", não
+    igualdade exata. `tecs` já validado contra TECH_ORDER (whitelist),
+    então não há risco de injeção mesmo interpolando o valor."""
+    valid = [t.upper() for t in (tecs or []) if t.upper() in TECH_ORDER]
+    if not valid:
+        return ""
+    conds = [f"{field} LIKE '%{t}%'" for t in valid]
+    return "AND (" + " OR ".join(conds) + ")"
+
+
 def _build_site_venn_clause(region):
     """Combinação exata de tecnologias (fatia clicada do Venn de 4
     conjuntos). `region` vem de query param — só aceitamos valores do
@@ -245,6 +267,7 @@ def get_r1_sites_venn(filters):
         template, filters, params,
         uf_key="uf_filter_site",
         regional_field="g.REGIONAL", regional_key="regional_filter_site",
+        anf_key="anf_filter_site", pop_key="pop_urbana_filter_site",
     )
     row = (execute_query(sql, params) or [{}])[0]
     return {
@@ -278,6 +301,7 @@ def get_r1_sites_hierarchy(filters):
         template, filters, params,
         uf_key="uf_filter_site",
         regional_field="g.REGIONAL", regional_key="regional_filter_site",
+        anf_key="anf_filter_site", pop_key="pop_urbana_filter_site",
     )
     row = (execute_query(sql, params) or [{}])[0]
 
@@ -322,13 +346,23 @@ def get_r1_cities_by_tech(filters):
 
 
 def get_r1_vendors(filters):
+    """Fornecedor dominante por site (Raia 1). Ganhou filtro de tecnologia
+    (jul/26, pedido do usuário): restringe o universo de sites ao mesmo
+    critério de presença usado em "Mobile Sites por Tecnologia"
+    (TECNOLOGIA LIKE '%2G%' etc.) — "tem pelo menos uma das tecs
+    selecionadas", igual o filtro de tecnologia da FilterBar em Cidades."""
     params, ano_int = _prepare_params(filters)
     params["baseline_date"] = _dt.date(ano_int - 1, 12, 31)
 
     mun_clause = _build_municipio_end_id_clause(
         _normalize_list(filters.get("municipios")), "mun", params
     )
-    template = R1_VENDORS.replace("{municipio_filter}", mun_clause)
+    tec_clause = _build_tecnologia_like_clause("TECNOLOGIA", filters.get("tecs"))
+    template = (
+        R1_VENDORS
+        .replace("{municipio_filter}", mun_clause)
+        .replace("{tecnologia_filter_site}", tec_clause)
+    )
 
     sql = _apply_geo_all(template, filters, params, regional_field="g.REGIONAL")
     rows = execute_query(sql, params) or []
@@ -388,6 +422,7 @@ def get_r2_vendors_new_sites(filters):
         uf_field="d.UF", mun_field="d.MUNICIPIO",
         uf_key="uf_filter_d", mun_key="municipio_filter_d",
         regional_field="d.REGIONAL", regional_key="regional_filter_d",
+        anf_key="anf_filter_d", pop_key="pop_urbana_filter_d",
     )
     rows = execute_query(sql, params) or []
 
@@ -424,6 +459,7 @@ def get_casa_nova_nexus(filters):
         uf_field="g.UF", mun_field="g.MUNICIPIO",
         uf_key="uf_filter_g", mun_key="municipio_filter_g",
         regional_field="g.REGIONAL", regional_key="regional_filter_g",
+        anf_key="anf_filter_g", pop_key="pop_urbana_filter_g",
     )
     rows = execute_query(sql, params) or []
     por_tech = [
@@ -592,7 +628,16 @@ def get_r2_cac_por_projeto():
 
 def get_r2_orcamento_por_tecnologia(filters):
     """CAPEX vs OPEX/LEASE do plano, rateado por OC e quebrado por
-    tecnologia (4G/5G) — fonte TB_NEXUS_FINANCEIRO."""
+    tecnologia (4G/5G) — fonte TB_NEXUS_FINANCEIRO (rótulo na UI:
+    "Master (Nexus)").
+
+    Arredondado pra inteiro (jul/26, pedido do usuário: "arredondar todos
+    os números referente a valores") — antes ficava com 2 casas decimais,
+    que expunham ruído do rateio (frações de R$ mi sem significado pra
+    leitura executiva). Arredondar aqui, na origem, propaga pro rótulo do
+    gráfico e pro Excel exportado sem precisar de formatação especial em
+    cada consumidor.
+    """
     params, ano_int = _prepare_params(filters)
     params["ano"] = ano_int
 
@@ -602,6 +647,7 @@ def get_r2_orcamento_por_tecnologia(filters):
         uf_key="uf_filter_g", mun_key="municipio_filter_g",
         regional_field="g.REGIONAL", regional_key="regional_filter_g",
         projeto_field="R.PRIORIDADE",
+        anf_key="anf_filter_g", pop_key="pop_urbana_filter_g",
     )
     rows = execute_query(sql, params) or []
 
@@ -615,12 +661,23 @@ def get_r2_orcamento_por_tecnologia(filters):
             {
                 "name": grupo,
                 "color": "#003399" if grupo == "CAPEX" else "#7DC242",
-                "data": [round(by_key.get((t, grupo), 0), 2) for t in techs],
+                "data": [round(by_key.get((t, grupo), 0)) for t in techs],
             }
             for grupo in grupos
         ],
-        "total": round(sum(by_key.values()), 2),
+        "total": round(sum(by_key.values())),
     }
+
+
+#  Cores DESTE gráfico especificamente (jul/26, pedido do usuário:
+# "trocar cores do gráfico [amarelo e vermelho]") — não é o mesmo par de
+# CASA_COLORS (verde/azul) usado no resto do portal pra Casa Nova/Casa
+# Existente. Local a esta função de propósito: CASA_COLORS continua
+# sendo o par "oficial" caso outro visual de CN/CE precise dele no
+# futuro; este card pediu uma paleta própria, não uma mudança global.
+# Reaproveita os hex já usados em TECH_COLORS (4G amarelo, 3G vermelho) —
+# fonte única de cor em vez de inventar hex novo.
+_ENDERECO_CORES = {"CN": TECH_COLORS["4G"], "CE": TECH_COLORS["3G"]}
 
 
 def get_r2_endereco_por_tecnologia(filters):
@@ -641,6 +698,7 @@ def get_r2_endereco_por_tecnologia(filters):
         uf_key="uf_filter_g", mun_key="municipio_filter_g",
         regional_field="g.REGIONAL", regional_key="regional_filter_g",
         projeto_field="RR.PRIORIDADE",
+        anf_key="anf_filter_g", pop_key="pop_urbana_filter_g",
     )
     rows = execute_query(sql, params) or []
 
@@ -674,7 +732,7 @@ def get_r2_endereco_por_tecnologia(filters):
             "series": [
                 {
                     "name": c,
-                    "color": CASA_COLORS[c],
+                    "color": _ENDERECO_CORES[c],
                     "data": [data_by_cell[(t, c)] for t in techs],
                 }
                 for c in classificacoes

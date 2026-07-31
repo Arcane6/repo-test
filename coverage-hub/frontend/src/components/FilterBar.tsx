@@ -10,7 +10,14 @@ import { themedSelectStyles } from "./selectStyles";
 
 const tecOptions = TECH_ORDER.map((t) => ({ value: t, label: t }));
 
-export type FilterField = "uf" | "municipio" | "tecnologia" | "ano";
+export type FilterField =
+  | "uf"
+  | "municipio"
+  | "tecnologia"
+  | "ano"
+  | "regional"
+  | "anf"
+  | "populacaoUrbana";
 
 interface FilterBarProps {
   /** Quais seletores mostrar — cada dashboard usa só os filtros que faz sentido. */
@@ -18,13 +25,32 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ fields }: FilterBarProps) {
-  const { uf, municipio, tecnologia, ano, setValues, setAno, clear } = useFilterStore();
+  const { uf, municipio, tecnologia, regional, anf, popUrbana, ano, setValues, setAno, clear } =
+    useFilterStore();
   const multiStyles = themedSelectStyles<{ value: string; label: string }, true>();
   const singleStyles = themedSelectStyles<{ value: string; label: string }, false>();
 
   const { data: ufOptions = [] } = useQuery({
     queryKey: ["actual-ufs"],
     queryFn: mobileAccessApi.ufs,
+  });
+
+  const { data: regionalOptions = [] } = useQuery({
+    queryKey: ["actual-regionais"],
+    queryFn: mobileAccessApi.regionais,
+    enabled: fields.includes("regional"),
+  });
+
+  const { data: anfOptions = [] } = useQuery({
+    queryKey: ["actual-anfs"],
+    queryFn: mobileAccessApi.anfs,
+    enabled: fields.includes("anf"),
+  });
+
+  const { data: popUrbanaOptions = [] } = useQuery({
+    queryKey: ["pop-urbana-buckets"],
+    queryFn: mobileAccessApi.popUrbanaBuckets,
+    enabled: fields.includes("populacaoUrbana"),
   });
 
   const { data: anos = [] } = useQuery({
@@ -115,6 +141,56 @@ export function FilterBar({ fields }: FilterBarProps) {
                     selected.map((s) => s.value),
                   )
                 }
+              />
+            </div>
+          )}
+
+          {fields.includes("regional") && (
+            <div className="col-md" style={{ flexBasis: 0, flexGrow: colSize }}>
+              <label className="form-label fw-bold small">Regional</label>
+              <Select
+                isMulti
+                styles={multiStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
+                placeholder="Todas as regionais"
+                options={regionalOptions.map((r) => ({ value: r, label: r }))}
+                value={regional.map((r) => ({ value: r, label: r }))}
+                onChange={(selected) => setValues("regional", selected.map((s) => s.value))}
+              />
+            </div>
+          )}
+
+          {fields.includes("anf") && (
+            <div className="col-md" style={{ flexBasis: 0, flexGrow: colSize }}>
+              <label className="form-label fw-bold small">ANF</label>
+              <Select
+                isMulti
+                styles={multiStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
+                placeholder="Todos os ANFs"
+                options={anfOptions.map((a) => ({ value: a, label: a }))}
+                value={anf.map((a) => ({ value: a, label: a }))}
+                onChange={(selected) => setValues("anf", selected.map((s) => s.value))}
+              />
+            </div>
+          )}
+
+          {fields.includes("populacaoUrbana") && (
+            <div className="col-md" style={{ flexBasis: 0, flexGrow: colSize }}>
+              <label className="form-label fw-bold small">População Urbana</label>
+              <Select
+                isMulti
+                styles={multiStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
+                placeholder="Todas as faixas"
+                options={popUrbanaOptions.map((p) => ({ value: p.value, label: p.label }))}
+                value={popUrbanaOptions
+                  .filter((p) => popUrbana.includes(p.value))
+                  .map((p) => ({ value: p.value, label: p.label }))}
+                onChange={(selected) => setValues("popUrbana", selected.map((s) => s.value))}
               />
             </div>
           )}

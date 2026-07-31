@@ -44,7 +44,7 @@ WITH BASE AS (
     {municipio_filter_site}
 ),
 GEO AS (
-    SELECT IBGE, REGIONAL, UF, MUNICIPIO
+    SELECT IBGE, REGIONAL, UF, MUNICIPIO, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -64,6 +64,8 @@ FROM BASE b
 LEFT JOIN GEO g ON g.IBGE = b.IBGE
 WHERE 1=1
 {regional_filter_site}
+{anf_filter_site}
+{pop_urbana_filter_site}
 """
 
 # ---------- Sites por tecnologia — contagem independente por tech. ----------
@@ -80,6 +82,8 @@ FROM BASE b
 LEFT JOIN GEO g ON g.IBGE = b.IBGE
 WHERE 1=1
 {regional_filter_site}
+{anf_filter_site}
+{pop_urbana_filter_site}
 """
 
 # ---------- Pivot: mesmas duas métricas acima, abertas por Regional/UF/ ----------
@@ -114,6 +118,8 @@ FROM BASE b
 LEFT JOIN GEO g ON g.IBGE = b.IBGE
 WHERE 1=1
 {regional_filter_site}
+{anf_filter_site}
+{pop_urbana_filter_site}
 GROUP BY b.IBGE, g.REGIONAL, g.UF, g.MUNICIPIO
 ORDER BY g.REGIONAL, 2, 3
 """
@@ -170,7 +176,7 @@ WITH BASE AS (
     {municipio_filter_site}
 ),
 GEO AS (
-    SELECT IBGE, REGIONAL
+    SELECT IBGE, REGIONAL, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -186,4 +192,6 @@ FROM BASE b
 LEFT JOIN GEO g ON g.IBGE = b.IBGE
 WHERE 1=1
 {regional_filter_site}
+{anf_filter_site}
+{pop_urbana_filter_site}
 """

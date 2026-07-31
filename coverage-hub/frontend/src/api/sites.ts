@@ -12,6 +12,9 @@ export interface SitesFilters {
   uf: string[];
   municipio: string[];
   regionais?: string[];
+  /** Filtros globais (jul/26) — ANF (DDD) e faixa de população urbana. */
+  anfs?: string[];
+  popUrbana?: string[];
 }
 
 function query(filters: SitesFilters): string {
@@ -19,6 +22,8 @@ function query(filters: SitesFilters): string {
   filters.uf.forEach((v) => params.append("uf", v));
   filters.municipio.forEach((v) => params.append("municipio", v));
   (filters.regionais ?? []).forEach((v) => params.append("regional", v));
+  (filters.anfs ?? []).forEach((v) => params.append("anf", v));
+  (filters.popUrbana ?? []).forEach((v) => params.append("pop_urbana", v));
   return params.toString();
 }
 

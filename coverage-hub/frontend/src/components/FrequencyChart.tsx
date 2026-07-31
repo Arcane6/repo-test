@@ -22,11 +22,12 @@ function bandaSortKey(banda: string): [number, string] {
  * clicar direto na barra).
  */
 export function FrequencyChart() {
-  const { uf, municipio, tecnologia, vennRegion } = useFilterStore();
+  const { uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion } = useFilterStore();
 
   const { data, isFetching } = useQuery({
-    queryKey: ["actual-frequencies", uf, municipio, tecnologia, vennRegion],
-    queryFn: () => mobileAccessApi.frequencies({ uf, municipio, tecnologia, vennRegion }),
+    queryKey: ["actual-frequencies", uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion],
+    queryFn: () =>
+      mobileAccessApi.frequencies({ uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion }),
   });
 
   const bars = data?.bars ?? [];

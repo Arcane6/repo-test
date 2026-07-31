@@ -13,6 +13,7 @@ from flask import request
 
 from modules.mobile_access.shared.filters import parse_filters
 from modules.mobile_access.shared.refs import get_refs
+from modules.mobile_access.shared.constants import POP_URBANA_BUCKET_LABELS
 from modules.mobile_access.actual import service as actual
 from modules.mobile_access.summary import service as summary
 from modules.mobile_access.sites import service as sites
@@ -35,6 +36,15 @@ def api_refs():
     return jsonify(get_refs())
 
 
+@mobile_access_bp.route("/api/pop-urbana-buckets")
+def api_pop_urbana_buckets():
+    """Opções do combo de faixas de população urbana (filtro global) — o
+    valor exibido é o mesmo texto que o backend usa pra montar a
+    cláusula SQL (POP_URBANA_BUCKETS em shared/constants.py), fonte
+    única entre front e back."""
+    return jsonify([{"value": key, "label": label} for key, label in POP_URBANA_BUCKET_LABELS.items()])
+
+
 # ---------------------------------------------------------------------------
 # API — Cidades (rede hoje)
 # ---------------------------------------------------------------------------
@@ -46,6 +56,9 @@ def _net_filters():
         "municipios": f["municipios"],
         "tecs": f["tecs"],
         "venn_region": f["venn_region"],
+        "regionais": f["regionais"],
+        "anfs": f["anfs"],
+        "pop_urbana": f["pop_urbana"],
     }
 
 
@@ -89,6 +102,16 @@ def api_actual_frequencies():
 @mobile_access_bp.route("/api/actual/ufs")
 def api_actual_ufs():
     return jsonify(actual.get_ufs())
+
+
+@mobile_access_bp.route("/api/actual/regionais")
+def api_actual_regionais():
+    return jsonify(actual.get_regionais())
+
+
+@mobile_access_bp.route("/api/actual/anfs")
+def api_actual_anfs():
+    return jsonify(actual.get_anfs())
 
 
 @mobile_access_bp.route("/api/actual/municipios/search")
@@ -173,6 +196,8 @@ def _sites_filters():
         "ufs": f["ufs"],
         "municipios": f["municipios"],
         "regionais": f["regionais"],
+        "anfs": f["anfs"],
+        "pop_urbana": f["pop_urbana"],
     }
 
 

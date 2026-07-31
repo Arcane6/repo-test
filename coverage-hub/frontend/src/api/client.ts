@@ -5,6 +5,11 @@ export interface ActiveFilters {
   ano?: string | null;
   /** Região exata do diagrama de Venn (ex.: "only_2g", "inter_all"). */
   vennRegion?: string | null;
+  /** Filtros globais (jul/26) — Regional TIM, ANF (DDD) e faixa de
+   * população urbana (chave de bucket, ver POP_URBANA_BUCKETS). */
+  regional?: string[];
+  anf?: string[];
+  popUrbana?: string[];
 }
 
 export function filtersToQuery(filters: ActiveFilters): string {
@@ -14,6 +19,9 @@ export function filtersToQuery(filters: ActiveFilters): string {
   filters.tecnologia?.forEach((v) => params.append("tecnologia", v));
   if (filters.ano) params.append("ano", filters.ano);
   if (filters.vennRegion) params.append("venn", filters.vennRegion);
+  filters.regional?.forEach((v) => params.append("regional", v));
+  filters.anf?.forEach((v) => params.append("anf", v));
+  filters.popUrbana?.forEach((v) => params.append("pop_urbana", v));
   return params.toString();
 }
 

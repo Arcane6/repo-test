@@ -1149,6 +1149,144 @@ diferente" do esperado — 1.845,3 total, 1.674,7 em 5G + 170,6 em 4G).
      `showTotalLabel: true` (Orçamento por Tecnologia e Endereço por
      Tecnologia hoje) — não é específico de um card.
 
+## Bateria de pedidos do "chefe" — jul/26 (filtros globais + ajustes finos)
+
+Lote grande, entregue como screenshot de checklist. Dois itens foram
+explicitamente excluídos pelo usuário (não implementar sem pedido novo):
+"Novas Cidades por Regional: colocar o gráfico de rosca no bloco projeção
+2026" e, em Orçamento por Tecnologia, "criar filtro com cenários da
+Master". Todo o resto do checklist foi implementado.
+
+- **Filtros globais novos: Regional, ANF, População Urbana** (as 3 abas —
+  Cidades, Sites, Resumo). `Regional` já existia como filtro de dado em
+  quase toda query (`regionais`/`regional_filter*`), só não estava
+  exposto na `FilterBar` como seletor manual — agora está. `ANF` e
+  `POPULACAO_URBANA` são colunas confirmadas em
+  `NTW_OP.MUNICIPIOS_FECHAMENTO` (usadas pelo agente de IA em
+  `agent/dicionario_municipios.py`, `COLUNAS_MUNICIPIOS` — foi de lá que
+  vieram os nomes reais, não foram adivinhadas). **Capital ficou de
+  fora** — não há evidência de nenhuma coluna desse tipo em nenhuma
+  query/dicionário do projeto, e o usuário confirmou "não sei/não existe
+  ainda" quando perguntado; não reintroduzir sem confirmar a fonte real.
+  - **População Urbana é filtro de FAIXA fixa, não intervalo livre**
+    (decisão do usuário): 4 buckets (`POP_URBANA_BUCKETS` em
+    `shared/constants.py` — até 20 mil / 20-100 mil / 100-500 mil / 500
+    mil+), fonte única entre back (monta a cláusula SQL) e front (popula
+    o combo via `/api/pop-urbana-buckets`, que devolve os mesmos
+    rótulos). `shared/filters.py` ganhou `build_pop_urbana_clause()`
+    (única função realmente compartilhada entre as 3 abas — todo o
+    resto de filtro geo continua com cópia local por aba, convenção já
+    estabelecida) — gera `AND (faixa1 OR faixa2 OR ...)` com bind
+    min/max por bucket selecionado, nunca interpolando o valor cru.
+  - **`_apply_geo_all`** (summary/service.py) e o equivalente `_apply_geo`
+    (sites/service.py) ganharam `anf_field`/`anf_key`/`pop_field`/
+    `pop_key` seguindo o MESMO padrão já usado pra `regional_field`/
+    `regional_key` — cada query só recebe o filtro nos placeholders que
+    ela realmente declara (`{anf_filter_g}`, `{pop_urbana_filter_site}`
+    etc., sufixo depende do alias de tabela da query). anf_field/
+    pop_field default pro mesmo alias do regional_field (troca
+    "REGIONAL" por "ANF"/"POPULACAO_URBANA" no nome) — não precisa
+    repetir o alias a cada chamada.
+  - **`REL_CIDADES_PLANEJADO_26` não tem `POPULACAO_URBANA`** (só
+    `REGIONAL, UF, ANF, MUNICIPIO, IBGE` — confirmado no CLAUDE.md já
+    documentado antes). `R2_NEW_CITIES_BY_ANF` ganhou uma ponte por IBGE
+    até `MUNICIPIOS_FECHAMENTO` só pra esse filtro (mesmo princípio de
+    ponte-por-IBGE já usado em Tráfego/Transporte) — `ANF` em si já
+    existe direto na tabela, sem precisar de ponte.
+  - **`SITES_GEO_POINTS` (mapa de sites) NÃO ganhou os filtros novos** —
+    ela já não respondia a `regional` antes (gap pré-existente, não
+    introduzido agora); não fizemos essa extensão pra não expandir o
+    escopo de uma query que nunca teve JOIN com `MUNICIPIOS_FECHAMENTO`.
+    Se algum dia isso for pedido, seguir o mesmo padrão de
+    `SITES_BASE_CTE` (join por IBGE).
+  - Resumo: `regional` do filtro global se combina com o cross-filter já
+    existente (`useResumoFocusStore.regional`, clique num donut) — o
+    cross-filter tem prioridade quando ativo, senão cai pro filtro
+    global (`regionais: focusedRegional ? [focusedRegional] : regional`
+    em `ResumoDashboard.tsx`). `tecnologia`/`anf`/`popUrbana` do filtro
+    global vão direto (Resumo continua sem filtro global de tecnologia
+    — ver próximo item).
+- **"Mobile Sites por Fornecedor" (ex-"Sites por Fornecedor", Raia 1)
+  ganhou filtro de tecnologia — só deste card**, não um filtro global do
+  Resumo (que continua sem tecnologia como filtro real — CLAUDE.md já
+  documentava isso, "tecnologia é só destaque"). Estado local
+  (`useState` em `Raia1.tsx`), combo compacto no `headerExtra` do
+  `ChartPanel` (mesmo padrão do seletor de cenário em "Endereço por
+  Tecnologia"). Backend: `R1_VENDORS` ganhou `{tecnologia_filter_site}`
+  dentro da CTE `SITE_UNIVERSE` (LIKE-based, "tem pelo menos uma das
+  tecs", igual o resto do módulo) — `_build_tecnologia_like_clause()`
+  novo em `summary/service.py`, aplicado via `.replace()` antes do
+  `_apply_geo_all` (não cabia no mecanismo IN-clause dos outros
+  filtros).
+- **Orçamento por Tecnologia: arredondado pra inteiro na origem**
+  (`get_r2_orcamento_por_tecnologia`, `round(...)` sem casas decimais em
+  vez de `round(...,2)`) — arredondar no service em vez de só na
+  formatação do front propaga pro rótulo do gráfico E pro Excel
+  exportado de graça, sem duplicar lógica de arredondamento em dois
+  lugares. Fonte renomeada de "Nexus Financeiro" pra "Master (Nexus)"
+  (`TABLE_LABELS` em `SourceBadge.tsx`) — só essa tabela usa esse rótulo,
+  troca segura.
+- **Endereço por Tecnologia (Raia 2)**: 4 mudanças no mesmo card.
+  1. **Reordenado**: Novas Cidades → Endereço → Orçamento (era Novas
+     Cidades → Orçamento → Endereço) — só trocar a ordem dos blocos JSX
+     em `Raia2.tsx`, sem tocar em estado/lógica.
+  2. **Badge de fonte só "Master (Nexus)"**: `sourceTable` mudou de
+     `["TB_ROLLOUT_ACESSO", "VW_CAPEX_MASTER_FULL"]` pra só
+     `"VW_CAPEX_MASTER_FULL"`. O rateio geográfico por OC do
+     `TB_ROLLOUT_ACESSO` continua existindo por trás (não mudou a
+     mecânica, só o que aparece como badge visível).
+  3. **Rodapé trocado**: era "referência: Data do arquivo de rollout" →
+     agora "referência: cenário Master (Nexus) selecionado acima" — a
+     `VW_CAPEX_MASTER_FULL` não tem data de carga própria
+     (`STATIC_REFS["VW_CAPEX_MASTER_FULL"] = None`), então a referência
+     que faz sentido mostrar é o cenário do combo, não uma data.
+  4. **Cores próprias (amarelo/vermelho), NÃO o `CASA_COLORS` global**:
+     `CASA_COLORS` (verde/azul, `shared/constants.py`) é documentado como
+     o par "oficial" de Casa Nova/Casa Existente pra qualquer visual novo
+     do portal — mudar esse valor global quebraria essa convenção pra
+     sempre. Como só este card pediu cor diferente, criamos
+     `_ENDERECO_CORES` local em `summary/service.py`
+     (`{"CN": TECH_COLORS["4G"], "CE": TECH_COLORS["3G"]}` — reaproveita
+     os hex de amarelo/vermelho já usados no resto do app em vez de
+     inventar cor nova) e trocamos só a query deste card
+     (`get_r2_endereco_por_tecnologia`). `CASA_COLORS` continua
+     definida em `constants.py`, só não é mais importada em
+     `summary/service.py` (sem consumidor no momento — se outro CN/CE
+     precisar dela de novo, reimportar).
+  5. **"Trocar cores do gráfico" NÃO se aplica ao resumo "MBB Evolution +
+     B2B IoT"/tabela "CAC por Projeto"** — só ao gráfico "Endereço por
+     Tecnologia" mesmo (não havia pedido pra mudar as outras).
+- **Toda a raia "Fechamento 2025" (R1) mostra a referência de data
+  MOCADA em `12/2025`, sempre** — pedido de acompanhamento do usuário
+  depois da entrega acima. Motivo: o badge de fonte (`/api/refs`) mostra
+  o `MAX(DT_CARGA)`/`MAX(MES_REF)` **real** da tabela, que pode já ter
+  avançado além de dez/2025 (carga contínua — a tabela recebe loads
+  novos com o tempo, mesmo a análise desta raia sempre olhando o
+  snapshot de 31/dez/2025 via `baseline_date`). Mostrar a data real do
+  último load, quando ela diverge do que está de fato sendo exibido,
+  confunde o leitor sobre qual recorte está na tela.
+  - **`SourceBadge` ganhou a prop `staticRef?: string`** — quando
+    presente, ignora completamente o valor vindo de `/api/refs` (a
+    query nem é feita: `enabled: !staticRef`) e mostra esse texto fixo.
+    `ChartPanel` repassa via `sourceStaticRef`. Aplicado nos 4 cards da
+    R1: "Cidades Cobertas por Tecnologia", "Mobile Sites por
+    Tecnologia" (`SitesComboChart` — hardcoded direto no componente,
+    que só é usado nesta raia), "Mobile Sites por Fornecedor" e "Total
+    de sites ativos".
+  - **Escopo é só a raia R1 do Resumo** — as MESMAS tabelas
+    (`TB_FT_BASE_UNICA_SITES`, `BASE_TB_END_ID_NEW`) aparecem também na
+    aba **Sites** (`SitesDashboard.tsx`, `SitesMap.tsx`,
+    `SitesPivotTable.tsx`) mostrando o inventário **atual** (MES_REF
+    mais recente, não o fechamento de dezembro) — essas continuam com a
+    data real do `/api/refs`, sem `staticRef`. Não espalhar o mock pra
+    essas outras telas: são semanticamente diferentes (inventário de
+    hoje vs. fechamento congelado de dez/25).
+  - Literal `"12/2025"` fixo no código (não derivado de
+    `DEFAULT_PLAN_YEAR`) — mesmo valor que o usuário pediu por
+    extenso duas vezes. Se o ciclo de planejamento avançar (baseline
+    virar dez/26 etc.), atualizar a constante `FECHAMENTO_25_REF` em
+    `Raia1.tsx` e o literal em `SitesComboChart.tsx` junto.
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.

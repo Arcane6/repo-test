@@ -86,8 +86,20 @@ export interface GaugesResponse {
   cards: GaugeCard[];
 }
 
+export interface PopUrbanaBucketOption {
+  value: string;
+  label: string;
+}
+
 export const mobileAccessApi = {
   ufs: () => fetchJson<string[]>(`${BASE}/ufs`),
+
+  regionais: () => fetchJson<string[]>(`${BASE}/regionais`),
+
+  anfs: () => fetchJson<string[]>(`${BASE}/anfs`),
+
+  popUrbanaBuckets: () =>
+    fetchJson<PopUrbanaBucketOption[]>("/mobile-access/api/pop-urbana-buckets"),
 
   municipiosSearch: (q: string, uf: string[]) => {
     const params = new URLSearchParams();

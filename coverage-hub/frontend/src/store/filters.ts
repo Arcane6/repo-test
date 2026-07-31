@@ -6,7 +6,13 @@ import { create } from "zustand";
  * consultar dados) e qualquer componente pode escrever nela (ao ser
  * clicado) — isso é o mecanismo de cross-filtering entre visuais.
  */
-export type FilterListDimension = "uf" | "municipio" | "tecnologia";
+export type FilterListDimension =
+  | "uf"
+  | "municipio"
+  | "tecnologia"
+  | "regional"
+  | "anf"
+  | "popUrbana";
 
 /** Região do diagrama de Venn (Presença nos Municípios): combinação exata
  * de tecnologias presentes/ausentes, ex.: "only_2g" (só 2G, sem 3G/5G) ou
@@ -26,6 +32,12 @@ interface FilterState {
   uf: string[];
   municipio: string[];
   tecnologia: string[];
+  /** Filtros globais (jul/26) — mesmas 3 abas, mesmos campos:
+   * Regional TIM, ANF (DDD) e faixa de população urbana (chave de
+   * POP_URBANA_BUCKETS no backend, não um número livre). */
+  regional: string[];
+  anf: string[];
+  popUrbana: string[];
   ano: string | null;
   vennRegion: VennRegionKey | null;
   toggle: (dimension: FilterListDimension, value: string) => void;
@@ -39,6 +51,9 @@ export const useFilterStore = create<FilterState>((set) => ({
   uf: [],
   municipio: [],
   tecnologia: [],
+  regional: [],
+  anf: [],
+  popUrbana: [],
   ano: null,
   vennRegion: null,
 
@@ -61,5 +76,14 @@ export const useFilterStore = create<FilterState>((set) => ({
   toggleVennRegion: (region) =>
     set((state) => ({ vennRegion: state.vennRegion === region ? null : region })),
 
-  clear: () => set({ uf: [], municipio: [], tecnologia: [], vennRegion: null }),
+  clear: () =>
+    set({
+      uf: [],
+      municipio: [],
+      tecnologia: [],
+      regional: [],
+      anf: [],
+      popUrbana: [],
+      vennRegion: null,
+    }),
 }));

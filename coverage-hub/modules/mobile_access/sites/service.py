@@ -11,6 +11,7 @@ import string as _string
 from database.oracle import execute_query
 
 from modules.mobile_access.shared.constants import TECH_COLORS, TECH_ORDER
+from modules.mobile_access.shared.filters import build_pop_urbana_clause
 from modules.mobile_access.sites.queries import (
     SITES_BY_MAX_TECH,
     SITES_BY_TECNOLOGIA,
@@ -85,6 +86,7 @@ def _apply_geo(sql_template, filters, params):
     spec = {
         "uf_filter_site": ("UF", _normalize_list(filters.get("ufs")), "uf"),
         "regional_filter_site": ("g.REGIONAL", _normalize_list(filters.get("regionais")), "reg"),
+        "anf_filter_site": ("g.ANF", _normalize_list(filters.get("anfs")), "anf"),
     }
     to_fill = {
         key: _build_in_clause(field, values, prefix, params)
@@ -94,6 +96,10 @@ def _apply_geo(sql_template, filters, params):
     if "municipio_filter_site" in fields:
         to_fill["municipio_filter_site"] = _build_municipio_ibge_clause(
             _normalize_list(filters.get("municipios")), "mun", params
+        )
+    if "pop_urbana_filter_site" in fields:
+        to_fill["pop_urbana_filter_site"] = build_pop_urbana_clause(
+            "g.POPULACAO_URBANA", filters.get("pop_urbana"), params, "pop"
         )
     return sql_template.format(**to_fill)
 
