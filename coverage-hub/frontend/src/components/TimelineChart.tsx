@@ -8,11 +8,12 @@ import { useFilterStore } from "../store/filters";
 import { timeseriesToRows } from "../utils/timeseries";
 
 export function TimelineChart() {
-  const { uf, municipio, tecnologia, vennRegion } = useFilterStore();
+  const { uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion } = useFilterStore();
 
   const { data, isFetching } = useQuery({
-    queryKey: ["actual-timeseries", uf, municipio, tecnologia, vennRegion],
-    queryFn: () => mobileAccessApi.timeseries({ uf, municipio, tecnologia, vennRegion }),
+    queryKey: ["actual-timeseries", uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion],
+    queryFn: () =>
+      mobileAccessApi.timeseries({ uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion }),
   });
 
   const option: EChartsCoreOption = useMemo(() => {

@@ -12,13 +12,13 @@ import { municipiosColumns, municipiosToRows } from "../utils/municipiosColumns"
  * dashboard.
  */
 export function ExportAllButton() {
-  const { uf, municipio, tecnologia } = useFilterStore();
+  const { uf, municipio, tecnologia, regional, anf, popUrbana } = useFilterStore();
   const [loading, setLoading] = useState(false);
 
   async function handleExport() {
     setLoading(true);
     try {
-      const filters = { uf, municipio, tecnologia };
+      const filters = { uf, municipio, tecnologia, regional, anf, popUrbana };
       const [kpis, frequencies, timeseries, table] = await Promise.all([
         mobileAccessApi.kpis(filters),
         mobileAccessApi.frequencies(filters),

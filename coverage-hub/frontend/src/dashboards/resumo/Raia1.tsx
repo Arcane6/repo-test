@@ -1,14 +1,24 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Select from "react-select";
 import { summaryApi, type SummaryFilters } from "../../api/summary";
 import { barsByTechOption, siteHierarchyTreeOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { SitesComboChart } from "../../components/SitesComboChart";
+import { themedSelectStyles } from "../../components/selectStyles";
 import { useResumoFocusStore } from "../../store/resumoFocus";
+import { TECH_ORDER } from "../../theme";
+
+const tecOptions = TECH_ORDER.map((t) => ({ value: t, label: t }));
 
 export function Raia1({ filters }: { filters: SummaryFilters }) {
   const { uf, municipio, ano, regionais } = filters;
   const { tecnologia: focusedTec, toggleTecnologia } = useResumoFocusStore();
+  // Filtro local, só deste card — Resumo não tem filtro global de
+  // tecnologia (ver CLAUDE.md), mas o usuário pediu especificamente aqui.
+  const [vendorTecs, setVendorTecs] = useState<string[]>([]);
+  const vendorFilters = { ...filters, tecs: vendorTecs };
+  const multiStyles = themedSelectStyles<{ value: string; label: string }, true>();
 
   const { data: cities, isFetching: loadingCities } = useQuery({
     queryKey: ["summary-r1-cities", uf, municipio, ano, regionais],
@@ -16,8 +26,8 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
   });
 
   const { data: vendors, isFetching: loadingVendors } = useQuery({
-    queryKey: ["summary-r1-vendors", uf, municipio, ano, regionais],
-    queryFn: () => summaryApi.r1Vendors(filters),
+    queryKey: ["summary-r1-vendors", uf, municipio, ano, regionais, vendorTecs],
+    queryFn: () => summaryApi.r1Vendors(vendorFilters),
   });
 
   const { data: hierarchy, isFetching: loadingHierarchy } = useQuery({
@@ -30,14 +40,12 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
       <div className="d-flex align-items-center mb-3">
         <span className="raia-badge me-2" style={{ background: "#003399" }}>R1</span>
         <h5 className="fw-bold mb-0">Fechamento 2025</h5>
-        <small className="text-muted ms-3">Rede consolidada até 31/dez do ano anterior</small>
       </div>
 
       <div className="row g-3">
         <div className="col-lg-4">
           <ChartPanel
             title="Cidades Cobertas por Tecnologia"
-            subtitle="Clique numa barra para filtrar uma tecnologia"
             sourceTable="MUNICIPIOS_FECHAMENTO"
             sourceDateFormat="month"
             option={barsByTechOption(cities?.bars ?? [], cities?.total ?? 0, focusedTec)}
@@ -59,9 +67,22 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
         </div>
         <div className="col-lg-4">
           <ChartPanel
-            title="Sites por Fornecedor"
+            title="Mobile Sites por Fornecedor"
             sourceTable="BASE_TB_END_ID_NEW"
             height={340}
+            headerExtra={
+              <Select
+                isMulti
+                styles={multiStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                menuPosition="fixed"
+                placeholder="Todas as tecnologias"
+                options={tecOptions}
+                value={vendorTecs.map((t) => ({ value: t, label: t }))}
+                onChange={(selected) => setVendorTecs(selected.map((s) => s.value))}
+                className="mb-1"
+              />
+            }
             option={vendorDonutSideOption(vendors ?? [])}
             loading={loadingVendors}
             imageFilename="r1-fornecedor-por-site.png"

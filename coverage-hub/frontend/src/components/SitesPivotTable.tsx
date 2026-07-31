@@ -31,7 +31,7 @@ export function SitesPivotTable({ filters }: { filters: SitesFilters }) {
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["sites-pivot", filters.uf, filters.municipio, filters.regionais],
+    queryKey: ["sites-pivot", filters.uf, filters.municipio, filters.regionais, filters.anfs, filters.popUrbana],
     queryFn: () => sitesApi.pivot(filters),
   });
   const rows = data?.rows ?? [];

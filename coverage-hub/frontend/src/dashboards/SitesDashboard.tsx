@@ -10,21 +10,21 @@ import { useFilterStore } from "../store/filters";
 const fmt = (v: number) => v.toLocaleString("pt-BR");
 
 export function SitesDashboard() {
-  const { uf, municipio } = useFilterStore();
-  const filters = { uf, municipio };
+  const { uf, municipio, regional, anf, popUrbana } = useFilterStore();
+  const filters = { uf, municipio, regionais: regional, anfs: anf, popUrbana };
 
   const { data: maxTech, isFetching: loadingMaxTech } = useQuery({
-    queryKey: ["sites-by-max-tech", uf, municipio],
+    queryKey: ["sites-by-max-tech", uf, municipio, regional, anf, popUrbana],
     queryFn: () => sitesApi.byMaxTech(filters),
   });
 
   const { data: byTec, isFetching: loadingByTec } = useQuery({
-    queryKey: ["sites-by-tecnologia", uf, municipio],
+    queryKey: ["sites-by-tecnologia", uf, municipio, regional, anf, popUrbana],
     queryFn: () => sitesApi.byTecnologia(filters),
   });
 
   const { data: hierarchy, isFetching: loadingHierarchy } = useQuery({
-    queryKey: ["sites-hierarchy", uf, municipio],
+    queryKey: ["sites-hierarchy", uf, municipio, regional, anf, popUrbana],
     queryFn: () => sitesApi.hierarchy(filters),
   });
 
@@ -34,7 +34,7 @@ export function SitesDashboard() {
         <span className="tim-eyebrow">Inventário de sites físicos</span>
       </div>
 
-      <FilterBar fields={["uf", "municipio"]} />
+      <FilterBar fields={["uf", "municipio", "regional", "anf", "populacaoUrbana"]} />
 
       <div className="row g-3">
         <div className="col-lg-6">

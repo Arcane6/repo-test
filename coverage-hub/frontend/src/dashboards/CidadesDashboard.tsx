@@ -14,7 +14,7 @@ export function CidadesDashboard() {
         <ExportAllButton />
       </div>
 
-      <FilterBar fields={["uf", "municipio", "tecnologia"]} />
+      <FilterBar fields={["uf", "municipio", "tecnologia", "regional", "anf", "populacaoUrbana"]} />
       <GaugeCards />
 
       <div className="row g-3">

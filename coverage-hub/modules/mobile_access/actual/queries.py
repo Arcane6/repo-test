@@ -12,6 +12,9 @@ WITH BASE_RAW AS (
         IBGE,
         UF,
         MUNICIPIO,
+        REGIONAL,
+        ANF,
+        POPULACAO_URBANA,
         BANDA_2G_MHZ,
         BANDA_3G_MHZ,
         BANDA_4G_MHZ,
@@ -55,6 +58,9 @@ BASE AS (
     {municipio_filter}
     {tecnologia_filter}
     {venn_filter}
+    {regional_filter}
+    {anf_filter}
+    {pop_urbana_filter}
 )
 """
 
@@ -166,6 +172,32 @@ WHERE TRUNC(DT_CARGA) = (
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
 )
 ORDER BY UF
+"""
+
+
+# Opções dos filtros globais novos (Regional/ANF) — mesmo princípio de
+# UFS_QUERY: lista de valores distintos da última carga, pra popular o
+# combo da FilterBar (compartilhada pelas 3 abas).
+REGIONAIS_QUERY = """
+SELECT DISTINCT REGIONAL
+FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+WHERE TRUNC(DT_CARGA) = (
+    SELECT TRUNC(MAX(DT_CARGA))
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+)
+AND REGIONAL IS NOT NULL
+ORDER BY REGIONAL
+"""
+
+ANFS_QUERY = """
+SELECT DISTINCT ANF
+FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+WHERE TRUNC(DT_CARGA) = (
+    SELECT TRUNC(MAX(DT_CARGA))
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+)
+AND ANF IS NOT NULL
+ORDER BY ANF
 """
 
 

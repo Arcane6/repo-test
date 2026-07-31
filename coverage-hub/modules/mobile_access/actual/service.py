@@ -9,6 +9,7 @@ from modules.mobile_access.shared.constants import (
     TECH_ORDER,
     TIM_BRAND_COLOR,
 )
+from modules.mobile_access.shared.filters import build_pop_urbana_clause
 from modules.mobile_access.actual.queries import (
     BASE_CTE_TEMPLATE,
     KPIS_TEMPLATE,
@@ -16,6 +17,8 @@ from modules.mobile_access.actual.queries import (
     VENN_REGION_CLAUSES,
     TABLE_TEMPLATE,
     UFS_QUERY,
+    REGIONAIS_QUERY,
+    ANFS_QUERY,
     MUNICIPIOS_SEARCH_QUERY,
     FREQUENCIES_TEMPLATE,
     TIMESERIES_TEMPLATE,
@@ -75,28 +78,38 @@ def _build_venn_clause(region):
     return f"AND {clause}" if clause else ""
 
 
-def _build_query(base_template, ufs, municipios, tecs, venn_region=None):
+def _build_query(base_template, ufs, municipios, tecs, venn_region=None,
+                  regionais=None, anfs=None, pop_urbana=None):
     params = {}
 
     uf_clause = _build_in_clause("UF", ufs, "uf", params)
     mun_clause = _build_in_clause("MUNICIPIO", municipios, "mun", params)
     tec_clause = _build_tec_clause(tecs, params)
     venn_clause = _build_venn_clause(venn_region)
+    regional_clause = _build_in_clause("REGIONAL", regionais, "reg", params)
+    anf_clause = _build_in_clause("ANF", anfs, "anf", params)
+    pop_clause = build_pop_urbana_clause("POPULACAO_URBANA", pop_urbana, params, "pop")
 
     cte = BASE_CTE_TEMPLATE.format(
         uf_filter=uf_clause,
         municipio_filter=mun_clause,
         tecnologia_filter=tec_clause,
         venn_filter=venn_clause,
+        regional_filter=regional_clause,
+        anf_filter=anf_clause,
+        pop_urbana_filter=pop_clause,
     )
     return cte + base_template, params
 
 
-def _prepare(ufs, municipios, tecs):
+def _prepare(ufs, municipios, tecs, regionais=None, anfs=None, pop_urbana=None):
     return (
         _normalize_list(ufs),
         _normalize_list(municipios),
         _normalize_list(tecs),
+        _normalize_list(regionais),
+        _normalize_list(anfs),
+        _normalize_list(pop_urbana),
     )
 
 
@@ -113,6 +126,16 @@ def _pct(value, total):
 def get_ufs():
     """UFs distintas da última carga (para dropdown)."""
     return [row["uf"] for row in execute_query(UFS_QUERY)]
+
+
+def get_regionais():
+    """Regionais distintas da última carga (para dropdown do filtro global)."""
+    return [row["regional"] for row in execute_query(REGIONAIS_QUERY)]
+
+
+def get_anfs():
+    """ANFs (DDD) distintos da última carga (para dropdown do filtro global)."""
+    return [row["anf"] for row in execute_query(ANFS_QUERY)]
 
 
 def search_municipios(q="", uf=None):
@@ -140,10 +163,15 @@ def search_municipios(q="", uf=None):
 # Endpoints de visualização
 # ---------------------------------------------------------------------------
 
-def get_kpis(ufs=None, municipios=None, tecs=None, venn_region=None):
-    ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
+def get_kpis(ufs=None, municipios=None, tecs=None, venn_region=None,
+             regionais=None, anfs=None, pop_urbana=None):
+    ufs, municipios, tecs, regionais, anfs, pop_urbana = _prepare(
+        ufs, municipios, tecs, regionais, anfs, pop_urbana
+    )
 
-    sql, params = _build_query(KPIS_TEMPLATE, ufs, municipios, tecs, venn_region)
+    sql, params = _build_query(
+        KPIS_TEMPLATE, ufs, municipios, tecs, venn_region, regionais, anfs, pop_urbana
+    )
     result = execute_query(sql, params)
     row = result[0] if result else {}
 
@@ -166,10 +194,15 @@ def get_kpis(ufs=None, municipios=None, tecs=None, venn_region=None):
     }
 
 
-def get_venn(ufs=None, municipios=None, tecs=None, venn_region=None):
-    ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
+def get_venn(ufs=None, municipios=None, tecs=None, venn_region=None,
+             regionais=None, anfs=None, pop_urbana=None):
+    ufs, municipios, tecs, regionais, anfs, pop_urbana = _prepare(
+        ufs, municipios, tecs, regionais, anfs, pop_urbana
+    )
 
-    sql, params = _build_query(VENN_TEMPLATE, ufs, municipios, tecs, venn_region)
+    sql, params = _build_query(
+        VENN_TEMPLATE, ufs, municipios, tecs, venn_region, regionais, anfs, pop_urbana
+    )
     result = execute_query(sql, params)
     row = result[0] if result else {}
 
@@ -215,9 +248,14 @@ def _translate_statuses(rows):
     return rows
 
 
-def get_table(ufs=None, municipios=None, tecs=None, venn_region=None):
-    ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
-    sql, params = _build_query(TABLE_TEMPLATE, ufs, municipios, tecs, venn_region)
+def get_table(ufs=None, municipios=None, tecs=None, venn_region=None,
+              regionais=None, anfs=None, pop_urbana=None):
+    ufs, municipios, tecs, regionais, anfs, pop_urbana = _prepare(
+        ufs, municipios, tecs, regionais, anfs, pop_urbana
+    )
+    sql, params = _build_query(
+        TABLE_TEMPLATE, ufs, municipios, tecs, venn_region, regionais, anfs, pop_urbana
+    )
     return _translate_statuses(execute_query(sql, params))
 
 
@@ -229,17 +267,23 @@ def get_full_base():
     return _translate_statuses(execute_query(sql, params))
 
 
-def get_gauges(ufs=None, municipios=None, tecs=None, venn_region=None):
+def get_gauges(ufs=None, municipios=None, tecs=None, venn_region=None,
+               regionais=None, anfs=None, pop_urbana=None):
     """Velocímetros: por tecnologia (e TIM geral), municípios divulgados no
     fechamento anterior (piso), até hoje (ponteiro) e no fechamento do ano
     corrente (alvo, inclui planejados)."""
-    ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
+    ufs, municipios, tecs, regionais, anfs, pop_urbana = _prepare(
+        ufs, municipios, tecs, regionais, anfs, pop_urbana
+    )
     metrics = ",".join(
         [GAUGE_TIM_METRIC]
         + [GAUGE_METRIC.format(tec=t) for t in TECH_ORDER]
         + [GAUGE_PLANEJADO_5G_METRIC]
     )
-    sql, params = _build_query(GAUGES_TEMPLATE.format(metrics=metrics), ufs, municipios, tecs, venn_region)
+    sql, params = _build_query(
+        GAUGES_TEMPLATE.format(metrics=metrics), ufs, municipios, tecs, venn_region,
+        regionais, anfs, pop_urbana,
+    )
     row = (execute_query(sql, params) or [{}])[0]
 
     # Alvo 5G = fechamento anterior + cidades novas do plano. O eoy_curr
@@ -266,10 +310,15 @@ def get_gauges(ufs=None, municipios=None, tecs=None, venn_region=None):
     }
 
 
-def get_frequencies(ufs=None, municipios=None, tecs=None, venn_region=None):
-    ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
+def get_frequencies(ufs=None, municipios=None, tecs=None, venn_region=None,
+                     regionais=None, anfs=None, pop_urbana=None):
+    ufs, municipios, tecs, regionais, anfs, pop_urbana = _prepare(
+        ufs, municipios, tecs, regionais, anfs, pop_urbana
+    )
 
-    sql, params = _build_query(FREQUENCIES_TEMPLATE, ufs, municipios, tecs, venn_region)
+    sql, params = _build_query(
+        FREQUENCIES_TEMPLATE, ufs, municipios, tecs, venn_region, regionais, anfs, pop_urbana
+    )
     result = execute_query(sql, params)
 
     bars = []
@@ -298,10 +347,15 @@ def get_frequencies(ufs=None, municipios=None, tecs=None, venn_region=None):
     return {"bars": bars, "groups": groups}
 
 
-def get_timeseries(ufs=None, municipios=None, tecs=None, venn_region=None):
-    ufs, municipios, tecs = _prepare(ufs, municipios, tecs)
+def get_timeseries(ufs=None, municipios=None, tecs=None, venn_region=None,
+                    regionais=None, anfs=None, pop_urbana=None):
+    ufs, municipios, tecs, regionais, anfs, pop_urbana = _prepare(
+        ufs, municipios, tecs, regionais, anfs, pop_urbana
+    )
 
-    sql, params = _build_query(TIMESERIES_TEMPLATE, ufs, municipios, tecs, venn_region)
+    sql, params = _build_query(
+        TIMESERIES_TEMPLATE, ufs, municipios, tecs, venn_region, regionais, anfs, pop_urbana
+    )
     result = execute_query(sql, params)
 
     active_tecs = [t.upper() for t in tecs] if tecs else TECH_ORDER

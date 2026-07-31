@@ -76,39 +76,9 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
 
         <div className="col-lg-4">
           <ChartPanel
-            title="Orçamento por Tecnologia"
-            subtitle="CAPEX x OPEX/LEASE rateado por OC (R$ milhões)"
-            sourceTable="TB_NEXUS_FINANCEIRO"
-            height={340}
-            option={stackedBarsOption(
-              orcamento?.categories ?? [],
-              orcamento?.series ?? [],
-              { valueFormatter: valorFmt, showValueLabels: true, showTotalLabel: true },
-            )}
-            loading={loadingOrcamento}
-            imageFilename="r2-orcamento-por-tecnologia.png"
-            footnote="* Valores por município estimados a partir da estratificação do Rollout de Acesso (referência: Data do arquivo de rollout)."
-            exportSheet={{
-              name: "R2 Orçamento por Tecnologia",
-              columns: [
-                { header: "Tecnologia", key: "tech" },
-                { header: "CAPEX (R$ mi)", key: "capex" },
-                { header: "OPEX/LEASE (R$ mi)", key: "opex" },
-              ],
-              rows: (orcamento?.categories ?? []).map((tech, i) => ({
-                tech,
-                capex: orcamento?.series[0]?.data[i] ?? 0,
-                opex: orcamento?.series[1]?.data[i] ?? 0,
-              })),
-            }}
-          />
-        </div>
-
-        <div className="col-lg-4">
-          <ChartPanel
             title="Endereço por Tecnologia"
             subtitle="Novos endereços no CAC — Casa Nova (CN) x Casa Existente (CE)"
-            sourceTable={["TB_ROLLOUT_ACESSO", "VW_CAPEX_MASTER_FULL"]}
+            sourceTable="VW_CAPEX_MASTER_FULL"
             height={340}
             headerExtra={
               <select
@@ -133,7 +103,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
             )}
             loading={loadingEndereco}
             imageFilename="r2-endereco-por-tecnologia.png"
-            footnote="* Valores por município estimados a partir da estratificação do Rollout de Acesso (referência: Data do arquivo de rollout)."
+            footnote="* Valores estimados via rateio geográfico proporcional — referência: cenário Master (Nexus) selecionado acima."
             exportSheet={{
               name: "R2 Endereço por Tecnologia",
               columns: [
@@ -145,6 +115,36 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
                 tech,
                 cn: enderecoCenario?.series[0]?.data[i] ?? 0,
                 ce: enderecoCenario?.series[1]?.data[i] ?? 0,
+              })),
+            }}
+          />
+        </div>
+
+        <div className="col-lg-4">
+          <ChartPanel
+            title="Orçamento por Tecnologia"
+            subtitle="CAPEX x OPEX/LEASE rateado por OC (R$ milhões)"
+            sourceTable="TB_NEXUS_FINANCEIRO"
+            height={340}
+            option={stackedBarsOption(
+              orcamento?.categories ?? [],
+              orcamento?.series ?? [],
+              { valueFormatter: valorFmt, showValueLabels: true, showTotalLabel: true },
+            )}
+            loading={loadingOrcamento}
+            imageFilename="r2-orcamento-por-tecnologia.png"
+            footnote="* Valores por município estimados a partir da estratificação do Rollout de Acesso (referência: Data do arquivo de rollout)."
+            exportSheet={{
+              name: "R2 Orçamento por Tecnologia",
+              columns: [
+                { header: "Tecnologia", key: "tech" },
+                { header: "CAPEX (R$ mi)", key: "capex" },
+                { header: "OPEX/LEASE (R$ mi)", key: "opex" },
+              ],
+              rows: (orcamento?.categories ?? []).map((tech, i) => ({
+                tech,
+                capex: orcamento?.series[0]?.data[i] ?? 0,
+                opex: orcamento?.series[1]?.data[i] ?? 0,
               })),
             }}
           />

@@ -6,7 +6,7 @@ import { Raia2 } from "./resumo/Raia2";
 import { Raia3 } from "./resumo/Raia3";
 
 export function ResumoDashboard() {
-  const { uf, municipio, ano } = useFilterStore();
+  const { uf, municipio, ano, regional, anf, popUrbana } = useFilterStore();
   const {
     tecnologia: focusedTec,
     regional: focusedRegional,
@@ -17,8 +17,13 @@ export function ResumoDashboard() {
     uf,
     municipio,
     ano,
-    regionais: focusedRegional ? [focusedRegional] : [],
+    // Clique num regional (cross-filter da própria Raia) tem prioridade
+    // sobre o filtro global da FilterBar — mesma semântica de antes, só
+    // com o filtro global como fallback quando não há destaque ativo.
+    regionais: focusedRegional ? [focusedRegional] : regional,
     projetos: focusedProjeto ? [focusedProjeto] : [],
+    anfs: anf,
+    popUrbana,
   };
   const hasFocus = Boolean(focusedTec || focusedRegional || focusedProjeto);
 
@@ -36,7 +41,7 @@ export function ResumoDashboard() {
         )}
       </div>
 
-      <FilterBar fields={["uf", "municipio"]} />
+      <FilterBar fields={["uf", "municipio", "regional", "anf", "populacaoUrbana"]} />
 
       <Raia1 filters={filters} />
       <Raia2 filters={filters} />

@@ -59,7 +59,7 @@ WITH BASE AS (
     {site_venn_filter}
 ),
 GEO AS (
-    SELECT UF, MUNICIPIO, REGIONAL
+    SELECT UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -86,6 +86,8 @@ FROM BASE b
 LEFT JOIN GEO g ON g.UF = b.UF AND UPPER(g.MUNICIPIO) = UPPER(b.MUNICIPIO)
 WHERE 1=1
 {regional_filter_site}
+{anf_filter_site}
+{pop_urbana_filter_site}
 """
 
 # Combinação exata de tecnologias por fatia do Venn de 4 conjuntos — clicar
@@ -133,7 +135,7 @@ WITH BASE AS (
     {municipio_filter_site}
 ),
 GEO AS (
-    SELECT UF, MUNICIPIO, REGIONAL
+    SELECT UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -149,6 +151,8 @@ FROM BASE b
 LEFT JOIN GEO g ON g.UF = b.UF AND UPPER(g.MUNICIPIO) = UPPER(b.MUNICIPIO)
 WHERE 1=1
 {regional_filter_site}
+{anf_filter_site}
+{pop_urbana_filter_site}
 """
 
 
@@ -169,6 +173,8 @@ WHERE TRUNC(DT_CARGA) = (
 {uf_filter}
 {municipio_filter}
 {regional_filter}
+{anf_filter}
+{pop_urbana_filter}
 """
 
 
@@ -197,6 +203,7 @@ WITH SITE_UNIVERSE AS (
     AND """ + MOBILE_SITES_WHERE + """
     {uf_filter}
     {municipio_filter}
+    {tecnologia_filter_site}
 ),
 VENDOR_BASE AS (
     SELECT
@@ -235,7 +242,7 @@ VENDOR_BASE AS (
     )
 ),
 GEO AS (
-    SELECT UF, MUNICIPIO, REGIONAL
+    SELECT UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -249,6 +256,8 @@ LEFT JOIN VENDOR_BASE vb ON vb.END_ID = su.END_ID
 LEFT JOIN GEO g ON g.UF = su.UF AND UPPER(g.MUNICIPIO) = UPPER(su.MUNICIPIO)
 WHERE 1=1
 {regional_filter}
+{anf_filter}
+{pop_urbana_filter}
 GROUP BY UPPER(COALESCE(vb.VENDOR_5G, vb.VENDOR_4G, vb.VENDOR_3G, vb.VENDOR_2G, 'NÃO INFORMADO'))
 ORDER BY qtd DESC
 """
@@ -265,15 +274,29 @@ ORDER BY qtd DESC
 # trocado a pedido do usuário porque misturava a raia de Plano com dado real.
 
 R2_NEW_CITIES_BY_ANF = """
+WITH POP AS (
+    -- REL_CIDADES_PLANEJADO_26 já tem ANF (usado no filtro global), mas
+    -- não tem POPULACAO_URBANA — ponte por IBGE até MUNICIPIOS_FECHAMENTO
+    -- só pra esse filtro, mesmo princípio da ponte por IBGE já usada em
+    -- todo o resto do módulo.
+    SELECT IBGE, POPULACAO_URBANA
+    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    WHERE TRUNC(DT_CARGA) = (
+        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
+    )
+)
 SELECT
-    REGIONAL AS agrupador,
+    p26.REGIONAL AS agrupador,
     COUNT(*) AS cidades
-FROM NTW_OP.REL_CIDADES_PLANEJADO_26
+FROM NTW_OP.REL_CIDADES_PLANEJADO_26 p26
+LEFT JOIN POP pop ON pop.IBGE = p26.IBGE
 WHERE 1 = 1
 {uf_filter}
 {municipio_filter}
 {regional_filter}
-GROUP BY REGIONAL
+{anf_filter}
+{pop_urbana_filter}
+GROUP BY p26.REGIONAL
 ORDER BY cidades DESC
 """
 
@@ -304,7 +327,7 @@ WITH ROLLOUT_2026 AS (
         END AS TIPO_CASA
     FROM NTW_OP.TB_ROLLOUT_ACESSO r
     LEFT JOIN (
-        SELECT IBGE, UF, MUNICIPIO, REGIONAL
+        SELECT IBGE, UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
         FROM NTW_OP.MUNICIPIOS_FECHAMENTO
         WHERE TRUNC(DT_CARGA) = (
             SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -315,6 +338,8 @@ WITH ROLLOUT_2026 AS (
       {uf_filter_d}
       {municipio_filter_d}
       {regional_filter_d}
+      {anf_filter_d}
+      {pop_urbana_filter_d}
       {projeto_filter}
 ),
 -- Para cada município, pega o vendor dominante considerando TODOS os REFs
@@ -402,7 +427,7 @@ TOTAL_OCS AS (
     GROUP BY TECNOLOGIA
 ),
 GEO AS (
-    SELECT IBGE, UF, MUNICIPIO, REGIONAL
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -417,6 +442,8 @@ ROLLOUT AS (
     {uf_filter_g}
     {municipio_filter_g}
     {regional_filter_g}
+    {anf_filter_g}
+    {pop_urbana_filter_g}
 ),
 NEXUS AS (
     SELECT UPPER(TRIM(TECH)) AS TECH, SUM(CAC) AS QTD
@@ -546,6 +573,8 @@ AND REGIONAL IS NOT NULL
 {uf_filter}
 {municipio_filter}
 {regional_filter}
+{anf_filter}
+{pop_urbana_filter}
 GROUP BY REGIONAL
 ORDER BY base_25 + ganho_26 DESC
 """
@@ -598,7 +627,7 @@ TOTAL_OCS AS (
     FROM ROLLOUT_ALL
 ),
 GEO AS (
-    SELECT IBGE, UF, MUNICIPIO, REGIONAL
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -613,6 +642,8 @@ ROLLOUT AS (
     {uf_filter_g}
     {municipio_filter_g}
     {regional_filter_g}
+    {anf_filter_g}
+    {pop_urbana_filter_g}
     {projeto_filter}
 ),
 FINANCEIRO AS (
@@ -691,7 +722,7 @@ WITH ROLLOUT_REFERENCIA_ALL AS (
         R.ID_MASTER_PIVOT
 ),
 GEO AS (
-    SELECT IBGE, UF, MUNICIPIO, REGIONAL
+    SELECT IBGE, UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
     FROM NTW_OP.MUNICIPIOS_FECHAMENTO
     WHERE TRUNC(DT_CARGA) = (
         SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
@@ -705,6 +736,8 @@ ROLLOUT_REFERENCIA AS (
     {uf_filter_g}
     {municipio_filter_g}
     {regional_filter_g}
+    {anf_filter_g}
+    {pop_urbana_filter_g}
     {projeto_filter}
 ),
 CAPEX_BASE AS (

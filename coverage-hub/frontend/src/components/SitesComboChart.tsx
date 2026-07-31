@@ -101,11 +101,6 @@ export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
               <h6 className="fw-bold mb-0">Mobile Sites por Tecnologia</h6>
               <SourceBadge table="TB_FT_BASE_UNICA_SITES" />
             </div>
-            <small className="text-muted d-block mb-2">
-              {selected
-                ? `Destacando ${REGION_LABELS[selected]} — clique de novo pra limpar`
-                : "Cada site conta uma única vez — clique numa barra pra filtrar a combinação"}
-            </small>
           </div>
           <ChartToolbar
             onDownloadImage={() => downloadChartImage(instanceRef.current, "r1-sites-por-tecnologia.png")}

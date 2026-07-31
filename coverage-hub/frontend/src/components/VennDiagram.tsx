@@ -33,11 +33,13 @@ const REGION_LABELS: Record<VennRegionKey, string> = {
  * fatia (diferente do filtro de tecnologia, que é "tem pelo menos uma").
  */
 export function VennDiagram() {
-  const { uf, municipio, tecnologia, vennRegion, toggleVennRegion } = useFilterStore();
+  const { uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion, toggleVennRegion } =
+    useFilterStore();
 
   const { data } = useQuery({
-    queryKey: ["actual-venn", uf, municipio, tecnologia, vennRegion],
-    queryFn: () => mobileAccessApi.venn({ uf, municipio, tecnologia, vennRegion }),
+    queryKey: ["actual-venn", uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion],
+    queryFn: () =>
+      mobileAccessApi.venn({ uf, municipio, tecnologia, regional, anf, popUrbana, vennRegion }),
   });
 
   const regions = data?.regions;

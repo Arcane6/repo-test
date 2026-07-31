@@ -6,9 +6,9 @@ const TABLE_LABELS: Record<string, string> = {
   TB_FT_BASE_UNICA_SITES: "Base Única de Sites",
   BASE_TB_END_ID_NEW: "RF Design Profile",
   TB_ROLLOUT_ACESSO: "Rollout Acesso",
-  TB_NEXUS_FINANCEIRO: "Nexus Financeiro",
+  TB_NEXUS_FINANCEIRO: "Master (Nexus)",
   TB_NEXUS_CN_CE: "Nexus CN/CE",
-  VW_CAPEX_MASTER_FULL: "CAPEX Master (NEXUS)",
+  VW_CAPEX_MASTER_FULL: "Master (Nexus)",
   REL_CIDADES_PLANEJADO_26: "Plano Nominal de Municípios 5G",
 };
 
