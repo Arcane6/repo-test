@@ -1376,6 +1376,36 @@ acompanhar a troca de cenário daquele card.
   NEXUS" em Fornecedores EoY 26 corretamente (1.000 → 130 no teste),
   confirmando a sincronização entre as duas raias.
 
+## Combo de Regional só mostrava 5 opções (ago/26)
+
+Usuário reportou (testando o filtro global novo) que o combo de Regional
+só listava 5 valores, quando existem pelo menos 7-10 regionais reais.
+Confirmado que não era scroll escondendo opções — o combo realmente só
+tinha 5 pra escolher.
+
+**Causa**: `REGIONAIS_QUERY`/`ANFS_QUERY` (`actual/queries.py`) seguiam o
+mesmo padrão de `UFS_QUERY` — restritas a
+`TRUNC(DT_CARGA) = MAX(DT_CARGA)` (só a carga mais recente). Isso é
+correto pra UF (toda linha tem UF preenchida, sempre), mas `REGIONAL` e
+`ANF` aparentemente **não vêm preenchidos em 100% das linhas em toda
+carga** — então a carga mais recente, sozinha, não necessariamente
+contém todos os valores que já existiram/existem.
+
+**Fix**: `REGIONAIS_QUERY` e `ANFS_QUERY` não restringem mais por
+`DT_CARGA` — olham a tabela inteira (`WHERE REGIONAL IS NOT NULL`, sem
+o filtro de carga). Justificativa: essas duas queries só alimentam a
+LISTA DE OPÇÕES do combo (não um número agregado que precisa ser
+ponto-no-tempo), então pegar qualquer valor que já apareceu em qualquer
+carga é estritamente mais seguro do que esconder opções reais — o pior
+caso é mostrar uma opção "velha" que ninguém mais usa, não esconder uma
+válida. **Não usar esse mesmo raciocínio pra UFS_QUERY nem pra nenhuma
+query de dado agregado** (KPIs, gráficos) — ali o recorte de carga mais
+recente continua sendo o correto por design.
+⚠️ Não confirmado contra Oracle real (sandbox sem conectividade) — a
+lógica foi validada só estruturalmente (SQL sem placeholder quebrado);
+confirmar no próximo deploy que o combo passa a listar as 7-10
+regionais esperadas.
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.
