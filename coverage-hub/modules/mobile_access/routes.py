@@ -157,11 +157,6 @@ def api_summary_r2_cities_anf():
 def api_summary_r2_vendors():
     return jsonify(summary.get_r2_vendors_new_sites(parse_filters()))
 
-@mobile_access_bp.route("/api/summary/r2/casa-nova-nexus")
-def api_summary_r2_casa_nova_nexus():
-    """Meta NEXUS de Casa Nova, rateada geograficamente pelo rollout."""
-    return jsonify(summary.get_casa_nova_nexus(parse_filters()))
-
 @mobile_access_bp.route("/api/summary/r2/cac-por-projeto")
 def api_summary_r2_cac_por_projeto():
     """CAC por Casa Nova/Existente > segmento > projeto, por cenário.

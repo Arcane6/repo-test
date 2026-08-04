@@ -1336,6 +1336,46 @@ Bases — carregam sem erro de console, mapa Leaflet estrutura ok).
 ⚠️ Números ainda não validados contra Oracle real (mesma ressalva de
 sempre neste sandbox) — primeira prioridade no próximo deploy.
 
+## "Meta NEXUS" (Fornecedores EoY 26) migrada pra base de "Endereço por Tecnologia" (ago/26)
+
+Usuário reportou que a "Meta NEXUS" (toggle no donut "Fornecedores EoY
+26", Raia 3) estava fixa numa base antiga e pediu pra ela usar a MESMA
+base de "Endereço por Tecnologia", só filtrando pra Casa Nova (CN), e
+acompanhar a troca de cenário daquele card.
+
+- **Antes**: `R2_CASA_NOVA_NEXUS_RATEIO` lia `TB_NEXUS_CN_CE`
+  (`TIPO_CASA='CN'`) — meta NACIONAL fixa (4G 755 + 5G 245 = 1000
+  endereços), sem dimensão de cenário, rateada geograficamente pelo peso
+  de OCs de Casa Nova do rollout. **Removida por completo** — query
+  (`R2_CASA_NOVA_NEXUS_RATEIO`), service (`get_casa_nova_nexus`) e rota
+  (`/api/summary/r2/casa-nova-nexus`) não existem mais. Nada mais
+  consumia essa fonte, então não sobrou código morto.
+- **Agora**: a "Meta NEXUS" é simplesmente a soma das células "CN" (4G +
+  5G) de `get_r2_endereco_por_tecnologia` — MESMA query, MESMO cenário
+  selecionado no combo de "Endereço por Tecnologia". Nenhuma query nova
+  no backend: o card de Raia 3 só passou a receber, via prop, o mesmo
+  dado que Raia 2 já busca.
+- **Estado subido pro `ResumoDashboard.tsx`**: a query de
+  `r2EnderecoPorTecnologia` e o estado `cenarioEscolhido`/`cenarioAtual`
+  (antes moravam dentro de `Raia2.tsx`) subiram pro dashboard pai, que
+  passa `endereco`/`enderecoCenario`/`cenarioAtual`/`onChangeCenario`
+  como props pra `Raia2` (que virou parcialmente presentational nesse
+  pedaço, mesmo princípio já usado pra "CAC por Projeto"/"MBB Evolution")
+  **e** pra `Raia3` (só `enderecoCenario`, que é o que ela precisa pra
+  montar o valor de "A Contratar" quando `cnFonte === "nexus"`). Trocar
+  o cenário no combo de "Endereço por Tecnologia" agora atualiza a Meta
+  NEXUS de Fornecedores EoY 26 junto, sem request novo (mesmo dataset já
+  baixado, só o cálculo em Python no `Raia3.tsx` muda:
+  `enderecoCenario.series.find(s => s.name === "CN").data.reduce(sum)`).
+- **Badge de fonte trocado**: `TB_NEXUS_CN_CE` → `VW_CAPEX_MASTER_FULL`
+  no card, subtítulo/tooltip do botão "Meta NEXUS" atualizados pra
+  descrever a nova mecânica. O toggle "Rollout" (outra fonte do mesmo
+  card, endereços únicos do próprio `TB_ROLLOUT_ACESSO`) não mudou.
+- Validado com stub simulando 2 cenários com valores bem diferentes:
+  trocar o combo em "Endereço por Tecnologia" mudou o número de "Meta
+  NEXUS" em Fornecedores EoY 26 corretamente (1.000 → 130 no teste),
+  confirmando a sincronização entre as duas raias.
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.

@@ -397,69 +397,6 @@ ORDER BY qtd DESC
 """
 
 
-# ---------- Casa Nova — meta NEXUS, estratificada geograficamente ----------
-# TB_NEXUS_CN_CE nesta leitura é a META NACIONAL de endereços por tech
-# (CAC aqui = contagem-meta: CN 4G 755 + CN 5G 245 = 1000 endereços novos).
-# A tabela em si não tem UF/regional/município — mas o card "Fornecedores
-# EoY 26" precisa responder aos filtros da tela, então a meta nacional é
-# rateada geograficamente pelo mesmo mecanismo de "Orçamento por
-# Tecnologia"/"Endereço por Tecnologia": peso = OCs de Casa Nova do
-# rollout dentro do filtro ÷ OCs de Casa Nova do rollout no Brasil
-# inteiro (TOTAL_OCS, sem filtro — denominador nunca filtra), por
-# tecnologia. Aplicado à meta nacional de cada tech.
-R2_CASA_NOVA_NEXUS_RATEIO = """
-WITH ROLLOUT_ALL AS (
-    -- SEM filtro geográfico: universo completo, denominador do rateio.
-    SELECT
-        COD_IBGE,
-        TECNOLOGIA,
-        ID_MASTER_PIVOT,
-        COUNT(*) AS NUM_OCS
-    FROM NTW_OP.TB_ROLLOUT_ACESSO
-    WHERE PLANO = :ano
-      AND TECNOLOGIA IN ('4G', '5G')
-      AND CLASSIFICACAO_CASA IN ('NEW SITE', 'CO SITE CASA NOVA')
-    GROUP BY COD_IBGE, TECNOLOGIA, ID_MASTER_PIVOT
-),
-TOTAL_OCS AS (
-    SELECT TECNOLOGIA, SUM(NUM_OCS) AS TOTAL
-    FROM ROLLOUT_ALL
-    GROUP BY TECNOLOGIA
-),
-GEO AS (
-    SELECT IBGE, UF, MUNICIPIO, REGIONAL, ANF, POPULACAO_URBANA
-    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    WHERE TRUNC(DT_CARGA) = (
-        SELECT TRUNC(MAX(DT_CARGA)) FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-    )
-),
-ROLLOUT AS (
-    -- Só essa camada, que alimenta a soma exibida, recebe o filtro.
-    SELECT R.*
-    FROM ROLLOUT_ALL R
-    LEFT JOIN GEO g ON g.IBGE = R.COD_IBGE
-    WHERE 1=1
-    {uf_filter_g}
-    {municipio_filter_g}
-    {regional_filter_g}
-    {anf_filter_g}
-    {pop_urbana_filter_g}
-),
-NEXUS AS (
-    SELECT UPPER(TRIM(TECH)) AS TECH, SUM(CAC) AS QTD
-    FROM TB_NEXUS_CN_CE
-    WHERE UPPER(TRIM(TIPO_CASA)) = 'CN'
-    GROUP BY UPPER(TRIM(TECH))
-)
-SELECT
-    R.TECNOLOGIA AS tech,
-    SUM(ROUND((R.NUM_OCS / T.TOTAL) * N.QTD, 4)) AS qtd
-FROM ROLLOUT R
-JOIN TOTAL_OCS T ON T.TECNOLOGIA = R.TECNOLOGIA
-JOIN NEXUS N ON N.TECH = R.TECNOLOGIA
-GROUP BY R.TECNOLOGIA
-ORDER BY R.TECNOLOGIA DESC
-"""
 # ---------- CAC por projeto (Casa Nova > segmento > projeto, por cenário) ----------
 # Substituiu o antigo "Top 10 Projetos" (que contava OCs de
 # TB_ROLLOUT_ACESSO por PRIORIDADE). Hierarquia de 3 níveis, igual ao

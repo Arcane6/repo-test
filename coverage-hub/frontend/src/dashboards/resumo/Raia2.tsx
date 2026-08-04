@@ -1,13 +1,37 @@
 import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { summaryApi, type SummaryFilters } from "../../api/summary";
+import {
+  summaryApi,
+  type EnderecoPorTecnologiaResponse,
+  type EnderecoPorTecnologiaCenario,
+  type SummaryFilters,
+} from "../../api/summary";
 import { regionalDonutOption, stackedBarsOption } from "../../charts/optionBuilders";
 import { CacPorProjetoTable } from "../../components/CacPorProjetoTable";
 import { CacResumoTecnologia } from "../../components/CacResumoTecnologia";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
-export function Raia2({ filters }: { filters: SummaryFilters }) {
+interface Raia2Props {
+  filters: SummaryFilters;
+  // "Endereço por Tecnologia" e o cenário selecionado sobem pro
+  // ResumoDashboard (não mora mais aqui) — a Raia 3 (Meta NEXUS de
+  // Fornecedores EoY 26) precisa do MESMO cenário, ver CLAUDE.md.
+  endereco?: EnderecoPorTecnologiaResponse;
+  loadingEndereco: boolean;
+  cenarioAtual: string | null;
+  enderecoCenario?: EnderecoPorTecnologiaCenario;
+  onChangeCenario: (cenario: string) => void;
+}
+
+export function Raia2({
+  filters,
+  endereco,
+  loadingEndereco,
+  cenarioAtual,
+  enderecoCenario,
+  onChangeCenario,
+}: Raia2Props) {
   const { uf, municipio, ano, regionais, projetos, anfs, popUrbana } = filters;
   const { regional: focusedRegional, toggleRegional } = useResumoFocusStore();
 
@@ -20,16 +44,6 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
     queryKey: ["summary-r2-orcamento", uf, municipio, ano, regionais, projetos, anfs, popUrbana],
     queryFn: () => summaryApi.r2OrcamentoPorTecnologia(filters),
   });
-
-  // Responde a geo/ano (rateio por OC, igual Orçamento por Tecnologia) —
-  // o combo de cenário só troca o recorte já baixado, sem request novo.
-  const { data: endereco, isFetching: loadingEndereco } = useQuery({
-    queryKey: ["summary-r2-endereco", uf, municipio, ano, regionais, projetos, anfs, popUrbana],
-    queryFn: () => summaryApi.r2EnderecoPorTecnologia(filters),
-  });
-  const [cenarioEscolhido, setCenarioEscolhido] = useState<string | null>(null);
-  const cenarioAtual = cenarioEscolhido ?? endereco?.cenario_default ?? endereco?.cenarios[0]?.cenario ?? null;
-  const enderecoCenario = endereco?.cenarios.find((c) => c.cenario === cenarioAtual);
 
   // "CAC por Projeto" e o resumo "MBB Evolution + B2B IoT" ao lado
   // compartilham o mesmo cenário selecionado (estado aqui, não em cada
@@ -85,7 +99,7 @@ export function Raia2({ filters }: { filters: SummaryFilters }) {
                 className="form-select form-select-sm mb-1"
                 style={{ maxWidth: 220 }}
                 value={cenarioAtual ?? ""}
-                onChange={(e) => setCenarioEscolhido(e.target.value)}
+                onChange={(e) => onChangeCenario(e.target.value)}
                 aria-label="Cenário do CAC"
                 disabled={!endereco?.cenarios.length}
               >

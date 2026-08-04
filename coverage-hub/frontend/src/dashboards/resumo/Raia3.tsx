@@ -1,18 +1,26 @@
 import { useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { summaryApi, type SummaryFilters } from "../../api/summary";
+import { summaryApi, type EnderecoPorTecnologiaCenario, type SummaryFilters } from "../../api/summary";
 import { regionalSunburstOption, vendorDonutSideOption } from "../../charts/optionBuilders";
 import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 /** Fonte do nº de "Casa Nova a contratar" no donut de fornecedores:
  *  - rollout: TB_ROLLOUT_ACESSO deduplicado por endereço (responde aos filtros)
- *  - nexus:   meta TB_NEXUS_CN_CE (755 CN 4G + 245 CN 5G = 1000 nacional),
- *             rateada geograficamente pelo peso de OCs do rollout — também
- *             responde a UF/município/regional (ver R2_CASA_NOVA_NEXUS_RATEIO) */
+ *  - nexus:   soma das células "CN" (Casa Nova) de "Endereço por Tecnologia"
+ *             (4G + 5G) — MESMA base (VW_CAPEX_MASTER_FULL) e MESMO cenário
+ *             selecionado naquele card (ver ResumoDashboard.tsx). Antes vinha
+ *             de TB_NEXUS_CN_CE, uma base fixa sem cenário — trocado a
+ *             pedido do usuário (ago/26) pra sempre bater com "Endereço por
+ *             Tecnologia". */
 type CasaNovaFonte = "rollout" | "nexus";
 
-export function Raia3({ filters }: { filters: SummaryFilters }) {
+interface Raia3Props {
+  filters: SummaryFilters;
+  enderecoCenario?: EnderecoPorTecnologiaCenario;
+}
+
+export function Raia3({ filters, enderecoCenario }: Raia3Props) {
   const { uf, municipio, ano, regionais, projetos, anfs, popUrbana } = filters;
   const { regional: focusedRegional, toggleRegional } = useResumoFocusStore();
 
@@ -27,16 +35,17 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
   });
 
   const [cnFonte, setCnFonte] = useState<CasaNovaFonte>("rollout");
-  const { data: cnNexus } = useQuery({
-    queryKey: ["summary-r2-casa-nova-nexus", uf, municipio, ano, regionais, anfs, popUrbana],
-    queryFn: () => summaryApi.r2CasaNovaNexus(filters),
-  });
+  const metaNexusCn = (enderecoCenario?.series.find((s) => s.name === "CN")?.data ?? []).reduce(
+    (sum, v) => sum + v,
+    0,
+  );
 
-  // Com a fonte NEXUS, o valor da fatia "A Contratar" vira a meta nacional
-  // (o resto do donut — Base 25 por vendor — não muda de fonte).
+  // Com a fonte NEXUS, o valor da fatia "A Contratar" vira a meta do
+  // cenário selecionado (o resto do donut — Base 25 por vendor — não
+  // muda de fonte).
   const vendorSlices = (vendors ?? []).map((v) =>
-    cnFonte === "nexus" && v.label.toUpperCase().includes("A CONTRATAR") && cnNexus
-      ? { ...v, value: cnNexus.total }
+    cnFonte === "nexus" && v.label.toUpperCase().includes("A CONTRATAR") && enderecoCenario
+      ? { ...v, value: metaNexusCn }
       : v,
   );
 
@@ -81,12 +90,12 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
             subtitle={
               cnFonte === "rollout"
                 ? "Sites físicos · Base 25 + Casa Nova (endereços únicos do rollout)"
-                : "Sites físicos · Base 25 + Casa Nova (meta NEXUS, rateada pelo rollout)"
+                : "Sites físicos · Base 25 + Casa Nova (CN de Endereço por Tecnologia, mesmo cenário)"
             }
             sourceTable={
               cnFonte === "rollout"
                 ? ["BASE_TB_END_ID_NEW", "TB_ROLLOUT_ACESSO"]
-                : ["BASE_TB_END_ID_NEW", "TB_NEXUS_CN_CE", "TB_ROLLOUT_ACESSO"]
+                : ["BASE_TB_END_ID_NEW", "VW_CAPEX_MASTER_FULL"]
             }
             height={340}
             headerExtra={
@@ -103,7 +112,7 @@ export function Raia3({ filters }: { filters: SummaryFilters }) {
                   type="button"
                   className={`btn ${cnFonte === "nexus" ? "btn-primary" : "btn-outline-secondary"}`}
                   onClick={() => setCnFonte("nexus")}
-                  title="Meta NEXUS (TB_NEXUS_CN_CE) rateada geograficamente pelo peso de OCs do rollout — responde aos filtros"
+                  title="Casa Nova (CN) de 'Endereço por Tecnologia' — mesma base e cenário daquele card, 4G+5G somados"
                 >
                   Meta NEXUS
                 </button>
