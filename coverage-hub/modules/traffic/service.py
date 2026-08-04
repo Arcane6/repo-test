@@ -27,6 +27,7 @@ from modules.traffic.queries import (
     PLANEJADO_TOP_MUNICIPIOS,
     REALIZADO_POR_MUNICIPIO,
     REALIZADO_POR_MES,
+    CTP_TRAFEGO_TECNOLOGIAS,
 )
 
 # Ano do plano / fechamentos exibidos nas 3 raias do Resumo Executivo.
@@ -269,6 +270,71 @@ def _rz_por_tecnologia(mun_rows):
     return [{"label": k, "value": round(v, 4)} for k, v in buckets.items()]
 
 
+# ---------------------------------------------------------------------------
+# CTP (TB_TRAFEGO_TECNOLOGIAS_PB) — SÓ Fechamento 2025 (ago/26, pedido do
+# usuário)
+# ---------------------------------------------------------------------------
+#
+# TB_TRAFEGO_TECNOLOGIAS_PB ("a query do CTP") é o total NACIONAL oficial
+# de dez/25 por tecnologia — 1 linha, já em PB, sem UF/município. Vira a
+# fonte de verdade do TOTAL da Raia 1 (troca o total cru do REL_DS013), mas
+# como não tem dimensão geográfica, o REL_DS013 continua entrando — só pra
+# saber COMO distribuir esse total pelo país, proporcionalmente à própria
+# distribuição do REL_DS013 (mesmo princípio de rateio geográfico usado no
+# resto do portal: peso = fatia filtrada ÷ fatia SEM filtro, denominador
+# nunca filtra). Peso é calculado POR TECNOLOGIA (2G/3G/4G/5G
+# separadamente, não um peso único pro total) — uma cidade pode ter uma
+# distribuição de tecnologia bem diferente da média nacional.
+
+def _ctp_tecnologias_fechamento_2025():
+    """Totais nacionais oficiais de dez/25 por tecnologia (PB), direto de
+    TB_TRAFEGO_TECNOLOGIAS_PB — sem filtro geográfico (a tabela não tem
+    essa dimensão). `None` se a linha não existir (fallback pro cálculo
+    cru de sempre, ver `_rz_por_tecnologia_estratificado`)."""
+    mes_referencia = ANO_FECHAMENTO_ANTERIOR * 100 + 12  # ex.: 202512
+    rows = execute_query(CTP_TRAFEGO_TECNOLOGIAS, {"mes_referencia": mes_referencia}) or []
+    if not rows:
+        return None
+    r = rows[0]
+    return {
+        "2G": _num(r.get("vol_2g_pb")),
+        "3G": _num(r.get("vol_3g_pb")),
+        "4G": _num(r.get("vol_4g_pb")),
+        "5G": _num(r.get("vol_5g_pb")),
+    }
+
+
+def _rz_por_tecnologia_estratificado(mun_rows_filtrado, mun_rows_all, ctp):
+    """Fechamento 2025 (SÓ esta raia): pondera o total OFICIAL do CTP, por
+    tecnologia, pela distribuição geográfica do realizado (REL_DS013).
+
+        peso_tech = tráfego da tech DENTRO DO FILTRO (REL_DS013)
+                    ÷ tráfego da MESMA tech no Brasil inteiro (REL_DS013,
+                      SEM filtro — denominador nunca filtra)
+        valor_tech = peso_tech × total_oficial_da_tech (CTP)
+
+    Sem filtro geográfico ativo, peso_tech = 1.0 pra toda tecnologia (o
+    filtrado é igual ao nacional), então o resultado bate exatamente com
+    o CTP puro — é assim que os números batem com a fonte oficial quando
+    a tela está sem filtro.
+
+    Sem linha no CTP (`ctp is None`), cai pro cálculo cru de sempre (soma
+    direta do REL_DS013 filtrado) — nunca quebra a tela por falta de dado
+    no CTP."""
+    if not ctp:
+        return _rz_por_tecnologia(mun_rows_filtrado)
+
+    tec_filtrado = {t["label"]: t["value"] for t in _rz_por_tecnologia(mun_rows_filtrado)}
+    tec_all = {t["label"]: t["value"] for t in _rz_por_tecnologia(mun_rows_all)}
+
+    out = []
+    for tech in ("2G", "3G", "4G", "5G"):
+        total_brasil = tec_all.get(tech, 0.0)
+        peso = (tec_filtrado.get(tech, 0.0) / total_brasil) if total_brasil else 0.0
+        out.append({"label": tech, "value": round(peso * ctp.get(tech, 0.0), 4)})
+    return out
+
+
 def _rz_ranking_municipios(mun_rows, limit=15):
     ranked = sorted(
         ((r.get("municipio_nome") or "N/D", _rz_pb(r.get("mb_total"))) for r in mun_rows),
@@ -332,13 +398,23 @@ def get_resumo_executivo(filters):
     mes_max = max(rz26_mes) if rz26_mes else 0
 
     # --- Raia 1: Fechamento 2025 — mês de corte = dezembro/2025 ---
+    # Total/split por tecnologia ancorados no CTP (TB_TRAFEGO_TECNOLOGIAS_PB,
+    # oficial), estratificados geograficamente pela distribuição do REL_DS013
+    # — ver `_rz_por_tecnologia_estratificado`. SÓ esta raia; Plano 26 e
+    # Fechamento 26 continuam 100% REL_DS013/planejado, sem CTP.
     rz25_mun = _rz_municipio_rows(filters, ANO_FECHAMENTO_ANTERIOR, mes=12)
-    tec25 = _rz_por_tecnologia(rz25_mun)
+    rz25_mun_all = _rz_municipio_rows({}, ANO_FECHAMENTO_ANTERIOR, mes=12)  # sem filtro — denominador do rateio
+    ctp25 = _ctp_tecnologias_fechamento_2025()
+    tec25 = _rz_por_tecnologia_estratificado(rz25_mun, rz25_mun_all, ctp25)
+    trafego_pb_25 = round(sum(t["value"] for t in tec25), 4) if ctp25 else _rz_total(rz25_mun)
     fechamento_2025 = {
         "ano": ANO_FECHAMENTO_ANTERIOR,
-        "trafego_pb": _rz_total(rz25_mun),
+        "trafego_pb": trafego_pb_25,
         "por_tecnologia": tec25,
         "mix_5g_pct": _mix_5g_pct(tec25),
+        # Ranking de município continua cru (REL_DS013) — é uma comparação
+        # relativa entre cidades, não precisa (nem tem como, o CTP não tem
+        # município) ficar ancorado no total oficial.
         "ranking_municipios": _rz_ranking_municipios(rz25_mun),
     }
 
