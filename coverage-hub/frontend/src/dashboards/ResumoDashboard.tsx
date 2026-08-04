@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FilterBar } from "../components/FilterBar";
+import { summaryApi } from "../api/summary";
 import { useFilterStore } from "../store/filters";
 import { useResumoFocusStore } from "../store/resumoFocus";
 import { Raia1 } from "./resumo/Raia1";
@@ -27,6 +30,25 @@ export function ResumoDashboard() {
   };
   const hasFocus = Boolean(focusedTec || focusedRegional || focusedProjeto);
 
+  // "Endereço por Tecnologia" (card na Raia 2) e a fonte "Meta NEXUS" do
+  // donut "Fornecedores EoY 26" (Raia 3) usam a MESMA base (VW_CAPEX_
+  // MASTER_FULL) e o MESMO cenário selecionado — pedido do usuário
+  // (ago/26): a Meta NEXUS estava presa numa base antiga (TB_NEXUS_CN_CE,
+  // fixa, sem cenário) e devia acompanhar o que "Endereço por Tecnologia"
+  // já mostra, só filtrando pra Casa Nova (CN). Estado subido pro
+  // dashboard (não em cada raia) pra sincronizar as duas.
+  const { data: endereco, isFetching: loadingEndereco } = useQuery({
+    queryKey: [
+      "summary-r2-endereco",
+      filters.uf, filters.municipio, filters.ano, filters.regionais,
+      filters.projetos, filters.anfs, filters.popUrbana,
+    ],
+    queryFn: () => summaryApi.r2EnderecoPorTecnologia(filters),
+  });
+  const [cenarioEscolhido, setCenarioEscolhido] = useState<string | null>(null);
+  const cenarioAtual = cenarioEscolhido ?? endereco?.cenario_default ?? endereco?.cenarios[0]?.cenario ?? null;
+  const enderecoCenario = endereco?.cenarios.find((c) => c.cenario === cenarioAtual);
+
   return (
     <div className="tim-page-enter">
       <div className="mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -44,8 +66,15 @@ export function ResumoDashboard() {
       <FilterBar fields={["uf", "municipio", "regional", "anf", "populacaoUrbana"]} />
 
       <Raia1 filters={filters} />
-      <Raia2 filters={filters} />
-      <Raia3 filters={filters} />
+      <Raia2
+        filters={filters}
+        endereco={endereco}
+        loadingEndereco={loadingEndereco}
+        cenarioAtual={cenarioAtual}
+        enderecoCenario={enderecoCenario}
+        onChangeCenario={setCenarioEscolhido}
+      />
+      <Raia3 filters={filters} enderecoCenario={enderecoCenario} />
     </div>
   );
 }

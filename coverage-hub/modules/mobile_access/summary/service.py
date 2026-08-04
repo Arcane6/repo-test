@@ -24,7 +24,6 @@ from modules.mobile_access.summary.queries import (
     R1_VENDORS,
     R2_NEW_CITIES_BY_ANF,
     R2_VENDORS_NEW_SITES,
-    R2_CASA_NOVA_NEXUS_RATEIO,
     R2_CAC_POR_PROJETO,
     R2_ORCAMENTO_POR_TECNOLOGIA,
     R2_ENDERECO_POR_TECNOLOGIA,
@@ -443,30 +442,6 @@ def get_r2_vendors_new_sites(filters):
         color = VENDOR_COLORS_PLAN.get(name.upper(), "#888888")
         result.append({"label": name, "value": value, "color": color})
     return result
-
-
-def get_casa_nova_nexus(filters):
-    """Meta de Casa Nova do NEXUS (TB_NEXUS_CN_CE, TIPO_CASA='CN'): a
-    contagem-meta de endereços novos por tecnologia (4G 755 + 5G 245 = 1000),
-    rateada geograficamente pelo mesmo peso de OCs de Casa Nova do rollout
-    (ver R2_CASA_NOVA_NEXUS_RATEIO) — responde a UF/município/regional,
-    igual "Orçamento por Tecnologia"/"Endereço por Tecnologia"."""
-    params, ano_int = _prepare_params(filters)
-    params["ano"] = ano_int
-
-    sql = _apply_geo_all(
-        R2_CASA_NOVA_NEXUS_RATEIO, filters, params,
-        uf_field="g.UF", mun_field="g.MUNICIPIO",
-        uf_key="uf_filter_g", mun_key="municipio_filter_g",
-        regional_field="g.REGIONAL", regional_key="regional_filter_g",
-        anf_key="anf_filter_g", pop_key="pop_urbana_filter_g",
-    )
-    rows = execute_query(sql, params) or []
-    por_tech = [
-        {"tech": r.get("tech"), "qtd": int(round(r.get("qtd") or 0))}
-        for r in rows if r.get("tech")
-    ]
-    return {"total": sum(t["qtd"] for t in por_tech), "por_tech": por_tech}
 
 
 CASA_LABELS = {"CN": "Casa Nova", "CE": "Casa Existente"}

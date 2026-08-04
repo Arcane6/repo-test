@@ -175,28 +175,27 @@ ORDER BY UF
 """
 
 
-# Opções dos filtros globais novos (Regional/ANF) — mesmo princípio de
-# UFS_QUERY: lista de valores distintos da última carga, pra popular o
-# combo da FilterBar (compartilhada pelas 3 abas).
+# Opções dos filtros globais novos (Regional/ANF) — lista de valores
+# distintos pra popular o combo da FilterBar (compartilhada pelas 3
+# abas). Ao contrário de UFS_QUERY, NÃO restringe à última carga
+# (TRUNC(DT_CARGA) = MAX(DT_CARGA)): REGIONAL/ANF não vêm preenchidos em
+# 100% das linhas em toda carga (diferente de UF, que é sempre
+# obrigatório) — restringir à carga mais recente escondia valores reais
+# (achado pelo usuário: só 5 regionais apareciam no combo, quando
+# existem pelo menos 7-10). Como isso é só a lista de OPÇÕES de filtro
+# (não um dado agregado que precisa ser ponto-no-tempo), olhar pra tabela
+# inteira é seguro e pega qualquer valor que já apareceu em alguma carga.
 REGIONAIS_QUERY = """
 SELECT DISTINCT REGIONAL
 FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-WHERE TRUNC(DT_CARGA) = (
-    SELECT TRUNC(MAX(DT_CARGA))
-    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-)
-AND REGIONAL IS NOT NULL
+WHERE REGIONAL IS NOT NULL
 ORDER BY REGIONAL
 """
 
 ANFS_QUERY = """
 SELECT DISTINCT ANF
 FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-WHERE TRUNC(DT_CARGA) = (
-    SELECT TRUNC(MAX(DT_CARGA))
-    FROM NTW_OP.MUNICIPIOS_FECHAMENTO
-)
-AND ANF IS NOT NULL
+WHERE ANF IS NOT NULL
 ORDER BY ANF
 """
 
