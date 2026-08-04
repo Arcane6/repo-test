@@ -8,23 +8,23 @@ import { ChartPanel } from "../../components/ChartPanel";
 import { useResumoFocusStore } from "../../store/resumoFocus";
 
 export function Raia2({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano, regionais, projetos } = filters;
+  const { uf, municipio, ano, regionais, projetos, anfs, popUrbana } = filters;
   const { regional: focusedRegional, toggleRegional } = useResumoFocusStore();
 
   const { data: citiesAnf, isFetching: loadingCitiesAnf } = useQuery({
-    queryKey: ["summary-r2-cities-anf", uf, municipio, ano, regionais, projetos],
+    queryKey: ["summary-r2-cities-anf", uf, municipio, ano, regionais, projetos, anfs, popUrbana],
     queryFn: () => summaryApi.r2NewCitiesByAnf(filters),
   });
 
   const { data: orcamento, isFetching: loadingOrcamento } = useQuery({
-    queryKey: ["summary-r2-orcamento", uf, municipio, ano, regionais, projetos],
+    queryKey: ["summary-r2-orcamento", uf, municipio, ano, regionais, projetos, anfs, popUrbana],
     queryFn: () => summaryApi.r2OrcamentoPorTecnologia(filters),
   });
 
   // Responde a geo/ano (rateio por OC, igual Orçamento por Tecnologia) —
   // o combo de cenário só troca o recorte já baixado, sem request novo.
   const { data: endereco, isFetching: loadingEndereco } = useQuery({
-    queryKey: ["summary-r2-endereco", uf, municipio, ano, regionais, projetos],
+    queryKey: ["summary-r2-endereco", uf, municipio, ano, regionais, projetos, anfs, popUrbana],
     queryFn: () => summaryApi.r2EnderecoPorTecnologia(filters),
   });
   const [cenarioEscolhido, setCenarioEscolhido] = useState<string | null>(null);

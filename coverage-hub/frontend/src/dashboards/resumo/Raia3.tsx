@@ -13,22 +13,22 @@ import { useResumoFocusStore } from "../../store/resumoFocus";
 type CasaNovaFonte = "rollout" | "nexus";
 
 export function Raia3({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano, regionais, projetos } = filters;
+  const { uf, municipio, ano, regionais, projetos, anfs, popUrbana } = filters;
   const { regional: focusedRegional, toggleRegional } = useResumoFocusStore();
 
   const { data: citiesAnf, isFetching: loadingCitiesAnf } = useQuery({
-    queryKey: ["summary-r3-cities-anf", uf, municipio, ano, regionais],
+    queryKey: ["summary-r3-cities-anf", uf, municipio, ano, regionais, anfs, popUrbana],
     queryFn: () => summaryApi.r3NewCitiesByAnf(filters),
   });
 
   const { data: vendors, isFetching: loadingVendors } = useQuery({
-    queryKey: ["summary-r3-vendors", uf, municipio, ano, regionais, projetos],
+    queryKey: ["summary-r3-vendors", uf, municipio, ano, regionais, projetos, anfs, popUrbana],
     queryFn: () => summaryApi.r3Vendors(filters),
   });
 
   const [cnFonte, setCnFonte] = useState<CasaNovaFonte>("rollout");
   const { data: cnNexus } = useQuery({
-    queryKey: ["summary-r2-casa-nova-nexus", uf, municipio, ano, regionais],
+    queryKey: ["summary-r2-casa-nova-nexus", uf, municipio, ano, regionais, anfs, popUrbana],
     queryFn: () => summaryApi.r2CasaNovaNexus(filters),
   });
 

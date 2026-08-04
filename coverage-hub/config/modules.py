@@ -24,7 +24,7 @@ MODULES = [
         "url": "/transport/",
         "icon": "bi-diagram-3",
         "color": "#F5C518",
-        "enabled": False,
+        "enabled": True,
     },
     {
         "key": "orcamento",
