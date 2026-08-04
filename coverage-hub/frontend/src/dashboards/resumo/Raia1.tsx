@@ -19,7 +19,7 @@ const tecOptions = TECH_ORDER.map((t) => ({ value: t, label: t }));
 const FECHAMENTO_25_REF = "12/2025";
 
 export function Raia1({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano, regionais } = filters;
+  const { uf, municipio, ano, regionais, anfs, popUrbana } = filters;
   const { tecnologia: focusedTec, toggleTecnologia } = useResumoFocusStore();
   // Filtro local, só deste card — Resumo não tem filtro global de
   // tecnologia (ver CLAUDE.md), mas o usuário pediu especificamente aqui.
@@ -28,17 +28,17 @@ export function Raia1({ filters }: { filters: SummaryFilters }) {
   const multiStyles = themedSelectStyles<{ value: string; label: string }, true>();
 
   const { data: cities, isFetching: loadingCities } = useQuery({
-    queryKey: ["summary-r1-cities", uf, municipio, ano, regionais],
+    queryKey: ["summary-r1-cities", uf, municipio, ano, regionais, anfs, popUrbana],
     queryFn: () => summaryApi.r1CitiesByTech(filters),
   });
 
   const { data: vendors, isFetching: loadingVendors } = useQuery({
-    queryKey: ["summary-r1-vendors", uf, municipio, ano, regionais, vendorTecs],
+    queryKey: ["summary-r1-vendors", uf, municipio, ano, regionais, anfs, popUrbana, vendorTecs],
     queryFn: () => summaryApi.r1Vendors(vendorFilters),
   });
 
   const { data: hierarchy, isFetching: loadingHierarchy } = useQuery({
-    queryKey: ["summary-r1-sites-hierarchy", uf, municipio, ano, regionais],
+    queryKey: ["summary-r1-sites-hierarchy", uf, municipio, ano, regionais, anfs, popUrbana],
     queryFn: () => summaryApi.r1SitesHierarchy(filters),
   });
 

@@ -61,12 +61,12 @@ const fmt = (v: number) => v.toLocaleString("pt-BR");
  * própria base pra uma combinação não sobra o que comparar.
  */
 export function SitesComboChart({ filters }: { filters: SummaryFilters }) {
-  const { uf, municipio, ano, regionais, projetos } = filters;
+  const { uf, municipio, ano, regionais, projetos, anfs, popUrbana } = filters;
   const [selected, setSelected] = useState<string | null>(null);
   const instanceRef = useRef<echarts.ECharts | null>(null);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["summary-r1-sites-venn", uf, municipio, ano, regionais, projetos],
+    queryKey: ["summary-r1-sites-venn", uf, municipio, ano, regionais, projetos, anfs, popUrbana],
     queryFn: () => summaryApi.r1SitesVenn(filters),
   });
 

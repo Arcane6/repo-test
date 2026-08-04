@@ -1287,6 +1287,55 @@ Master". Todo o resto do checklist foi implementado.
     virar dez/26 etc.), atualizar a constante `FECHAMENTO_25_REF` em
     `Raia1.tsx` e o literal em `SitesComboChart.tsx` junto.
 
+## Bug: filtro de ANF/População Urbana no Resumo "seleciona mas não filtra" (ago/26)
+
+Usuário reportou que trocar SÓ o filtro de ANF ou de População Urbana no
+Resumo não mudava nada na tela — sem erro, sem combo vazio, só não
+refletia. Regional/UF/Município no mesmo Resumo funcionavam normalmente.
+
+**Causa raiz: bug de `queryKey` do React Query, não do backend.** Todo
+`useQuery` em `Raia1.tsx`/`Raia2.tsx`/`Raia3.tsx`/`SitesComboChart.tsx`
+desestruturava `filters` pra montar o `queryKey`
+(`const { uf, municipio, ano, regionais } = filters`), mas a
+desestruturação **não incluía `anfs`/`popUrbana`** — só foram
+adicionados ao objeto `filters` (e iam corretos pro `queryFn`), nunca ao
+array do `queryKey`. Resultado: ao trocar só ANF/População Urbana, o
+`queryKey` ficava idêntico ao de antes, e o React Query servia o cache
+existente sem nunca disparar o `queryFn` (logo, sem nunca mandar a
+request nova pro backend). O backend estava 100% correto desde
+jul/26 — confirmado reproduzindo com stub e vendo o histórico de
+requests HTTP: SEM o fix, só 1 request acontecia (a inicial); COM o
+fix, uma segunda request com `?anf=11` disparava ao trocar o combo.
+
+**Fix**: adicionar `anfs, popUrbana` na desestruturação de `filters` e
+no array de `queryKey` de TODO `useQuery` do Resumo que usa esses
+campos — exceto `summary-r2-cac-por-projeto` (CAC por Projeto/MBB
+Evolution), que continua sem nenhum filtro geo por design (nacional).
+
+**Lição pra qualquer `useQuery` novo neste módulo**: o `queryKey` tem
+que espelhar TODO campo do objeto de filtro que o `queryFn` realmente
+usa — nunca destructure um subconjunto "que parecia suficiente" na hora
+de escrever o card. Cidades e Sites (`VennDiagram.tsx`, `GaugeCards.tsx`,
+`TimelineChart.tsx`, `FrequencyChart.tsx`, `MunicipiosTable.tsx`,
+`SitesDashboard.tsx`, `SitesPivotTable.tsx`) já incluíam `anf`/
+`popUrbana` corretamente desde o início — só o Resumo tinha o bug,
+porque esses componentes foram escritos num commit anterior ao dos
+filtros novos e a desestruturação existente não foi revisitada quando
+`anfs`/`popUrbana` foram adicionados ao `SummaryFilters`.
+
+## Módulo Transporte reativado (ago/26)
+
+Estava com `enabled: False` em `config/modules.py`
+(`config/modules.py`), mas o módulo inteiro (backend `modules/transport/`
+— queries/service/routes — e frontend, rotas em `App.tsx`) já estava
+implementado e documentado neste arquivo há tempo. **Reativação foi só
+`enabled: True`** — nenhum código novo necessário. Validado com stub
+(Home mostra o card "Disponível", as 4 abas — Resumo Executivo,
+Composição & Migração, Infraestrutura & Fornecimento, Comparação de
+Bases — carregam sem erro de console, mapa Leaflet estrutura ok).
+⚠️ Números ainda não validados contra Oracle real (mesma ressalva de
+sempre neste sandbox) — primeira prioridade no próximo deploy.
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.
