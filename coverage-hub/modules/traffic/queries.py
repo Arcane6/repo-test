@@ -135,3 +135,23 @@ WHERE EXTRACT(YEAR FROM DT_REFERENCIA) = :ano
 {municipio_filter}
 GROUP BY EXTRACT(MONTH FROM DT_REFERENCIA)
 """
+
+
+# ---------- CTP — total OFICIAL de Fechamento 2025, por tecnologia ----------
+# TB_TRAFEGO_TECNOLOGIAS_PB ("a query do CTP"): 1 linha nacional por mês de
+# referência, já em PB, SEM município — o total oficial de tráfego de
+# dez/2025 por tecnologia (VOL_2G_PB..VOL_5G_PB, TOTAL_PB). Usado SÓ na
+# Raia 1 (Fechamento 2025): esse total substitui o total cru do realizado
+# (REL_DS013) como fonte de verdade, mas como a tabela não tem UF/
+# município, REL_DS013 continua entrando pra saber COMO distribuir esse
+# total pelo país (rateio proporcional — ver service.py,
+# `_rz_por_tecnologia_estratificado`). Filtra por MES_REFERENCIA explícito
+# (YYYYMM, ex.: 202512) em vez de MAX() — evita que uma carga futura de
+# outro mês (ex.: fechamento de 2026) troque silenciosamente qual linha
+# esta query usa; o mês vem de ANO_FECHAMENTO_ANTERIOR no service, sempre
+# o mesmo baseline que a Raia 1 já usa pra tudo o mais.
+CTP_TRAFEGO_TECNOLOGIAS = """
+SELECT VOL_2G_PB, VOL_3G_PB, VOL_4G_PB, VOL_5G_PB, TOTAL_PB
+FROM NTW_OP.TB_TRAFEGO_TECNOLOGIAS_PB
+WHERE MES_REFERENCIA = :mes_referencia
+"""

@@ -106,9 +106,11 @@ export function TrafegoResumoExecutivo() {
         </div>
         <div className="row g-3 mt-1">
           <div className="col-lg-5">
-            <ChartPanel title="Tráfego por Tecnologia" subtitle="Realizado Dez/2025 (PB)" sourceTable="REL_DS013_TRAFEGO_REALIZADO"
+            <ChartPanel title="Tráfego por Tecnologia" subtitle="Realizado Dez/2025 (PB)"
+              sourceTable={["TB_TRAFEGO_TECNOLOGIAS_PB", "REL_DS013_TRAFEGO_REALIZADO"]}
               height={300} option={donutOption(toDonut(f25?.por_tecnologia ?? []))} loading={loading}
-              imageFilename="trafego-2025-por-tecnologia.png" />
+              imageFilename="trafego-2025-por-tecnologia.png"
+              footnote="* Total oficial (CTP) distribuído geograficamente por tecnologia conforme o realizado — referência: fechamento dez/2025." />
           </div>
           <div className="col-lg-7">
             <ChartPanel title="Top 15 Municípios — Tráfego 2025" subtitle="Dezembro/2025 (PB)" sourceTable="REL_DS013_TRAFEGO_REALIZADO"

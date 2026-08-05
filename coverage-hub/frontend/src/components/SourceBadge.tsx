@@ -10,6 +10,8 @@ const TABLE_LABELS: Record<string, string> = {
   TB_NEXUS_CN_CE: "Nexus CN/CE",
   VW_CAPEX_MASTER_FULL: "Master (Nexus)",
   REL_CIDADES_PLANEJADO_26: "Plano Nominal de Municípios 5G",
+  TB_TRAFEGO_TECNOLOGIAS_PB: "CTP (Tráfego por Tecnologia)",
+  REL_DS013_TRAFEGO_REALIZADO: "Tráfego Realizado",
 };
 
 /** "31/12/2025" -> "12/2025" — usado quando o card só quer mês/ano, sem

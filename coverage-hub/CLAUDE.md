@@ -1406,6 +1406,75 @@ lógica foi validada só estruturalmente (SQL sem placeholder quebrado);
 confirmar no próximo deploy que o combo passa a listar as 7-10
 regionais esperadas.
 
+## Fechamento 2025 do Tráfego ancorado no CTP (`TB_TRAFEGO_TECNOLOGIAS_PB`) — ago/26
+
+Usuário trouxe uma tabela nova, `NTW_OP.TB_TRAFEGO_TECNOLOGIAS_PB`
+("a query do CTP"): **1 linha nacional** por `MES_REFERENCIA` (YYYYMM),
+já em PB, com o total oficial de tráfego por tecnologia
+(`VOL_2G_PB`..`VOL_5G_PB`, `TOTAL_PB`). Pediu pra Raia 1 (Fechamento
+2025) passar a usar esse total como fonte de verdade — mas como essa
+tabela **não tem município/UF**, o `REL_DS013_TRAFEGO_REALIZADO`
+continua entrando, só que agora só pra decidir **como distribuir**
+geograficamente o total oficial do CTP, não mais como a própria fonte do
+total.
+
+- **Padrão = mesmo rateio geográfico já usado em `mobile_access`**
+  (Orçamento por Tecnologia, Endereço por Tecnologia, a extinta Meta
+  NEXUS/`TB_NEXUS_CN_CE`): peso = subconjunto filtrado ÷ mesmo total SEM
+  filtro geográfico (denominador nunca filtra). Aqui é a primeira vez
+  que esse padrão aparece no módulo Tráfego — implementado em **Python**
+  (`_rz_por_tecnologia_estratificado`, `service.py`), não SQL/CTE, porque
+  o módulo inteiro já é "tudo calculado em Python a partir das linhas"
+  (ver docstring do módulo) — escolha deliberada de manter a
+  consistência com o estilo JÁ estabelecido NESTE módulo, em vez de
+  copiar cegamente a abordagem SQL do `mobile_access`.
+- **Peso calculado POR TECNOLOGIA, não um peso único**: a mistura de
+  tecnologia de uma região filtrada pode ser bem diferente da média
+  nacional (uma UF com mais 5G que a média, por exemplo), então usar um
+  peso único borraria essa diferença. `_ctp_tecnologias_fechamento_2025`
+  devolve o total oficial por tech; `_rz_por_tecnologia_estratificado`
+  calcula um peso separado pra cada uma de {2G, 3G, 4G, 5G} usando
+  `REL_DS013` (filtrado ÷ Brasil inteiro) e aplica esse peso ao valor
+  daquela tech no CTP.
+  - **Sem filtro geográfico ativo, o peso é exatamente 1.0 pra toda
+    tech** (filtrado = nacional) — o resultado bate 100% com o CTP puro,
+    que é como os números devem bater com a fonte oficial quando a tela
+    está sem filtro nenhum.
+- **`MES_REFERENCIA` filtrado explicitamente** (`ANO_FECHAMENTO_ANTERIOR
+  * 100 + 12` = 202512), nunca `MAX(MES_REFERENCIA)` — evita que uma
+  carga futura de outro mês (ex.: quando existir uma linha de fechamento
+  de 2026) troque silenciosamente qual linha esta query usa. Usa a MESMA
+  constante que o resto da Raia 1 já usa como baseline, então não pode
+  descasar.
+- **Fallback se o CTP não tiver linha pro mês** (`ctp is None`):
+  `_rz_por_tecnologia_estratificado` cai pro cálculo cru de sempre (soma
+  direta do `REL_DS013` filtrado, sem CTP) — nunca quebra a tela por
+  falta de dado nessa tabela nova.
+- **Escopo é SÓ a Raia 1 (Fechamento 2025)** — Plano 26 e Fechamento 26
+  continuam inteiramente `REL_DS013`/planejado, sem tocar no CTP (pedido
+  explícito do usuário: "SOMENTE PARA O QUE FOR FECHAMENTO 2025").
+- **`ranking_municipios` da Raia 1 continua cru** (`REL_DS013`, sem
+  estratificação) — é uma comparação relativa entre municípios, e o CTP
+  não tem dimensão de município pra ancorar uma cidade individual nele;
+  estratificar um ranking não faria sentido (o rateio serve pra
+  distribuir um TOTAL agregado, não pra corrigir posições relativas
+  entre linhas de uma mesma fonte).
+- **Frontend**: `ChartPanel` de "Tráfego por Tecnologia" (Raia 1) ganhou
+  `sourceTable={["TB_TRAFEGO_TECNOLOGIAS_PB", "REL_DS013_TRAFEGO_REALIZADO"]}`
+  (as duas fontes, já que o resultado é uma combinação das duas) + um
+  `footnote` explicando a metodologia. Os outros números da Raia 1
+  (KPI de tráfego total, top município/top 15) não mudaram de fonte —
+  só o donut de tecnologia usa a estratificação. `SourceBadge.TABLE_LABELS`
+  ganhou uma entrada pra `TB_TRAFEGO_TECNOLOGIAS_PB`.
+- ⚠️ **Não validado contra Oracle real** (sandbox sem conectividade,
+  como sempre) — a lógica foi validada com um stub Python (dados falsos
+  de CTP + município, casos sem filtro e com filtro de UF, matemática
+  conferida manualmente). Validar no primeiro deploy: (1) que a tabela
+  `NTW_OP.TB_TRAFEGO_TECNOLOGIAS_PB` realmente devolve 1 linha pra
+  `MES_REFERENCIA=202512`, (2) que o total sem filtro bate exatamente
+  com o TOTAL_PB da tabela, (3) que o total COM filtro geográfico é
+  plausível (não deveria nunca ultrapassar o total nacional).
+
 ## Git / PRs
 
 - O usuário mergeia PRs rapidamente, às vezes no meio de uma sessão.
