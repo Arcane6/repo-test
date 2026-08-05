@@ -448,8 +448,12 @@ e **Tráfego YTD** (planejado × realizado acumulado + aderência ao plano).
     100% é `{2G/3G, 4G, 5G}` (`CAMADAS_ADITIVAS`); "4G/5G" e "Consolidado"
     ficam de fora de qualquer pizza pra não dobrar.
   - **Planejado já vem em PB.** **Realizado vem em MB** →
-    converter pra PB dividindo por `1e9` (`MB_POR_PB`, decimal: 1 PB =
-    1e9 MB). As colunas por tecnologia do realizado **são aditivas**
+    converter pra PB dividindo por `1024³` (`MB_POR_PB`, **binário**: 1 PB
+    = 1024 GB = 1024² TB = 1024³ MB — **não** decimal/1e9; confirmado pelo
+    usuário, ago/26, que é assim que o "Tráfego Realizado" oficial trata
+    `S_MEGABYTE_TOTAL`. Constante corrigida de `1e9` pra `1024**3`; ver
+    seção "Conversão MB→PB do Realizado corrigida pra binário" abaixo).
+    As colunas por tecnologia do realizado **são aditivas**
     (`S_MEGABYTE_2G+3G+4G+5G_NSA+5G_SA = TOTAL`, confirmado).
   - **A OI pertence à TIM — NÃO existe market share.** O usuário foi
     explícito: OI não é concorrente, é da TIM. Então "tráfego realizado" =
@@ -801,7 +805,7 @@ consome token; se o token não existe, cria-se o token primeiro.
 | `TB_NEXUS_CN_CE` | Meta de Casa Nova | `CAC` com `TIPO_CASA='CN'` é a **contagem-meta de endereços novos** (4G 755 + 5G 245 = 1000) — fonte do toggle "Meta NEXUS" no donut Fornecedores EoY 26 (`/api/summary/r2/casa-nova-nexus`). É **nacional** (sem UF/regional) — não responde aos filtros, e o subtítulo do card avisa. **Não é mais** a fonte de "Endereço por Tecnologia" (ver `VW_CAPEX_MASTER_FULL` abaixo) — esse uso foi substituído. |
 | `VW_CAPEX_MASTER_FULL@NEXUS_LINK` | CAC total por tecnologia/tipo de casa/cenário — insumo do rateio geográfico de "Endereço por Tecnologia" (Raia 2, junto com `TB_ROLLOUT_ACESSO`) | Acesso via DB link `NEXUS_LINK`, sem schema prefix. Ver seção própria abaixo. |
 | `REL_TRAFEGO_CIDADES_WIDE` | Tráfego **planejado** (módulo Tráfego) | 1 linha por (município, `TIPO_TRAF`), 12 meses em COLUNAS (`JANEIRO`..`DEZEMBRO`), `ANO`. `TIPO_TRAF='Consolidado'` é o total (NÃO somar as camadas). Valores em **PB**. `MUNICIPIO_ID`=IBGE 6 díg. Versão `REL_TRAFEGO_CIDADES_LONG` tem os meses em linha |
-| `REL_DS013_TRAFEGO_REALIZADO` | Tráfego **realizado** + base de usuários (módulo Tráfego) | 1 linha por (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz TIM e OI → market share. `S_MEGABYTE_TOTAL` em MB (÷1e9 = PB); colunas por tec aditivas |
+| `REL_DS013_TRAFEGO_REALIZADO` | Tráfego **realizado** + base de usuários (módulo Tráfego) | 1 linha por (município, `OPERADORA`), snapshot mensal (`DT_REFERENCIA`). Traz TIM e OI → market share. `S_MEGABYTE_TOTAL` em MB (÷1024³ = PB, binário — ver seção própria abaixo); colunas por tec aditivas |
 | ~~`NTW_MABE.ALTAIA_PM_MES_4G/5G`~~ | ~~Volumetria RAN (módulo Core)~~ | **Descontinuada** — o módulo Core foi removido e substituído pelo módulo Tráfego quando a fonte mudou |
 
 ### `VW_CAPEX_MASTER_FULL@NEXUS_LINK` — integrada (CAC de "Endereço por Tecnologia")
@@ -1474,6 +1478,50 @@ total.
   `MES_REFERENCIA=202512`, (2) que o total sem filtro bate exatamente
   com o TOTAL_PB da tabela, (3) que o total COM filtro geográfico é
   plausível (não deveria nunca ultrapassar o total nacional).
+
+## Conversão MB→PB do Realizado corrigida pra binário (ago/26)
+
+Usuário descobriu (inspecionando como o "Tráfego Realizado" oficial é
+calculado por quem já trata esse dado) que a conversão de
+`S_MEGABYTE_TOTAL` (MB) pra PB usa a base **binária** (1024), não a
+decimal que a gente tinha assumido.
+
+- **Antes**: `MB_POR_PB = 1e9` (decimal: 1 PB = 1000³ MB = 1e9 MB) —
+  convenção de engenharia/telecom mais comum (SI), mas não é a que a
+  fonte oficial usa aqui.
+- **Agora**: `MB_POR_PB = 1024 ** 3` (binário: 1 PB = 1024 GB = 1024² TB
+  = 1024³ MB = 1.073.741.824 MB) — confirmado pelo usuário, é assim que
+  o "Tráfego Realizado" oficial trata `S_MEGABYTE_TOTAL`.
+- A diferença entre as duas bases é ~7,4% (1024³ ÷ 1e9 ≈ 1,0737) — ou
+  seja, **todo valor em PB derivado do realizado (REL_DS013) fica ~7,4%
+  MENOR** com a correção (dividir por um número maior dá um resultado
+  menor). Antes o app superestimava o tráfego realizado em PB por esse
+  fator.
+- **Onde isso afeta números na tela**:
+  - **Raia 3 (Fechamento 26)**: `trafego_mes_pb`, `por_tecnologia`,
+    `ranking_municipios`, `mix_5g_pct` — TODOS derivados do realizado
+    (REL_DS013) sem nenhum outro fator de correção. Todos ficam ~7,4%
+    menores.
+  - **Aba "Tráfego YTD"** (`get_ytd`): mesma coisa — acumulado e
+    aderência ao plano recalculam com o novo divisor.
+  - **Raia 1 (Fechamento 2025)**: `ranking_municipios` (Top
+    Município/Top 15) usa `_rz_pb` direto — muda. `trafego_pb` e
+    `por_tecnologia`, porém, **não mudam** quando o CTP tem linha pro
+    mês (`ctp is not None`): esses dois vêm do total oficial do CTP
+    (`TB_TRAFEGO_TECNOLOGIAS_PB`, já em PB, sem conversão nenhuma),
+    só **ponderado** pelo peso geográfico
+    (`_rz_por_tecnologia_estratificado`) — e esse peso é uma RAZÃO
+    entre dois valores que passam pela MESMA conversão MB→PB
+    (filtrado ÷ nacional), então `MB_POR_PB` se cancela
+    algebricamente na divisão e o peso não muda com a correção. Só o
+    fallback (`ctp is None`) fica sujeito à correção, igual as outras
+    raias.
+  - **Planejado (REL_TRAFEGO_CIDADES_WIDE)** já vem em PB direto do
+    Oracle — não tem conversão nenhuma, não é afetado.
+- ⚠️ **Não validado contra Oracle real** (mesma ressalva de sempre) —
+  a mudança é só trocar a constante `MB_POR_PB`, então o risco é baixo,
+  mas confirmar no próximo deploy que os números da Raia 3/YTD caem
+  ~7,4% e ficam batendo com a fonte oficial de referência do usuário.
 
 ## Git / PRs
 
