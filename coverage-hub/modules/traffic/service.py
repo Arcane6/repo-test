@@ -7,8 +7,10 @@ Regras de negócio (confirmadas com os dados):
   5G) se sobrepõem, então NUNCA somar as camadas pra obter total; usar
   'Consolidado'.
 - **Realizado** (REL_DS013_TRAFEGO_REALIZADO) vem em MB. Converte pra PB
-  dividindo por 1e9 (decimal: 1 PB = 1e9 MB). As colunas por tecnologia
-  são aditivas (2G+3G+4G+5G_NSA+5G_SA = TOTAL).
+  dividindo por 1024³ (binário: 1 PB = 1024 GB = 1024² TB = 1024³ MB —
+  é assim que o "Tráfego Realizado" oficial trata S_MEGABYTE_TOTAL,
+  confirmado pelo usuário; NÃO é o decimal 1e9). As colunas por
+  tecnologia são aditivas (2G+3G+4G+5G_NSA+5G_SA = TOTAL).
 - **Market share** = tráfego TIM / (TIM + OI), com o realizado (a fonte
   traz as duas operadoras).
 - **YTD** = acumulado de Janeiro até o mês corrente (o mês corrente é o
@@ -35,7 +37,7 @@ ANO_PLANO = 2026
 ANO_FECHAMENTO_ATUAL = 2026
 ANO_FECHAMENTO_ANTERIOR = 2025
 
-MB_POR_PB = 1e9  # decimal: 1 PB = 1e6 GB = 1e9 MB
+MB_POR_PB = 1024 ** 3  # binário: 1 PB = 1024 GB = 1024² TB = 1024³ MB — confirmado com o usuário (ago/26) que é assim que o "Tráfego Realizado" oficial (S_MEGABYTE_TOTAL) é tratado, não decimal (1e9)
 
 MESES_LABEL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 

@@ -22,7 +22,9 @@ tabelas Oracle, ambas por município:
   → dá pra calcular market share. Tráfego de dados em MB
   (S_MEGABYTE_*), aditivo por tecnologia (2G+3G+4G+5G_NSA+5G_SA = TOTAL,
   confirmado). Pra comparar com o planejado (PB), converter
-  MB→PB dividindo por 1e9 (decimal: 1 PB = 1e9 MB) — feito no service.
+  MB→PB dividindo por 1024³ (binário: 1 PB = 1024³ MB — é assim que o
+  "Tráfego Realizado" oficial trata S_MEGABYTE_TOTAL, NÃO decimal 1e9)
+  — feito no service.
 
 Placeholders de filtro geográfico ({uf_filter}/{municipio_filter}) e de
 tempo ({ano_filter}/{periodo_filter}) seguem o padrão introspectivo do
@@ -105,8 +107,9 @@ SELECT * FROM (
 #  - REALIZADO_POR_MES: uma linha por mês (12), só o total. Alimenta a
 #    curva de acompanhamento e descobre o mês corrente (YTD).
 #
-# Valores agregados voltam em MB (converter pra PB dividindo por 1e9 no
-# service). O split por tecnologia é aditivo (2G+3G+4G+5G = total).
+# Valores agregados voltam em MB (converter pra PB dividindo por 1024³ no
+# service — binário, não decimal, ver MB_POR_PB). O split por tecnologia
+# é aditivo (2G+3G+4G+5G = total).
 REALIZADO_POR_MUNICIPIO = """
 SELECT
     ESTADO,
